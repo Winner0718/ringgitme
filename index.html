@@ -37,8 +37,8 @@
   --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 16px rgba(0,0,0,.35);
   --shadow-lg:0 10px 34px rgba(0,0,0,.5);
 }}
-html{height:100%;height:-webkit-fill-available}
-body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Inter',sans-serif;background:var(--bg);color:var(--text);overflow:hidden;-webkit-font-smoothing:antialiased;height:100%;height:-webkit-fill-available}
+html{height:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Inter',sans-serif;background:var(--bg);color:var(--text);overflow:hidden;-webkit-font-smoothing:antialiased;height:100%}
 .app{position:relative;height:100%;width:100%;margin:0 auto;max-width:440px;display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
 
 /* ── LOCK SCREEN ── */
@@ -677,7 +677,7 @@ function render(){
   if(LOCK.state!=='unlocked'){renderLock();return;}
   const TABS=[{id:'home',i:'ti-home',l:'首页'},{id:'cards',i:'ti-credit-card',l:'卡片'},{id:'record',i:'ti-circle-plus',l:'记账'},{id:'history',i:'ti-calendar',l:'记录'},{id:'fixed',i:'ti-repeat',l:'固定'},{id:'aa',i:'ti-users',l:'AA'}];
   const TITLES={home:'RinggitMe',cards:'卡片管理',record:'收入 & 记账',history:'消费记录',fixed:'固定支出',aa:'AA 分账'};
-  const SUBS={home:'马来西亚理财 · 数据存本机 · v6',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
+  const SUBS={home:'马来西亚理财 · 数据存本机 · v7',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
   let content=U.tab==='home'?renderHome():U.tab==='cards'?renderCards():U.tab==='record'?renderRecord():U.tab==='history'?renderHistory():U.tab==='fixed'?renderFixed():renderAA();
   document.getElementById('app').innerHTML=`
     <div class="topbar">
