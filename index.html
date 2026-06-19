@@ -107,8 +107,8 @@ input,textarea,select{-webkit-user-select:text;user-select:text}
 .sv{font-size:20px;font-weight:800;letter-spacing:-.4px}
 .g{color:var(--green)}.r{color:var(--red)}.b{color:var(--blue)}.w{color:var(--orange)}.p{color:var(--purple)}
 
-.sec{font-size:12px;font-weight:700;color:var(--text2);letter-spacing:.01em;margin:20px 2px 10px;display:flex;justify-content:space-between;align-items:center}
-.sec-a{font-size:12px;color:var(--accent);cursor:pointer;font-weight:600;display:flex;align-items:center;gap:3px}
+.sec{font-size:12px;font-weight:600;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin:26px 2px 11px;display:flex;justify-content:space-between;align-items:center}
+.sec-a{font-size:12px;color:var(--accent);cursor:pointer;font-weight:600;display:flex;align-items:center;gap:3px;text-transform:none;letter-spacing:0}
 
 .card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:10px;box-shadow:var(--shadow)}
 .row{display:flex;align-items:center;gap:12px}
@@ -693,7 +693,7 @@ function render(){
   if(LOCK.state!=='unlocked'){renderLock();return;}
   const TABS=[{id:'home',i:'ti-home',l:'首页'},{id:'cards',i:'ti-credit-card',l:'卡片'},{id:'record',i:'ti-circle-plus',l:'记账'},{id:'history',i:'ti-calendar',l:'记录'},{id:'fixed',i:'ti-repeat',l:'固定'},{id:'aa',i:'ti-users',l:'AA'}];
   const TITLES={home:'RinggitMe',cards:'卡片管理',record:'收入 & 记账',history:'消费记录',fixed:'固定支出',aa:'AA 分账'};
-  const SUBS={home:'马来西亚理财 · 数据存本机 · v14',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
+  const SUBS={home:'马来西亚理财 · 数据存本机 · v15',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
   // preserve scroll on same-tab re-render (no more jumping to top on every tap); fade only on tab switch
   const tabChanged=U.tab!==_lastRenderedTab;
   const prevContent=document.querySelector('.content');
