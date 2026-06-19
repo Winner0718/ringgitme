@@ -38,7 +38,14 @@
   --shadow-lg:0 10px 34px rgba(0,0,0,.5);
 }}
 html{height:100%}
-body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Inter',sans-serif;background:var(--bg);color:var(--text);overflow:hidden;-webkit-font-smoothing:antialiased;height:100%}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Inter',sans-serif;background:var(--bg);color:var(--text);overflow:hidden;-webkit-font-smoothing:antialiased;height:100%;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;font-variant-numeric:tabular-nums;font-feature-settings:'tnum' 1;text-rendering:optimizeLegibility}
+input,textarea,select{-webkit-user-select:text;user-select:text}
+/* unified press feedback — gives every tappable element real "手感" */
+.card,.acct,.fav-row,.po,.pill,.cat-btn,.ig-item,.mode-card,.btn,.mini,.t-ic,.add-btn,.ma button,.ni,.sec-a,.cc-acts .btn,.cdot,.pin-key,.face-btn{transition:transform .13s cubic-bezier(.2,.8,.2,1),background .16s ease,border-color .16s ease,opacity .13s ease,box-shadow .16s ease}
+.fav-row:active,.po:active,.cat-btn:active,.mode-card:active,.acct:active,.sec-a:active{transform:scale(.975)}
+.ni:active{transform:scale(.88);opacity:.6}
+@keyframes contentIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.content.tabfade{animation:contentIn .28s cubic-bezier(.2,.85,.25,1)}
 .app{position:relative;height:100%;width:100%;margin:0 auto;max-width:440px;display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
 
 /* ── LOCK SCREEN ── */
@@ -73,14 +80,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Inter',sans-
 .t-ic i{font-size:19px;color:var(--text2)}
 .t-ic:active{transform:scale(.94)}
 
-.content{flex:1;overflow-y:auto;padding:6px 16px calc(var(--safe-bot) + 96px);-webkit-overflow-scrolling:touch}
+.content{flex:1;overflow-y:auto;padding:6px 16px calc(var(--safe-bot) + 96px);-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 
 /* ── BOTTOM NAV ── */
 .nav{position:absolute;bottom:0;left:0;right:0;display:flex;background:var(--bg2);background:color-mix(in srgb,var(--bg2) 88%,transparent);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid var(--border);padding:8px 6px calc(var(--safe-bot) + 8px);justify-content:space-around}
 .ni{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;color:var(--text3);cursor:pointer;padding:6px 4px;border:none;background:none;flex:1;font-weight:600;transition:color .15s}
 .ni i{font-size:23px;transition:transform .15s}
 .ni.on{color:var(--accent)}
-.ni.on i{transform:translateY(-1px)}
+.ni.on i{transform:translateY(-2px) scale(1.06)}
 
 /* ── HERO ── */
 .hero{position:relative;border-radius:var(--rx);padding:20px 20px 18px;color:#fff;overflow:hidden;margin:8px 0 14px;background:linear-gradient(135deg,#1e2a52,#3b2a6b 55%,#5b2a72);box-shadow:0 12px 30px rgba(30,42,82,.35)}
@@ -89,9 +96,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Inter',sans-
 .hero-l{font-size:12px;opacity:.78;font-weight:600;letter-spacing:.04em;position:relative}
 .hero-v{font-size:34px;font-weight:800;letter-spacing:-1px;margin:5px 0 14px;position:relative}
 .hero-row{display:flex;gap:10px;position:relative}
-.hero-stat{flex:1;background:rgba(255,255,255,.12);border-radius:13px;padding:9px 11px;backdrop-filter:blur(4px)}
+.hero-stat{flex:1;min-width:0;background:rgba(255,255,255,.12);border-radius:13px;padding:9px 10px;backdrop-filter:blur(4px)}
 .hero-sl{font-size:10.5px;opacity:.8;margin-bottom:2px}
-.hero-sv{font-size:15px;font-weight:700;letter-spacing:-.3px}
+.hero-sv{font-size:14px;font-weight:700;letter-spacing:-.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* ── STAT GRID ── */
 .sg{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px}
@@ -123,13 +130,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Inter',sans-
 .cc-acts{display:flex;gap:7px;margin:-3px 0 11px}
 
 /* ── ACCOUNT ROW (saving / ew) ── */
-.acct{display:flex;align-items:center;gap:12px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:13px 14px;margin-bottom:10px;box-shadow:var(--shadow)}
+.acctcard{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:10px;box-shadow:var(--shadow)}
+.acct-top{display:flex;align-items:center;gap:12px}
 .acct-m{flex:1;min-width:0}
-.acct-n{font-size:14.5px;font-weight:650}
-.acct-s{font-size:11.5px;color:var(--text3);margin-top:2px}
-.acct-b{text-align:right;flex-shrink:0}
-.acct-v{font-size:17px;font-weight:800;letter-spacing:-.3px}
-.acct-acts{display:flex;gap:7px;margin-left:8px}
+.acct-n{font-size:15px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acct-s{font-size:11.5px;color:var(--text3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acct-b{text-align:right;flex-shrink:0;padding-left:8px}
+.acct-v{font-size:18px;font-weight:800;letter-spacing:-.3px}
+.acct-acts{display:flex;gap:8px;margin-top:13px}
 .mini{width:34px;height:34px;border-radius:11px;border:1px solid var(--border2);background:var(--bg2);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text2);flex-shrink:0}
 .mini i{font-size:16px}
 .mini:active{transform:scale(.92)}
@@ -173,7 +181,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Inter',sans-
 .md-ic i{font-size:19px}
 .field{margin-bottom:15px}
 .field label{display:block;font-size:12px;color:var(--text2);margin-bottom:7px;font-weight:650}
-.field input,.field select,.field textarea{width:100%;border-radius:12px;border:1.5px solid var(--border2);padding:13px 14px;font-size:15px;color:var(--text);background:var(--bg3);outline:none;-webkit-appearance:none;font-family:inherit}
+.field input,.field select,.field textarea{width:100%;border-radius:12px;border:1.5px solid var(--border2);padding:13px 14px;font-size:16px;color:var(--text);background:var(--bg3);outline:none;-webkit-appearance:none;font-family:inherit}
 .field input:focus,.field select:focus{border-color:var(--accent);background:var(--bg2)}
 .field input.big{font-size:26px;font-weight:800;letter-spacing:-.5px}
 .field-row{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
@@ -397,7 +405,9 @@ function iconHTML(spec,size=38,radius=12){
 const itemIcon=(obj,size,radius)=>iconHTML(obj&&obj.img?{img:obj.img}:gi(obj?obj.iconId:'star'),size,radius);
 
 let _tt;
-function toast(msg){clearTimeout(_tt);const o=document.getElementById('_t');if(o)o.remove();const el=document.createElement('div');el.id='_t';el.className='toast';el.textContent=msg;document.getElementById('app').appendChild(el);_tt=setTimeout(()=>el.remove(),2200);}
+// light haptic — buzzes on Android; iOS ignores silently (harmless)
+function haptic(ms){try{if(navigator.vibrate)navigator.vibrate(ms||8);}catch(e){}}
+function toast(msg){clearTimeout(_tt);haptic(12);const o=document.getElementById('_t');if(o)o.remove();const el=document.createElement('div');el.id='_t';el.className='toast';el.textContent=msg;document.getElementById('app').appendChild(el);_tt=setTimeout(()=>el.remove(),2200);}
 
 // ══════════════════════════════════════════════════════
 // LOCK SCREEN LOGIC  (auto-prompts Face ID ONCE — no loop)
@@ -507,7 +517,7 @@ function buildPinPad(){
 // MAIN APP
 // ══════════════════════════════════════════════════════
 const closeModal=()=>{U.modal=null;U.selIconId=null;U.selCustomImg=null;U.selCatId=null;U.selPayId=null;U.selSavId=null;U.selPaidBy='me';U.selSplit=2;U.editId=null;U.activePersonId=null;U.activeEditTxnId=null;U._presel=false;render();};
-const setTab=t=>{U.tab=t;U.modal=null;U.expandedId=null;render();};
+const setTab=t=>{if(t!==U.tab)haptic();U.tab=t;U.modal=null;U.expandedId=null;render();};
 const openModal=(m,ex={})=>{U.modal=m;U.selIconId=null;U.selCustomImg=null;Object.assign(U,ex);U.selColor=ex.selColor||COLORS[0];U._presel=false;render();};
 const toggle=id=>{U.expandedId=U.expandedId===id?null:id;render();};
 const sIcon=id=>{U.selIconId=id;U.selCustomImg=null;render();};
@@ -615,7 +625,7 @@ function renderHome(){
   if(D.incomeMode==='fullcomm'&&(totalSub+totalLoan)>0)h+=`<div class="ib w"><i class="ti ti-target-arrow"></i>本月固定开销 ${fmtR(totalSub+totalLoan)}，至少要赚这么多才 cover。</div>`;
   h+=`<div class="sec">收藏快捷 <span class="sec-a" onclick="setTab('record')"><i class="ti ti-plus" style="font-size:13px"></i>去记账</span></div>`;
   if(!D.favs.length)h+=`<div class="empty"><div class="empty-ic"><i class="ti ti-star"></i></div><div class="et">还没有收藏</div><div class="es">记账时勾选「存为收藏」<br>下次一键就能记</div></div>`;
-  else D.favs.forEach(f=>{const card=f.payId?D.cards.find(c=>c.id===f.payId):null;h+=`<div class="fav-row" onclick="useFav(${f.id})"><div class="fav-ic"><i class="ti ${f.catIcon||'ti-receipt'}"></i></div><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.name}</div><div style="font-size:11.5px;color:var(--text3)">${f.catLabel}${card?' · '+card.name:''}</div></div><div style="display:flex;align-items:center;gap:9px"><span style="font-size:15px;font-weight:800;color:var(--red)">${fmt(f.amt)}</span><span class="tap-badge">一键</span><i class="ti ti-x" onclick="event.stopPropagation();delFav(${f.id})" style="font-size:18px;color:var(--text3)"></i></div></div>`;});
+  else D.favs.forEach(f=>{const card=f.payId?D.cards.find(c=>c.id===f.payId):null;h+=`<div class="fav-row" onclick="useFav(${f.id})"><div class="fav-ic"><i class="ti ${f.catIcon||'ti-receipt'}"></i></div><div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.name}</div><div style="font-size:11.5px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${f.catLabel}${card?' · '+card.name:''}</div></div><div style="display:flex;align-items:center;gap:9px;flex-shrink:0"><span style="font-size:15px;font-weight:800;color:var(--red)">${fmt(f.amt)}</span><span class="tap-badge">一键</span><i class="ti ti-x" onclick="event.stopPropagation();delFav(${f.id})" style="font-size:18px;color:var(--text3)"></i></div></div>`;});
   if(D.txns.length){h+=`<div class="sec">最近记录 <span class="sec-a" onclick="setTab('history')">全部 →</span></div><div class="card">`;D.txns.slice(0,5).forEach(t=>{h+=`<div class="txn"><div class="txn-ic"><i class="ti ${t.catIcon||'ti-receipt'}"></i></div><div class="txn-m"><div class="txn-n">${t.desc||t.catLabel}</div><div class="txn-s">${t.catLabel}${t.payName?' · '+t.payName:''} · ${t.date}</div></div><div class="txn-a r">−${fmt(t.amt)}</div></div>`;});h+=`</div>`;}
   return h;
 }
@@ -626,10 +636,10 @@ function renderCards(){
   ccs.forEach(c=>{const p=pct(c.owed,c.limit);const g1=shade(c.color,1.05),g2=shade(c.color,0.62);h+=`<div class="cc" style="background:linear-gradient(135deg,${g1},${g2})"><div class="cc-top"><div>${itemIcon(c,40,12)}</div><div style="text-align:right"><div class="cc-name">${c.name}</div><div class="cc-due">结单日 ${c.dueDay} 号 · 额度 ${fmt(c.limit)}</div></div></div><div class="cc-owed-l">当前欠额</div><div class="cc-owed">${fmt(c.owed)}</div><div class="cc-bar"><i style="width:${p}%"></i></div><div class="cc-foot"><span>已用 ${p}%</span><span>${fmt(c.owed)} / ${fmt(c.limit)}</span></div></div><div class="cc-acts"><button class="btn pay" onclick="openModal('pay',{editId:${c.id}})"><i class="ti ti-arrow-up"></i>还款</button><button class="btn spd" onclick="openModal('spend',{selPayId:${c.id}})"><i class="ti ti-plus"></i>记消费</button><button class="btn del" onclick="delCard(${c.id})"><i class="ti ti-trash"></i></button></div>`;});
   h+=`<div class="sec">储蓄账户 <span class="sec-a" onclick="openModal('addsaving')"><i class="ti ti-plus" style="font-size:13px"></i>添加</span></div>`;
   if(!savs.length)h+=`<div class="empty"><div class="empty-ic"><i class="ti ti-building-bank"></i></div><div class="et">还没有储蓄账户</div></div>`;
-  savs.forEach(c=>{h+=`<div class="acct">${itemIcon(c,44,13)}<div class="acct-m"><div class="acct-n">${c.name}</div><div class="acct-s">储蓄账户</div></div><div class="acct-b"><div class="acct-v g">${fmt(c.balance)}</div></div><div class="acct-acts"><button class="mini g" onclick="openModal('topup',{editId:${c.id}})" title="入账"><i class="ti ti-plus"></i></button><button class="mini del" onclick="delCard(${c.id})"><i class="ti ti-trash"></i></button></div></div>`;});
+  savs.forEach(c=>{h+=`<div class="acctcard"><div class="acct-top">${itemIcon(c,44,13)}<div class="acct-m"><div class="acct-n">${c.name}</div><div class="acct-s">储蓄账户</div></div><div class="acct-b"><div class="acct-v g">${fmt(c.balance)}</div></div></div><div class="acct-acts"><button class="btn topup" onclick="openModal('topup',{editId:${c.id}})"><i class="ti ti-plus"></i>入账</button><button class="btn del" onclick="delCard(${c.id})"><i class="ti ti-trash"></i>删除</button></div></div>`;});
   h+=`<div class="sec">电子钱包 <span class="sec-a" onclick="openModal('addew')"><i class="ti ti-plus" style="font-size:13px"></i>添加</span></div>`;
   if(!ews.length)h+=`<div class="empty"><div class="empty-ic"><i class="ti ti-wallet"></i></div><div class="et">还没有电子钱包</div></div>`;
-  ews.forEach(c=>{h+=`<div class="acct">${itemIcon(c,44,13)}<div class="acct-m"><div class="acct-n">${c.name}</div><div class="acct-s">eWallet</div></div><div class="acct-b"><div class="acct-v w">${fmt(c.balance)}</div></div><div class="acct-acts"><button class="mini w" onclick="openModal('ewtopup',{editId:${c.id}})" title="充值"><i class="ti ti-bolt"></i></button><button class="mini" onclick="openModal('spend',{selPayId:${c.id}})" title="记消费"><i class="ti ti-plus"></i></button><button class="mini del" onclick="delCard(${c.id})"><i class="ti ti-trash"></i></button></div></div>`;});
+  ews.forEach(c=>{h+=`<div class="acctcard"><div class="acct-top">${itemIcon(c,44,13)}<div class="acct-m"><div class="acct-n">${c.name}</div><div class="acct-s">eWallet</div></div><div class="acct-b"><div class="acct-v w">${fmt(c.balance)}</div></div></div><div class="acct-acts"><button class="btn spd" onclick="openModal('ewtopup',{editId:${c.id}})"><i class="ti ti-bolt"></i>充值</button><button class="btn pay" onclick="openModal('spend',{selPayId:${c.id}})"><i class="ti ti-plus"></i>记消费</button><button class="btn del" onclick="delCard(${c.id})"><i class="ti ti-trash"></i></button></div></div>`;});
   return h;
 }
 function renderRecord(){
@@ -652,7 +662,7 @@ function renderFixed(){
   if(totalSub+totalLoan>0)h+=`<div class="sc" style="margin-bottom:14px"><div class="sl">月固定总支出</div><div class="sv r" style="font-size:24px">${fmt(totalSub+totalLoan)}</div></div>`;
   h+=`<div class="sec">订阅 Subscriptions <span class="sec-a" onclick="openModal('addsub')"><i class="ti ti-plus" style="font-size:13px"></i>添加</span></div>`;
   if(!D.subs.length)h+=`<div class="empty"><div class="empty-ic"><i class="ti ti-repeat"></i></div><div class="et">还没有订阅</div></div>`;
-  D.subs.forEach(s=>{h+=`<div class="acct">${itemIcon(s,44,13)}<div class="acct-m"><div class="acct-n">${s.name}</div><div class="acct-s">每月 ${s.day} 号扣款</div></div><div class="acct-b"><div class="acct-v b">${fmt(s.amt)}</div><div style="font-size:10.5px;color:var(--text3)">/ 月</div></div><div class="acct-acts"><button class="mini del" onclick="delSub(${s.id})"><i class="ti ti-trash"></i></button></div></div>`;});
+  D.subs.forEach(s=>{h+=`<div class="acctcard"><div class="acct-top">${itemIcon(s,44,13)}<div class="acct-m"><div class="acct-n">${s.name}</div><div class="acct-s">每月 ${s.day} 号扣款</div></div><div class="acct-b"><div class="acct-v b">${fmt(s.amt)}</div><div style="font-size:10.5px;color:var(--text3)">/ 月</div></div><button class="mini del" onclick="delSub(${s.id})" style="margin-left:10px"><i class="ti ti-trash"></i></button></div></div>`;});
   h+=`<div class="sec">贷款 / 租金 <span class="sec-a" onclick="openModal('addloan')"><i class="ti ti-plus" style="font-size:13px"></i>添加</span></div>`;
   if(!D.loans.length)h+=`<div class="empty"><div class="empty-ic"><i class="ti ti-home"></i></div><div class="et">还没有贷款记录</div></div>`;
   D.loans.forEach(l=>{const p=l.total>0?pct(l.total-l.remaining,l.total):0;h+=`<div class="card"><div class="row">${iconHTML(gi(l.iconId||'loan'),42,12)}<div class="name">${l.name}</div><span class="badge bloan">${l.type.split(' ')[0]}</span></div><div class="dg"><div class="db"><div class="dl">月供</div><div class="dv r">${fmt(l.monthly)}</div></div><div class="db"><div class="dl">还款日</div><div class="dv">${l.dueDay} 号</div></div>${l.remaining?`<div class="db" style="grid-column:span 2"><div class="dl">剩余贷款</div><div class="dv">${fmt(l.remaining)}</div></div>`:''}</div>${l.total>0&&l.remaining?`<div class="prog"><div class="pl"><span>已还 ${p}%</span><span>剩 ${fmt(l.remaining)}</span></div><div class="pt"><div class="pf" style="width:${p}%;background:${l.color}"></div></div></div>`:''}<div class="acts"><button class="btn del" onclick="delLoan(${l.id})"><i class="ti ti-trash"></i>删除</button></div></div>`;});
@@ -673,11 +683,16 @@ function renderAA(){
   return h;
 }
 
+let _lastRenderedTab=null;
 function render(){
   if(LOCK.state!=='unlocked'){renderLock();return;}
   const TABS=[{id:'home',i:'ti-home',l:'首页'},{id:'cards',i:'ti-credit-card',l:'卡片'},{id:'record',i:'ti-circle-plus',l:'记账'},{id:'history',i:'ti-calendar',l:'记录'},{id:'fixed',i:'ti-repeat',l:'固定'},{id:'aa',i:'ti-users',l:'AA'}];
   const TITLES={home:'RinggitMe',cards:'卡片管理',record:'收入 & 记账',history:'消费记录',fixed:'固定支出',aa:'AA 分账'};
-  const SUBS={home:'马来西亚理财 · 数据存本机 · v10',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
+  const SUBS={home:'马来西亚理财 · 数据存本机 · v11',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
+  // preserve scroll on same-tab re-render (no more jumping to top on every tap); fade only on tab switch
+  const tabChanged=U.tab!==_lastRenderedTab;
+  const prevContent=document.querySelector('.content');
+  const keepScroll=(prevContent&&!tabChanged)?prevContent.scrollTop:0;
   let content=U.tab==='home'?renderHome():U.tab==='cards'?renderCards():U.tab==='record'?renderRecord():U.tab==='history'?renderHistory():U.tab==='fixed'?renderFixed():renderAA();
   document.getElementById('app').innerHTML=`
     <div class="topbar">
@@ -687,9 +702,12 @@ function render(){
         <div class="t-ic" onclick="lockApp()" title="锁定"><i class="ti ti-lock"></i></div>
       </div>
     </div>
-    <div class="content">${content}</div>
+    <div class="content${tabChanged?' tabfade':''}">${content}</div>
     <div class="nav">${TABS.map(t=>`<button class="ni ${U.tab===t.id?'on':''}" onclick="setTab('${t.id}')"><i class="ti ${t.i}"></i>${t.l}</button>`).join('')}</div>
     ${buildModal()}`;
+  const newContent=document.querySelector('.content');
+  if(newContent&&keepScroll)newContent.scrollTop=keepScroll;
+  _lastRenderedTab=U.tab;
 }
 
 // ── START ──
