@@ -677,7 +677,7 @@ function render(){
   if(LOCK.state!=='unlocked'){renderLock();return;}
   const TABS=[{id:'home',i:'ti-home',l:'首页'},{id:'cards',i:'ti-credit-card',l:'卡片'},{id:'record',i:'ti-circle-plus',l:'记账'},{id:'history',i:'ti-calendar',l:'记录'},{id:'fixed',i:'ti-repeat',l:'固定'},{id:'aa',i:'ti-users',l:'AA'}];
   const TITLES={home:'RinggitMe',cards:'卡片管理',record:'收入 & 记账',history:'消费记录',fixed:'固定支出',aa:'AA 分账'};
-  const SUBS={home:'马来西亚理财 · 数据存本机 · v7',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
+  const SUBS={home:'马来西亚理财 · 数据存本机 · v8',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
   let content=U.tab==='home'?renderHome():U.tab==='cards'?renderCards():U.tab==='record'?renderRecord():U.tab==='history'?renderHistory():U.tab==='fixed'?renderFixed():renderAA();
   document.getElementById('app').innerHTML=`
     <div class="topbar">
@@ -691,6 +691,33 @@ function render(){
     <div class="nav">${TABS.map(t=>`<button class="ni ${U.tab===t.id?'on':''}" onclick="setTab('${t.id}')"><i class="ti ${t.i}"></i>${t.l}</button>`).join('')}</div>
     ${buildModal()}`;
 }
+
+// ── TEMP 调试条：读出手机真实数值，定位底部黑边 ──
+function debugHUD(){
+  var probe=document.getElementById('_sab');
+  if(!probe){probe=document.createElement('div');probe.id='_sab';probe.style.cssText='position:fixed;bottom:0;left:0;width:1px;height:env(safe-area-inset-bottom);pointer-events:none';document.body.appendChild(probe);}
+  var topProbe=document.getElementById('_sat');
+  if(!topProbe){topProbe=document.createElement('div');topProbe.id='_sat';topProbe.style.cssText='position:fixed;top:0;left:0;width:1px;height:env(safe-area-inset-top);pointer-events:none';document.body.appendChild(topProbe);}
+  var app=document.querySelector('.app'),nav=document.querySelector('.nav');
+  var ar=app?app.getBoundingClientRect():{},nr=nav?nav.getBoundingClientRect():{};
+  var vv=window.visualViewport;
+  var sab=Math.round(probe.getBoundingClientRect().height),sat=Math.round(topProbe.getBoundingClientRect().height);
+  var lines=[
+    'standalone:'+(window.navigator.standalone===true)+'/'+(matchMedia('(display-mode:standalone)').matches),
+    'innerH:'+window.innerHeight+'  screen.h:'+screen.height+'  avail:'+screen.availHeight,
+    'docClientH:'+document.documentElement.clientHeight,
+    'visualVP.h:'+(vv?Math.round(vv.height):'-')+'  vv.top:'+(vv?Math.round(vv.offsetTop):'-'),
+    'safeTop:'+sat+'  safeBot:'+sab,
+    'app.h:'+Math.round(ar.height||0)+'  app.bottom:'+Math.round(ar.bottom||0),
+    'nav.bottom:'+Math.round(nr.bottom||0)+'  gapBelowNav:'+Math.round(window.innerHeight-(nr.bottom||0))
+  ];
+  var hud=document.getElementById('_hud');
+  if(!hud){hud=document.createElement('div');hud.id='_hud';hud.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:rgba(0,0,0,.88);color:#3f6;font:10px/1.4 ui-monospace,monospace;padding:5px 7px;white-space:pre;pointer-events:none';document.body.appendChild(hud);}
+  hud.textContent=lines.join('\n');
+}
+setTimeout(debugHUD,300);
+window.addEventListener('resize',()=>setTimeout(debugHUD,50));
+if(window.visualViewport){window.visualViewport.addEventListener('resize',()=>setTimeout(debugHUD,50));}
 
 // ── START ──
 initSecurity();
