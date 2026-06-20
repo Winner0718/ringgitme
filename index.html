@@ -6,13 +6,16 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
 <meta name="apple-mobile-web-app-title" content="RinggitMe"/>
-<meta name="theme-color" content="#0e1116" media="(prefers-color-scheme:dark)"/>
-<meta name="theme-color" content="#f4f5f7" media="(prefers-color-scheme:light)"/>
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme:dark)"/>
+<meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme:light)"/>
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
 <meta http-equiv="Pragma" content="no-cache"/>
 <meta http-equiv="Expires" content="0"/>
 <title>RinggitMe</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap"/>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 :root{
@@ -26,6 +29,7 @@
   --shadow:0 1px 2px rgba(17,17,20,.04);
   --shadow-lg:0 6px 24px rgba(17,17,20,.08);
   --r:16px;--rl:20px;--rx:24px;
+  --font-display:'Space Grotesk',-apple-system,BlinkMacSystemFont,sans-serif;
   --safe-top:env(safe-area-inset-top,0px);--safe-bot:env(safe-area-inset-bottom,0px);
 }
 @media(prefers-color-scheme:dark){:root{
@@ -90,15 +94,21 @@ input,textarea,select{-webkit-user-select:text;user-select:text}
 .ni.on{color:var(--accent)}
 .ni.on i{transform:translateY(-2px) scale(1.06)}
 
-/* ── HERO (minimal neutral) ── */
-.hero{border-radius:var(--rx);padding:22px 22px 8px;overflow:hidden;margin:8px 0 14px;background:var(--bg2);border:1px solid var(--border);box-shadow:var(--shadow)}
-.hero-l{font-size:12px;color:var(--text3);font-weight:600;letter-spacing:.02em}
-.hero-v{font-size:40px;font-weight:800;letter-spacing:-1.5px;margin:6px 0 16px;color:var(--text);line-height:1}
-.hero-row{display:flex;border-top:1px solid var(--border);margin:0 -22px;padding:0}
+/* numerals + titles in the display typeface for character */
+.t-title,.hero-v,.hero-sv,.sv,.cc-owed,.acct-v,.aa-num,.txn-a,.aa-txn-a,.dh-r,.field input.big{font-family:var(--font-display)}
+/* ── HERO · premium dark wealth card ── */
+.hero{position:relative;border-radius:var(--rx);padding:22px 22px 6px;overflow:hidden;margin:10px 0 18px;color:#fff;background:linear-gradient(157deg,#232733 0%,#15171d 48%,#0b0c10 100%);border:1px solid rgba(255,255,255,.08);box-shadow:0 16px 36px rgba(0,0,0,.30)}
+.hero::after{content:"";position:absolute;top:-90px;right:-70px;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,rgba(52,210,127,.22),transparent 68%);pointer-events:none}
+.hero::before{content:"";position:absolute;right:14px;bottom:34px;font-family:var(--font-display);font-size:120px;font-weight:700;color:rgba(255,255,255,.03);content:"RM";line-height:1;pointer-events:none}
+.hero-top{display:flex;align-items:center;justify-content:space-between;position:relative}
+.hero-l{font-size:12px;color:rgba(255,255,255,.62);font-weight:500;letter-spacing:.03em}
+.hero-pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:5px 11px;border-radius:99px;background:rgba(255,255,255,.10);color:rgba(255,255,255,.85);position:relative}
+.hero-v{font-size:43px;font-weight:600;letter-spacing:-1.5px;margin:8px 0 18px;color:#fff;line-height:1;position:relative}
+.hero-row{display:flex;border-top:1px solid rgba(255,255,255,.12);margin:0 -22px;padding:0;position:relative}
 .hero-stat{flex:1;min-width:0;padding:13px 16px;position:relative}
-.hero-stat+.hero-stat::before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:1px;background:var(--border)}
-.hero-sl{font-size:10.5px;color:var(--text3);margin-bottom:3px;font-weight:500}
-.hero-sv{font-size:14px;font-weight:700;letter-spacing:-.3px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hero-stat+.hero-stat::before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:1px;background:rgba(255,255,255,.12)}
+.hero-sl{font-size:10.5px;color:rgba(255,255,255,.55);margin-bottom:3px;font-weight:500}
+.hero-sv{font-size:14.5px;font-weight:600;letter-spacing:-.3px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* ── STAT GRID ── */
 .sg{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px}
@@ -625,7 +635,8 @@ function renderHome(){
   const now=new Date(),thisMonth=D.txns.filter(t=>{const d=new Date(t.isoDate||Date.now());return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();}).reduce((a,t)=>a+t.amt,0);
   const monthIncome=D.incomes.reduce((a,i)=>a+i.amt,0);
   let h=`<div class="mode-row"><div class="mode-card ${D.incomeMode==='salary'?'on':''}" onclick="setMode('salary')"><div class="mode-lbl">薪水模式</div><div class="mode-val">固定收入</div></div><div class="mode-card on-fc ${D.incomeMode==='fullcomm'?'on':''}" onclick="setMode('fullcomm')"><div class="mode-lbl">全佣模式</div><div class="mode-val">房产经纪</div></div></div>`;
-  h+=`<div class="hero"><div class="hero-l">净资产 Net Worth</div><div class="hero-v" id="heroNet" data-net="${net}">${fmt(net)}</div><div class="hero-row"><div class="hero-stat"><div class="hero-sl">资产</div><div class="hero-sv">${fmt(totalSav+totalEw)}</div></div><div class="hero-stat"><div class="hero-sl">CC 欠额</div><div class="hero-sv">${fmt(totalOwed)}</div></div><div class="hero-stat"><div class="hero-sl">本月消费</div><div class="hero-sv">${fmt(thisMonth)}</div></div></div></div>`;
+  const monthLabel=new Date().toLocaleDateString('zh-CN',{year:'numeric',month:'long'});
+  h+=`<div class="hero"><div class="hero-top"><div class="hero-l">净资产 Net Worth</div><div class="hero-pill"><i class="ti ti-calendar-month" style="font-size:13px"></i>${monthLabel}</div></div><div class="hero-v" id="heroNet" data-net="${net}">${fmt(net)}</div><div class="hero-row"><div class="hero-stat"><div class="hero-sl">资产</div><div class="hero-sv">${fmt(totalSav+totalEw)}</div></div><div class="hero-stat"><div class="hero-sl">CC 欠额</div><div class="hero-sv">${fmt(totalOwed)}</div></div><div class="hero-stat"><div class="hero-sl">本月消费</div><div class="hero-sv">${fmt(thisMonth)}</div></div></div></div>`;
   h+=`<div class="sg"><div class="sc"><div class="sl">储蓄 Savings</div><div class="sv">${fmt(totalSav)}</div></div><div class="sc"><div class="sl">eWallet</div><div class="sv">${fmt(totalEw)}</div></div><div class="sc"><div class="sl">月固定支出</div><div class="sv">${fmt(totalSub+totalLoan)}</div></div><div class="sc"><div class="sl">累计收入</div><div class="sv">${fmt(monthIncome)}</div></div></div>`;
   if(D.incomeMode==='fullcomm'&&(totalSub+totalLoan)>0)h+=`<div class="ib w"><i class="ti ti-target-arrow"></i>本月固定开销 ${fmtR(totalSub+totalLoan)}，至少要赚这么多才 cover。</div>`;
   h+=`<div class="sec">收藏快捷 <span class="sec-a" onclick="setTab('record')"><i class="ti ti-plus" style="font-size:13px"></i>去记账</span></div>`;
@@ -693,7 +704,7 @@ function render(){
   if(LOCK.state!=='unlocked'){renderLock();return;}
   const TABS=[{id:'home',i:'ti-home',l:'首页'},{id:'cards',i:'ti-credit-card',l:'卡片'},{id:'record',i:'ti-circle-plus',l:'记账'},{id:'history',i:'ti-calendar',l:'记录'},{id:'fixed',i:'ti-repeat',l:'固定'},{id:'aa',i:'ti-users',l:'AA'}];
   const TITLES={home:'RinggitMe',cards:'卡片管理',record:'收入 & 记账',history:'消费记录',fixed:'固定支出',aa:'AA 分账'};
-  const SUBS={home:'马来西亚理财 · 数据存本机 · v15',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
+  const SUBS={home:'马来西亚理财 · 数据存本机 · v16',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
   // preserve scroll on same-tab re-render (no more jumping to top on every tap); fade only on tab switch
   const tabChanged=U.tab!==_lastRenderedTab;
   const prevContent=document.querySelector('.content');
