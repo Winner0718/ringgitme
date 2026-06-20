@@ -78,7 +78,7 @@ input,textarea,select{-webkit-user-select:text;user-select:text}
 
 /* ── TOP BAR ── */
 .topbar{padding:calc(var(--safe-top) + 14px) 18px 12px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;background:var(--bg)}
-.t-title{font-size:22px;font-weight:800;letter-spacing:-.5px}
+.t-title{font-size:23px;font-weight:600;letter-spacing:-.5px}
 .t-sub{font-size:11.5px;color:var(--text3);margin-top:2px;font-weight:500}
 .t-r{display:flex;gap:6px;align-items:center}
 .t-ic{width:38px;height:38px;border-radius:12px;background:var(--bg2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:var(--shadow)}
@@ -89,10 +89,11 @@ input,textarea,select{-webkit-user-select:text;user-select:text}
 
 /* ── BOTTOM NAV ── */
 .nav{position:absolute;bottom:0;left:0;right:0;display:flex;background:var(--bg2);background:color-mix(in srgb,var(--bg2) 88%,transparent);backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);border-top:1px solid var(--border);padding:8px 6px calc(var(--safe-bot) + 8px);justify-content:space-around}
-.ni{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;color:var(--text3);cursor:pointer;padding:6px 4px;border:none;background:none;flex:1;font-weight:600;transition:color .15s}
-.ni i{font-size:23px;transition:transform .15s}
+.ni{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;color:var(--text3);cursor:pointer;padding:8px 4px 6px;border:none;background:none;flex:1;font-weight:600;transition:color .15s}
+.ni i{font-size:23px;transition:transform .18s cubic-bezier(.2,.8,.2,1)}
 .ni.on{color:var(--accent)}
 .ni.on i{transform:translateY(-2px) scale(1.06)}
+.ni.on::after{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);width:16px;height:3px;border-radius:99px;background:var(--accent)}
 
 /* numerals + titles in the display typeface for character */
 .t-title,.hero-v,.hero-sv,.sv,.cc-owed,.acct-v,.aa-num,.txn-a,.aa-txn-a,.dh-r,.field input.big{font-family:var(--font-display)}
@@ -112,7 +113,7 @@ input,textarea,select{-webkit-user-select:text;user-select:text}
 
 /* ── STAT GRID ── */
 .sg{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px}
-.sc{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:13px 14px;box-shadow:var(--shadow)}
+.sc{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px 15px;box-shadow:var(--shadow)}
 .sl{font-size:11.5px;color:var(--text3);margin-bottom:4px;font-weight:600}
 .sv{font-size:20px;font-weight:800;letter-spacing:-.4px}
 .g{color:var(--green)}.r{color:var(--red)}.b{color:var(--blue)}.w{color:var(--orange)}.p{color:var(--purple)}
@@ -120,27 +121,29 @@ input,textarea,select{-webkit-user-select:text;user-select:text}
 .sec{font-size:12px;font-weight:600;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin:26px 2px 11px;display:flex;justify-content:space-between;align-items:center}
 .sec-a{font-size:12px;color:var(--accent);cursor:pointer;font-weight:600;display:flex;align-items:center;gap:3px;text-transform:none;letter-spacing:0}
 
-.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:10px;box-shadow:var(--shadow)}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:15px;margin-bottom:10px;box-shadow:var(--shadow)}
 .row{display:flex;align-items:center;gap:12px}
 .name{font-size:15px;font-weight:650;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .badge{font-size:10px;padding:3px 9px;border-radius:99px;font-weight:700;flex-shrink:0;letter-spacing:.02em}
 .bcc{background:var(--red-bg);color:var(--red)}.bsav{background:var(--green-bg);color:var(--green)}.bew{background:var(--orange-bg);color:var(--orange)}.bsub{background:var(--blue-bg);color:var(--blue)}.bloan{background:var(--purple-bg);color:var(--purple)}
 
-/* ── CREDIT CARD VISUAL ── */
-.cc{position:relative;border-radius:var(--rl);padding:16px 17px;color:#fff;overflow:hidden;margin-bottom:11px;box-shadow:0 8px 22px rgba(16,24,40,.22)}
-.cc::after{content:"";position:absolute;top:-50px;right:-30px;width:140px;height:140px;border-radius:50%;background:rgba(255,255,255,.1)}
-.cc-top{display:flex;align-items:flex-start;justify-content:space-between;position:relative;margin-bottom:18px}
-.cc-name{font-size:15px;font-weight:700}
-.cc-due{font-size:11px;opacity:.82;margin-top:2px}
-.cc-owed-l{font-size:11px;opacity:.8;position:relative}
-.cc-owed{font-size:25px;font-weight:800;letter-spacing:-.5px;position:relative;margin:1px 0 12px}
-.cc-bar{height:6px;border-radius:99px;background:rgba(255,255,255,.25);overflow:hidden;position:relative}
+/* ── CREDIT CARD VISUAL (premium) ── */
+.cc{position:relative;border-radius:var(--rl);padding:18px;color:#fff;overflow:hidden;margin-bottom:11px;box-shadow:0 14px 30px rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.09)}
+.cc::after{content:"";position:absolute;top:-80px;right:-60px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.14),transparent 68%);pointer-events:none}
+.cc-top{display:flex;align-items:flex-start;justify-content:space-between;position:relative;margin-bottom:16px}
+.cc-name{font-size:15px;font-weight:600}
+.cc-due{font-size:11px;opacity:.8;margin-top:3px;letter-spacing:.02em}
+.cc-chip{width:34px;height:26px;border-radius:6px;background:linear-gradient(135deg,#f3e3b0,#c9ad63);position:relative;margin-bottom:16px;box-shadow:inset 0 0 0 .5px rgba(0,0,0,.15)}
+.cc-chip::after{content:"";position:absolute;inset:5px 7px;border-radius:3px;border:.5px solid rgba(0,0,0,.18)}
+.cc-owed-l{font-size:11px;opacity:.78;position:relative}
+.cc-owed{font-size:28px;font-weight:600;letter-spacing:-.5px;position:relative;margin:2px 0 14px}
+.cc-bar{height:5px;border-radius:99px;background:rgba(255,255,255,.22);overflow:hidden;position:relative}
 .cc-bar i{display:block;height:100%;border-radius:99px;background:#fff}
-.cc-foot{display:flex;justify-content:space-between;font-size:11px;opacity:.85;margin-top:7px;position:relative}
-.cc-acts{display:flex;gap:7px;margin:-3px 0 11px}
+.cc-foot{display:flex;justify-content:space-between;font-size:11px;opacity:.85;margin-top:8px;position:relative}
+.cc-acts{display:flex;gap:7px;margin:-1px 0 13px}
 
 /* ── ACCOUNT ROW (saving / ew) ── */
-.acctcard{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:10px;box-shadow:var(--shadow)}
+.acctcard{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:15px;margin-bottom:10px;box-shadow:var(--shadow)}
 .acct-top{display:flex;align-items:center;gap:12px}
 .acct-m{flex:1;min-width:0}
 .acct-n{font-size:15px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -174,11 +177,11 @@ input,textarea,select{-webkit-user-select:text;user-select:text}
 
 .add-btn{width:100%;padding:14px;border-radius:var(--r);border:1.5px dashed var(--border2);background:transparent;color:var(--text3);cursor:pointer;font-size:13.5px;display:flex;align-items:center;justify-content:center;gap:7px;margin-bottom:10px;font-weight:650}
 .add-btn:active{background:var(--bg3)}
-.empty{text-align:center;padding:40px 20px;color:var(--text3)}
-.empty-ic{width:64px;height:64px;border-radius:20px;background:var(--bg3);display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
-.empty-ic i{font-size:30px;color:var(--text3)}
-.et{font-size:15px;font-weight:700;color:var(--text2);margin-bottom:6px}
-.es{font-size:13px;line-height:1.55}
+.empty{text-align:center;padding:38px 20px;color:var(--text3)}
+.empty-ic{width:66px;height:66px;border-radius:20px;background:color-mix(in srgb,var(--accent) 12%,var(--bg2));border:1px solid color-mix(in srgb,var(--accent) 22%,transparent);display:flex;align-items:center;justify-content:center;margin:0 auto 15px}
+.empty-ic i{font-size:30px;color:var(--accent)}
+.et{font-size:15px;font-weight:650;color:var(--text);margin-bottom:6px}
+.es{font-size:13px;line-height:1.6}
 
 /* ── MODAL ── */
 .mb{position:absolute;inset:0;background:rgba(8,12,20,.55);z-index:50;display:flex;align-items:flex-end;backdrop-filter:blur(2px);animation:fade .2s}
@@ -649,7 +652,7 @@ function renderCards(){
   const ccs=D.cards.filter(c=>c.type==='cc'),savs=D.cards.filter(c=>c.type==='saving'),ews=D.cards.filter(c=>c.type==='ew');
   let h=`<div class="sec">信用卡 <span class="sec-a" onclick="openModal('addcc')"><i class="ti ti-plus" style="font-size:13px"></i>添加</span></div>`;
   if(!ccs.length)h+=`<div class="empty"><div class="empty-ic"><i class="ti ti-credit-card"></i></div><div class="et">还没有信用卡</div><div class="es">添加后像真实卡片一样追踪欠额</div></div>`;
-  ccs.forEach(c=>{const p=pct(c.owed,c.limit);const g1=shade(c.color,1.05),g2=shade(c.color,0.62);h+=`<div class="cc" style="background:linear-gradient(135deg,${g1},${g2})"><div class="cc-top"><div>${itemIcon(c,40,12)}</div><div style="text-align:right"><div class="cc-name">${c.name}</div><div class="cc-due">结单日 ${c.dueDay} 号 · 额度 ${fmt(c.limit)}</div></div></div><div class="cc-owed-l">当前欠额</div><div class="cc-owed">${fmt(c.owed)}</div><div class="cc-bar"><i style="width:${p}%"></i></div><div class="cc-foot"><span>已用 ${p}%</span><span>${fmt(c.owed)} / ${fmt(c.limit)}</span></div></div><div class="cc-acts"><button class="btn pay" onclick="openModal('pay',{editId:${c.id}})"><i class="ti ti-arrow-up"></i>还款</button><button class="btn spd" onclick="openModal('spend',{selPayId:${c.id}})"><i class="ti ti-plus"></i>记消费</button><button class="btn del" onclick="delCard(${c.id})"><i class="ti ti-trash"></i></button></div>`;});
+  ccs.forEach(c=>{const p=pct(c.owed,c.limit);const g1=shade(c.color,1.05),g2=shade(c.color,0.62);h+=`<div class="cc" style="background:linear-gradient(135deg,${g1},${g2})"><div class="cc-top"><div>${itemIcon(c,40,12)}</div><div style="text-align:right"><div class="cc-name">${c.name}</div><div class="cc-due">结单日 ${c.dueDay} 号 · 额度 ${fmt(c.limit)}</div></div></div><div class="cc-chip"></div><div class="cc-owed-l">当前欠额</div><div class="cc-owed">${fmt(c.owed)}</div><div class="cc-bar"><i style="width:${p}%"></i></div><div class="cc-foot"><span>已用 ${p}%</span><span>${fmt(c.owed)} / ${fmt(c.limit)}</span></div></div><div class="cc-acts"><button class="btn pay" onclick="openModal('pay',{editId:${c.id}})"><i class="ti ti-arrow-up"></i>还款</button><button class="btn spd" onclick="openModal('spend',{selPayId:${c.id}})"><i class="ti ti-plus"></i>记消费</button><button class="btn del" onclick="delCard(${c.id})"><i class="ti ti-trash"></i></button></div>`;});
   h+=`<div class="sec">储蓄账户 <span class="sec-a" onclick="openModal('addsaving')"><i class="ti ti-plus" style="font-size:13px"></i>添加</span></div>`;
   if(!savs.length)h+=`<div class="empty"><div class="empty-ic"><i class="ti ti-building-bank"></i></div><div class="et">还没有储蓄账户</div></div>`;
   savs.forEach(c=>{h+=`<div class="acctcard"><div class="acct-top">${itemIcon(c,44,13)}<div class="acct-m"><div class="acct-n">${c.name}</div><div class="acct-s">储蓄账户</div></div><div class="acct-b"><div class="acct-v g">${fmt(c.balance)}</div></div></div><div class="acct-acts"><button class="btn topup" onclick="openModal('topup',{editId:${c.id}})"><i class="ti ti-plus"></i>入账</button><button class="btn del" onclick="delCard(${c.id})"><i class="ti ti-trash"></i>删除</button></div></div>`;});
@@ -704,7 +707,7 @@ function render(){
   if(LOCK.state!=='unlocked'){renderLock();return;}
   const TABS=[{id:'home',i:'ti-home',l:'首页'},{id:'cards',i:'ti-credit-card',l:'卡片'},{id:'record',i:'ti-circle-plus',l:'记账'},{id:'history',i:'ti-calendar',l:'记录'},{id:'fixed',i:'ti-repeat',l:'固定'},{id:'aa',i:'ti-users',l:'AA'}];
   const TITLES={home:'RinggitMe',cards:'卡片管理',record:'收入 & 记账',history:'消费记录',fixed:'固定支出',aa:'AA 分账'};
-  const SUBS={home:'马来西亚理财 · 数据存本机 · v16',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
+  const SUBS={home:'马来西亚理财 · 数据存本机 · v17',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
   // preserve scroll on same-tab re-render (no more jumping to top on every tap); fade only on tab switch
   const tabChanged=U.tab!==_lastRenderedTab;
   const prevContent=document.querySelector('.content');
