@@ -275,6 +275,13 @@ input,textarea,select{-webkit-user-select:text;user-select:text}
 .ins-pct{font-size:11px;color:var(--text3);margin-left:7px;flex-shrink:0;font-weight:500}
 .ins-bar{height:7px;border-radius:99px;background:var(--bg4);overflow:hidden}
 .ins-bar i{display:block;height:100%;border-radius:99px;background:var(--accent);transition:width .5s cubic-bezier(.2,.8,.2,1)}
+/* ── SEARCH ── */
+.search-bar{position:sticky;top:0;z-index:6;background:var(--bg);padding:6px 0 8px;margin-bottom:2px}
+.search-bar .si{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:17px;pointer-events:none}
+.search-wrap{position:relative}
+.search-input{width:100%;border-radius:12px;border:1px solid var(--border2);background:var(--bg2);padding:11px 36px 11px 38px;font-size:16px;color:var(--text);outline:none;-webkit-appearance:none}
+.search-input:focus{border-color:var(--accent)}
+.search-clear{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--text3);cursor:pointer}
 
 /* ── AA ── */
 .aa-p{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);margin-bottom:10px;overflow:hidden;box-shadow:var(--shadow)}
@@ -578,6 +585,8 @@ const delCard=id=>confirmSheet('删除这张卡片？','相关记录不受影响
 const delSub=id=>confirmSheet('删除这个订阅？','',()=>{D.subs=D.subs.filter(s=>s.id!==id);save();render();},{danger:true,okText:'删除'});
 const delLoan=id=>confirmSheet('删除这笔贷款 / 租金？','',()=>{D.loans=D.loans.filter(l=>l.id!==id);save();render();},{danger:true,okText:'删除'});
 const delTxn=id=>{D.txns=D.txns.filter(t=>t.id!==id);save();render();};
+// live transaction search — pure DOM filter, never re-renders (keeps input focus)
+function histFilter(q){q=(q||'').trim().toLowerCase();const clr=document.getElementById('hist-clear');if(clr)clr.style.display=q?'flex':'none';const ins=document.querySelector('.ins-wrap');if(ins)ins.style.display=q?'none':'';const cal=document.querySelector('.cal-sec');if(cal)cal.textContent=q?'搜索结果':'消费日历';let total=0;document.querySelectorAll('.dgroup').forEach(g=>{let vis=0;g.querySelectorAll('.txn[data-search]').forEach(r=>{const m=!q||r.getAttribute('data-search').indexOf(q)>=0;r.style.display=m?'':'none';if(m)vis++;});g.style.display=vis?'':'none';total+=vis;});const emp=document.getElementById('hist-empty');if(emp)emp.style.display=(q&&total===0)?'block':'none';}
 const delFav=id=>{D.favs=D.favs.filter(f=>f.id!==id);save();render();};
 const delIncomeCat=id=>{D.incomeCats=D.incomeCats.filter(c=>c.id!==id);save();render();};
 const delSpendCat=id=>{D.spendCats=D.spendCats.filter(c=>c.id!==id);save();render();};
@@ -717,19 +726,21 @@ function renderRecord(){
 }
 function renderHistory(){
   if(!D.txns.length)return`<div class="empty" style="margin-top:50px"><div class="empty-ic"><i class="ti ti-calendar"></i></div><div class="et">还没有消费记录</div><div class="es">去「记账」开始记第一笔</div></div>`;
-  let h='';
+  let h=`<div class="search-bar"><div class="search-wrap"><i class="ti ti-search si"></i><input class="search-input" id="hist-q" placeholder="搜索描述 / 类别 / 卡片…" oninput="histFilter(this.value)"/><span class="search-clear" id="hist-clear" style="display:none" onclick="document.getElementById('hist-q').value='';histFilter('')"><i class="ti ti-x"></i></span></div></div>`;
   // ── this-month spending insights ──
   const now=new Date();const mTx=D.txns.filter(t=>{const d=new Date(t.isoDate||Date.now());return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();});
+  h+=`<div class="ins-wrap">`;
   if(mTx.length){const mTotal=mTx.reduce((a,t)=>a+t.amt,0);const byCat={};mTx.forEach(t=>{const k=t.catLabel||'其他';if(!byCat[k])byCat[k]={sum:0,icon:t.catIcon||'ti-receipt'};byCat[k].sum+=t.amt;});
     const cats=Object.keys(byCat).map(k=>({label:k,sum:byCat[k].sum,icon:byCat[k].icon})).sort((a,b)=>b.sum-a.sum);const max=cats[0].sum||1;
     h+=`<div class="sec">本月消费分析</div><div class="card"><div class="ins-head"><div><div class="ins-hl">${now.toLocaleDateString('zh-CN',{year:'numeric',month:'long'})} 总消费</div><div class="ins-total r">${fmt(mTotal)}</div></div><div class="ins-cnt">${mTx.length} 笔 · ${cats.length} 类</div></div>`;
     cats.slice(0,6).forEach(c=>{const bw=Math.round(c.sum/max*100),pct=Math.round(c.sum/mTotal*100);h+=`<div class="ins-row"><div class="ins-top"><div class="ins-ic"><i class="ti ${c.icon}"></i></div><div class="ins-name">${c.label}</div><div class="ins-amt r">${fmt(c.sum)}</div><div class="ins-pct">${pct}%</div></div><div class="ins-bar"><i style="width:${D.privacyMode?0:bw}%"></i></div></div>`;});
     h+=`</div>`;
   }
+  h+=`</div>`;
   const byDate={};D.txns.forEach(t=>{const k=t.isoDate||todayISO();(byDate[k]=byDate[k]||[]).push(t);});
   const sorted=Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
-  h+=`<div class="sec">消费日历</div>`;
-  sorted.forEach(date=>{const txns=byDate[date],dayTotal=txns.reduce((a,t)=>a+t.amt,0);const d=new Date(date),lbl=d.toLocaleDateString('en-MY',{weekday:'short',month:'short',day:'numeric'});h+=`<div class="dh"><span class="dh-l">${lbl}</span><span class="dh-r">− ${fmtR(dayTotal)}</span></div><div class="card">`;txns.forEach(t=>{h+=`<div class="txn"><div class="txn-ic"><i class="ti ${t.catIcon||'ti-receipt'}"></i></div><div class="txn-m"><div class="txn-n">${t.desc||t.catLabel}</div><div class="txn-s">${t.catLabel}${t.payName?' · '+t.payName:''}</div></div><div class="txn-x"><div class="txn-a r">−${fmt(t.amt)}</div><i class="ti ti-edit" onclick="openModal('spend',{editId:${t.id}})" style="color:var(--accent)"></i><i class="ti ti-x" onclick="delTxn(${t.id})" style="color:var(--text3)"></i></div></div>`;});h+=`</div>`;});
+  h+=`<div class="sec cal-sec">消费日历</div><div id="hist-empty" class="empty" style="display:none"><div class="empty-ic"><i class="ti ti-search-off"></i></div><div class="et">没有匹配的记录</div></div>`;
+  sorted.forEach(date=>{const txns=byDate[date],dayTotal=txns.reduce((a,t)=>a+t.amt,0);const d=new Date(date),lbl=d.toLocaleDateString('en-MY',{weekday:'short',month:'short',day:'numeric'});h+=`<div class="dgroup"><div class="dh"><span class="dh-l">${lbl}</span><span class="dh-r">− ${fmtR(dayTotal)}</span></div><div class="card">`;txns.forEach(t=>{const sk=((t.desc||'')+' '+(t.catLabel||'')+' '+(t.payName||'')).toLowerCase();h+=`<div class="txn" data-search="${sk.replace(/"/g,'')}"><div class="txn-ic"><i class="ti ${t.catIcon||'ti-receipt'}"></i></div><div class="txn-m"><div class="txn-n">${t.desc||t.catLabel}</div><div class="txn-s">${t.catLabel}${t.payName?' · '+t.payName:''}</div></div><div class="txn-x"><div class="txn-a r">−${fmt(t.amt)}</div><i class="ti ti-edit" onclick="openModal('spend',{editId:${t.id}})" style="color:var(--accent)"></i><i class="ti ti-x" onclick="delTxn(${t.id})" style="color:var(--text3)"></i></div></div>`;});h+=`</div></div>`;});
   return h;
 }
 function renderFixed(){
@@ -764,7 +775,7 @@ function render(){
   if(LOCK.state!=='unlocked'){renderLock();return;}
   const TABS=[{id:'home',i:'ti-home',l:'首页'},{id:'cards',i:'ti-credit-card',l:'卡片'},{id:'record',i:'ti-circle-plus',l:'记账'},{id:'history',i:'ti-calendar',l:'记录'},{id:'fixed',i:'ti-repeat',l:'固定'},{id:'aa',i:'ti-users',l:'AA'}];
   const TITLES={home:'RinggitMe',cards:'卡片管理',record:'收入 & 记账',history:'消费记录',fixed:'固定支出',aa:'AA 分账'};
-  const SUBS={home:'马来西亚理财 · 数据存本机 · v21',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
+  const SUBS={home:'马来西亚理财 · 数据存本机 · v22',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
   // preserve scroll on same-tab re-render (no more jumping to top on every tap); fade only on tab switch
   const tabChanged=U.tab!==_lastRenderedTab;
   const prevContent=document.querySelector('.content');
