@@ -1,0 +1,14 @@
+{
+  "name": "RinggitMe",
+  "short_name": "RinggitMe",
+  "description": "马来西亚理财记账 · Malaysia personal finance",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f5f5f7",
+  "theme_color": "#0a8a54",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
