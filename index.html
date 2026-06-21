@@ -307,6 +307,10 @@ input,textarea,select{-webkit-user-select:text;user-select:text}
 .ins-total{font-size:26px;font-weight:600;font-family:var(--font-display);letter-spacing:-.5px;margin-top:2px}
 .ins-trend{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;margin-top:7px}
 .ins-trend i{font-size:13px}
+.ins-mini{display:flex;gap:8px;margin:14px 0 4px}
+.ins-mi{flex:1;background:var(--bg3);border-radius:11px;padding:9px 11px;min-width:0}
+.ins-mil{font-size:10.5px;color:var(--text3);margin-bottom:2px;font-weight:500}
+.ins-miv{font-size:13.5px;font-weight:700;font-family:var(--font-display);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ins-cnt{font-size:11.5px;color:var(--text3)}
 .ins-row{margin-bottom:13px}
 .ins-row:last-child{margin-bottom:2px}
@@ -846,6 +850,8 @@ function renderHistory(){
     const cats=Object.keys(byCat).map(k=>({label:k,sum:byCat[k].sum,icon:byCat[k].icon})).sort((a,b)=>b.sum-a.sum);const max=cats[0].sum||1;
     const pm=new Date(tgt.getFullYear(),tgt.getMonth()-1,1);const pTotal=D.txns.filter(t=>inM(t,pm)).reduce((a,t)=>a+t.amt,0);let trend='';if(pTotal>0){const diff=Math.round((mTotal-pTotal)/pTotal*100);const up=diff>0;trend=`<span class="ins-trend" style="background:${up?'var(--red-bg)':'var(--green-bg)'};color:${up?'var(--red)':'var(--green)'}"><i class="ti ti-${up?'arrow-up-right':diff<0?'arrow-down-right':'minus'}"></i>${Math.abs(diff)}% vs 上月</span>`;}
     h+=`<div class="sec">消费分析</div><div class="card"><div class="ins-head"><div><div class="ins-hl">当月总消费</div><div class="ins-total r">${fmt(mTotal)}</div>${trend}</div><div class="ins-cnt">${mTx.length} 笔 · ${cats.length} 类</div></div>`;
+    const dim=new Date(tgt.getFullYear(),tgt.getMonth()+1,0).getDate();const dpass=off===0?base.getDate():dim;const avg=mTotal/(dpass||1);const proj=off===0?mTotal/(dpass||1)*dim:null;
+    h+=`<div class="ins-mini"><div class="ins-mi"><div class="ins-mil">日均消费</div><div class="ins-miv">${fmt(avg)}</div></div>${proj!==null?`<div class="ins-mi"><div class="ins-mil">预计月底</div><div class="ins-miv">${fmt(proj)}</div></div><div class="ins-mi"><div class="ins-mil">本月剩余</div><div class="ins-miv">${dim-dpass} 天</div></div>`:''}</div>`;
     cats.slice(0,6).forEach(c=>{const bw=Math.round(c.sum/max*100),pct=Math.round(c.sum/mTotal*100);h+=`<div class="ins-row"><div class="ins-top"><div class="ins-ic"><i class="ti ${c.icon}"></i></div><div class="ins-name">${c.label}</div><div class="ins-amt r">${fmt(c.sum)}</div><div class="ins-pct">${pct}%</div></div><div class="ins-bar"><i style="width:${D.privacyMode?0:bw}%"></i></div></div>`;});
     h+=`</div>`;
   }
@@ -889,7 +895,7 @@ function render(){
   if(LOCK.state!=='unlocked'){renderLock();return;}
   const TABS=[{id:'home',i:'ti-home',l:'首页'},{id:'cards',i:'ti-credit-card',l:'卡片'},{id:'record',i:'ti-circle-plus',l:'记账'},{id:'history',i:'ti-calendar',l:'记录'},{id:'fixed',i:'ti-repeat',l:'固定'},{id:'aa',i:'ti-users',l:'AA'}];
   const TITLES={home:'RinggitMe',cards:'卡片管理',record:'收入 & 记账',history:'消费记录',fixed:'固定支出',aa:'AA 分账'};
-  const SUBS={home:'马来西亚理财 · 数据存本机 · v37',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
+  const SUBS={home:'马来西亚理财 · 数据存本机 · v38',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
   // preserve scroll on same-tab re-render (no more jumping to top on every tap); fade only on tab switch
   const tabChanged=U.tab!==_lastRenderedTab;
   const prevContent=document.querySelector('.content');
