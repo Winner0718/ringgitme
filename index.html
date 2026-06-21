@@ -339,6 +339,11 @@ input,textarea,select{-webkit-user-select:text;user-select:text}
 .day-chip:active{transform:scale(.93)}
 .dc-d{font-size:15px;font-weight:700;font-family:var(--font-display);color:var(--text)}
 .dc-w{font-size:9.5px;color:var(--text3)}
+/* ── SWIPE TO DELETE ── */
+.swipe{position:relative;overflow:hidden}
+.swipe-del{position:absolute;right:0;top:0;bottom:0;width:74px;background:var(--red);display:flex;align-items:center;justify-content:center;color:#fff;cursor:pointer}
+.swipe-del i{font-size:21px}
+.swipe-fg{position:relative;background:var(--bg2);transition:transform .25s cubic-bezier(.2,.8,.2,1);will-change:transform;touch-action:pan-y}
 
 /* ── AA ── */
 .aa-p{background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);margin-bottom:10px;overflow:hidden;box-shadow:var(--shadow)}
@@ -656,7 +661,7 @@ const delTxn=id=>{D.txns=D.txns.filter(t=>t.id!==id);save();render();};
 // jump the History list to a specific day
 function jumpDay(dt){const el=document.getElementById('dg-'+dt),c=document.querySelector('.content');if(!el||!c)return;const top=el.getBoundingClientRect().top-c.getBoundingClientRect().top+c.scrollTop-66;c.scrollTo({top:Math.max(0,top),behavior:'smooth'});haptic();}
 // live transaction search — pure DOM filter, never re-renders (keeps input focus)
-function histFilter(q){q=(q||'').trim().toLowerCase();const clr=document.getElementById('hist-clear');if(clr)clr.style.display=q?'flex':'none';const ins=document.querySelector('.ins-wrap');if(ins)ins.style.display=q?'none':'';const cal=document.querySelector('.cal-sec');if(cal)cal.textContent=q?'搜索结果':'消费日历';let total=0;document.querySelectorAll('.dgroup').forEach(g=>{let vis=0;g.querySelectorAll('.txn[data-search]').forEach(r=>{const m=!q||r.getAttribute('data-search').indexOf(q)>=0;r.style.display=m?'':'none';if(m)vis++;});g.style.display=vis?'':'none';total+=vis;});const emp=document.getElementById('hist-empty');if(emp)emp.style.display=(q&&total===0)?'block':'none';}
+function histFilter(q){q=(q||'').trim().toLowerCase();const clr=document.getElementById('hist-clear');if(clr)clr.style.display=q?'flex':'none';const ins=document.querySelector('.ins-wrap');if(ins)ins.style.display=q?'none':'';const cal=document.querySelector('.cal-sec');if(cal)cal.textContent=q?'搜索结果':'消费日历';let total=0;document.querySelectorAll('.dgroup').forEach(g=>{let vis=0;g.querySelectorAll('[data-search]').forEach(r=>{const m=!q||r.getAttribute('data-search').indexOf(q)>=0;r.style.display=m?'':'none';if(m)vis++;});g.style.display=vis?'':'none';total+=vis;});const emp=document.getElementById('hist-empty');if(emp)emp.style.display=(q&&total===0)?'block':'none';}
 const delFav=id=>{D.favs=D.favs.filter(f=>f.id!==id);save();render();};
 const delIncomeCat=id=>{D.incomeCats=D.incomeCats.filter(c=>c.id!==id);save();render();};
 const delSpendCat=id=>{D.spendCats=D.spendCats.filter(c=>c.id!==id);save();render();};
@@ -868,7 +873,7 @@ function renderHistory(){
   h+=`<div class="sec cal-sec">消费日历</div><div id="hist-empty" class="empty" style="display:none"><div class="empty-ic"><i class="ti ti-search-off"></i></div><div class="et">没有匹配的记录</div></div>`;
   if(!mTx.length){h+=`<div class="empty"><div class="empty-ic"><i class="ti ti-calendar-off"></i></div><div class="et">本月没有消费记录</div><div class="es">用上方箭头切换其他月份</div></div>`;}
   else{const byDate={};mTx.forEach(t=>{const k=t.isoDate||todayISO();(byDate[k]=byDate[k]||[]).push(t);});const sorted=Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
-    sorted.forEach(date=>{const txns=byDate[date],dayTotal=txns.reduce((a,t)=>a+t.amt,0);const d=new Date(date),lbl=d.toLocaleDateString('en-MY',{weekday:'short',month:'short',day:'numeric'});h+=`<div class="dgroup" id="dg-${date}"><div class="dh"><span class="dh-l">${lbl}</span><span class="dh-r">− ${fmtR(dayTotal)}</span></div><div class="card">`;txns.forEach(t=>{const sk=((t.desc||'')+' '+(t.catLabel||'')+' '+(t.payName||'')).toLowerCase();h+=`<div class="txn" data-search="${sk.replace(/"/g,'')}"><div class="txn-ic"><i class="ti ${t.catIcon||'ti-receipt'}"></i></div><div class="txn-m"><div class="txn-n">${t.desc||t.catLabel}</div><div class="txn-s">${t.catLabel}${t.payName?' · '+t.payName:''}</div></div><div class="txn-x"><div class="txn-a r">−${fmt(t.amt)}</div><i class="ti ti-edit" onclick="openModal('spend',{editId:${t.id}})" style="color:var(--accent)"></i><i class="ti ti-x" onclick="delTxn(${t.id})" style="color:var(--text3)"></i></div></div>`;});h+=`</div></div>`;});}
+    sorted.forEach(date=>{const txns=byDate[date],dayTotal=txns.reduce((a,t)=>a+t.amt,0);const d=new Date(date),lbl=d.toLocaleDateString('en-MY',{weekday:'short',month:'short',day:'numeric'});h+=`<div class="dgroup" id="dg-${date}"><div class="dh"><span class="dh-l">${lbl}</span><span class="dh-r">− ${fmtR(dayTotal)}</span></div><div class="card">`;txns.forEach(t=>{const sk=((t.desc||'')+' '+(t.catLabel||'')+' '+(t.payName||'')).toLowerCase();h+=`<div class="swipe" data-search="${sk.replace(/"/g,'')}"><div class="swipe-del" onclick="delTxn(${t.id})"><i class="ti ti-trash"></i></div><div class="swipe-fg txn"><div class="txn-ic"><i class="ti ${t.catIcon||'ti-receipt'}"></i></div><div class="txn-m"><div class="txn-n">${t.desc||t.catLabel}</div><div class="txn-s">${t.catLabel}${t.payName?' · '+t.payName:''}</div></div><div class="txn-x"><div class="txn-a r">−${fmt(t.amt)}</div><i class="ti ti-edit" onclick="openModal('spend',{editId:${t.id}})" style="color:var(--accent)"></i></div></div></div>`;});h+=`</div></div>`;});}
   return h;
 }
 function renderFixed(){
@@ -904,7 +909,7 @@ function render(){
   if(LOCK.state!=='unlocked'){renderLock();return;}
   const TABS=[{id:'home',i:'ti-home',l:'首页'},{id:'cards',i:'ti-credit-card',l:'卡片'},{id:'record',i:'ti-circle-plus',l:'记账'},{id:'history',i:'ti-calendar',l:'记录'},{id:'fixed',i:'ti-repeat',l:'固定'},{id:'aa',i:'ti-users',l:'AA'}];
   const TITLES={home:'RinggitMe',cards:'卡片管理',record:'收入 & 记账',history:'消费记录',fixed:'固定支出',aa:'AA 分账'};
-  const SUBS={home:'马来西亚理财 · 数据存本机 · v39',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
+  const SUBS={home:'马来西亚理财 · 数据存本机 · v40',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
   // preserve scroll on same-tab re-render (no more jumping to top on every tap); fade only on tab switch
   const tabChanged=U.tab!==_lastRenderedTab;
   const prevContent=document.querySelector('.content');
@@ -940,6 +945,13 @@ function animateHeroNet(){
   function frame(now){const t=Math.min(1,(now-start)/dur),v=target*ease(t);el.textContent=fmtN(v);if(t<1)requestAnimationFrame(frame);else el.textContent=fmtN(target);}
   requestAnimationFrame(frame);
 }
+
+// ── Swipe a transaction row left to reveal delete ──
+let _sw=null;
+function swClose(except){document.querySelectorAll('.swipe-fg.open').forEach(f=>{if(f!==except){f.style.transition='transform .25s cubic-bezier(.2,.8,.2,1)';f.style.transform='translateX(0)';f.classList.remove('open');}});}
+document.addEventListener('touchstart',e=>{const fg=e.target.closest&&e.target.closest('.swipe-fg');if(!fg){swClose(null);return;}if(e.target.closest('.txn-x')){return;}swClose(fg);_sw={fg,sx:e.touches[0].clientX,sy:e.touches[0].clientY,dx:0,active:false,open:fg.classList.contains('open')};fg.style.transition='none';},{passive:true});
+document.addEventListener('touchmove',e=>{if(!_sw)return;const dx=e.touches[0].clientX-_sw.sx,dy=e.touches[0].clientY-_sw.sy;if(!_sw.active){if(Math.abs(dx)>10&&Math.abs(dx)>Math.abs(dy)*1.3)_sw.active=true;else if(Math.abs(dy)>12){_sw.fg.style.transition='transform .25s';_sw.fg.style.transform=_sw.open?'translateX(-74px)':'translateX(0)';_sw=null;return;}}if(_sw.active){const base=_sw.open?-74:0;_sw.dx=Math.max(-92,Math.min(0,base+dx));_sw.fg.style.transform='translateX('+_sw.dx+'px)';}},{passive:true});
+document.addEventListener('touchend',()=>{if(!_sw)return;const fg=_sw.fg;fg.style.transition='transform .25s cubic-bezier(.2,.8,.2,1)';if(_sw.dx<-40){fg.style.transform='translateX(-74px)';fg.classList.add('open');haptic(8);}else{fg.style.transform='translateX(0)';fg.classList.remove('open');}_sw=null;});
 
 // ── Modal: drag the sheet down to dismiss (real-app feel) ──
 let _drag=null;
