@@ -274,7 +274,7 @@ input,textarea,select{-webkit-user-select:text;user-select:text}
 .txn-ic i{font-size:18px;color:var(--text2)}
 .txn-m{flex:1;min-width:0}
 .txn-n{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.txn-s{font-size:11.5px;color:var(--text3);margin-top:2px}
+.txn-s{font-size:11.5px;color:var(--text3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .txn-a{font-size:15px;font-weight:800;flex-shrink:0;letter-spacing:-.3px}
 .txn-a.r{color:var(--red)}.txn-a.g{color:var(--green)}
 .txn-x{display:flex;align-items:center;gap:6px}
@@ -756,6 +756,7 @@ function renderHome(){
   let h=`<div class="mode-row"><div class="mode-card ${D.incomeMode==='salary'?'on':''}" onclick="setMode('salary')"><div class="mode-lbl">薪水模式</div><div class="mode-val">固定收入</div></div><div class="mode-card on-fc ${D.incomeMode==='fullcomm'?'on':''}" onclick="setMode('fullcomm')"><div class="mode-lbl">全佣模式</div><div class="mode-val">房产经纪</div></div></div>`;
   const monthLabel=new Date().toLocaleDateString('zh-CN',{year:'numeric',month:'long'});
   h+=`<div class="hero"><div class="hero-top"><div class="hero-l">净资产 Net Worth</div><div class="hero-pill"><i class="ti ti-calendar-month" style="font-size:13px"></i>${monthLabel}</div></div><div class="hero-v" id="heroNet" data-net="${net}">${fmt(net)}</div><div class="hero-row"><div class="hero-stat"><div class="hero-sl">资产</div><div class="hero-sv">${fmt(totalSav+totalEw)}</div></div><div class="hero-stat"><div class="hero-sl">CC 欠额</div><div class="hero-sv">${fmt(totalOwed)}</div></div><div class="hero-stat"><div class="hero-sl">本月消费</div><div class="hero-sv">${fmt(thisMonth)}</div></div></div></div>`;
+  if(!D.cards.length&&!D.txns.length&&!D.incomes.length&&!D.subs.length&&!D.loans.length&&!D.aaPeople.length){h+=`<div class="card" style="text-align:center;padding:24px 18px;margin-top:2px"><div class="empty-ic" style="margin:0 auto 14px"><i class="ti ti-sparkles"></i></div><div style="font-size:17px;font-weight:700;margin-bottom:7px">欢迎使用 RinggitMe 👋</div><div style="font-size:13px;color:var(--text3);line-height:1.65;margin-bottom:18px">添加你的银行卡、储蓄、电子钱包，开始记录收支。<br>或先载入示例数据，看看满载时的完整效果。</div><button class="btn" style="width:100%;justify-content:center;padding:14px;margin-bottom:9px;background:var(--accent);color:#fff;border-color:transparent;font-size:14px" onclick="setTab('cards')"><i class="ti ti-plus"></i>添加我的第一张卡</button><button class="btn" style="width:100%;justify-content:center;padding:14px;font-size:14px" onclick="loadDemo()"><i class="ti ti-sparkles"></i>先看示例效果</button></div>`;return h;}
   const scIc=(g,c,lbl,val)=>`<div class="sc"><div class="sc-top"><div class="sc-ic" style="background:${c}1a;color:${c}"><i class="ti ${g}"></i></div><div class="sl" style="margin:0">${lbl}</div></div><div class="sv">${val}</div></div>`;
   h+=`<div class="sg">${scIc('ti-pig-money','#0a8a54','储蓄 Savings',fmt(totalSav))}${scIc('ti-wallet','#c07a1a','eWallet',fmt(totalEw))}${scIc('ti-repeat','#7c5cd0','月固定支出',fmt(totalSub+totalLoan))}${scIc('ti-trending-up','#2563eb','累计收入',fmt(monthIncome))}</div>`;
   if(D.budget>0){const used=thisMonth,over=used>D.budget,pctB=Math.round(used/D.budget*100),col=over?'var(--red)':pctB>=80?'var(--orange)':'var(--green)';h+=`<div class="budget" onclick="openModal('budget')"><div class="budget-top"><div class="budget-l">本月预算 · ${fmt(D.budget)}</div><div class="budget-v" style="color:${col}">${over?'超支 '+fmt(used-D.budget):'剩余 '+fmt(D.budget-used)}</div></div><div class="budget-bar"><i style="width:${D.privacyMode?0:Math.min(100,used/D.budget*100)}%;background:${col}"></i></div><div class="budget-foot"><span>已用 ${fmt(used)}</span><span>${Math.min(999,pctB)}%</span></div></div>`;}
@@ -839,7 +840,7 @@ function render(){
   if(LOCK.state!=='unlocked'){renderLock();return;}
   const TABS=[{id:'home',i:'ti-home',l:'首页'},{id:'cards',i:'ti-credit-card',l:'卡片'},{id:'record',i:'ti-circle-plus',l:'记账'},{id:'history',i:'ti-calendar',l:'记录'},{id:'fixed',i:'ti-repeat',l:'固定'},{id:'aa',i:'ti-users',l:'AA'}];
   const TITLES={home:'RinggitMe',cards:'卡片管理',record:'收入 & 记账',history:'消费记录',fixed:'固定支出',aa:'AA 分账'};
-  const SUBS={home:'马来西亚理财 · 数据存本机 · v27',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
+  const SUBS={home:'马来西亚理财 · 数据存本机 · v28',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
   // preserve scroll on same-tab re-render (no more jumping to top on every tap); fade only on tab switch
   const tabChanged=U.tab!==_lastRenderedTab;
   const prevContent=document.querySelector('.content');
