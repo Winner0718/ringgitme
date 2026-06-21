@@ -107,6 +107,10 @@ input,textarea,select{-webkit-user-select:text;user-select:text}
 .ni.on{color:var(--accent)}
 .ni.on i{transform:translateY(-2px) scale(1.06)}
 .ni.on::after{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);width:16px;height:3px;border-radius:99px;background:var(--accent)}
+/* ── FLOATING QUICK-ADD ── */
+.fab{position:absolute;right:18px;bottom:calc(var(--safe-bot) + 84px);width:56px;height:56px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 22px rgba(10,138,84,.4),0 2px 6px rgba(0,0,0,.2);z-index:40;cursor:pointer;transition:transform .14s cubic-bezier(.2,.8,.2,1)}
+.fab i{font-size:28px}
+.fab:active{transform:scale(.9)}
 
 /* numerals + titles in the display typeface for character */
 .t-title,.hero-v,.hero-sv,.sv,.cc-owed,.acct-v,.aa-num,.txn-a,.aa-txn-a,.dh-r,.field input.big{font-family:var(--font-display)}
@@ -885,7 +889,7 @@ function render(){
   if(LOCK.state!=='unlocked'){renderLock();return;}
   const TABS=[{id:'home',i:'ti-home',l:'首页'},{id:'cards',i:'ti-credit-card',l:'卡片'},{id:'record',i:'ti-circle-plus',l:'记账'},{id:'history',i:'ti-calendar',l:'记录'},{id:'fixed',i:'ti-repeat',l:'固定'},{id:'aa',i:'ti-users',l:'AA'}];
   const TITLES={home:'RinggitMe',cards:'卡片管理',record:'收入 & 记账',history:'消费记录',fixed:'固定支出',aa:'AA 分账'};
-  const SUBS={home:'马来西亚理财 · 数据存本机 · v36',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
+  const SUBS={home:'马来西亚理财 · 数据存本机 · v37',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
   // preserve scroll on same-tab re-render (no more jumping to top on every tap); fade only on tab switch
   const tabChanged=U.tab!==_lastRenderedTab;
   const prevContent=document.querySelector('.content');
@@ -903,6 +907,7 @@ function render(){
       </div>
     </div>
     <div class="content${tabChanged?' tabfade':''}">${content}</div>
+    ${(U.tab!=='record'&&!U.modal)?`<div class="fab" onclick="openModal('spend')" title="快速记账"><i class="ti ti-plus"></i></div>`:''}
     <div class="nav">${TABS.map(t=>`<button class="ni ${U.tab===t.id?'on':''}" onclick="setTab('${t.id}')"><i class="ti ${t.i}"></i>${t.l}</button>`).join('')}</div>
     ${buildModal()}`;
   const newContent=document.querySelector('.content');
