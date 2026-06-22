@@ -518,7 +518,7 @@ function hasData(o){return !!(o&&(o.cards&&o.cards.length||o.txns&&o.txns.length
 function accounts(){try{return JSON.parse(localStorage.getItem('rm_accounts')||'[]');}catch(e){return [];}}
 function rememberAccount(s){if(!s||!s.user||!s.access_token||!s.refresh_token)return;const list=accounts().filter(a=>a.id!==s.user.id);list.push({id:s.user.id,email:s.user.email||'',access_token:s.access_token,refresh_token:s.refresh_token});try{localStorage.setItem('rm_accounts',JSON.stringify(list));}catch(e){}}
 function forgetAccount(id){try{localStorage.setItem('rm_accounts',JSON.stringify(accounts().filter(a=>a.id!==id)));}catch(e){}}
-function initSupa(){const c=supaCfg();if(!c.url||!c.key||!window.supabase)return;try{supa=window.supabase.createClient(c.url,c.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});supa.auth.onAuthStateChange((_e,s)=>{const prevUid=SESSION&&SESSION.user?SESSION.user.id:null;SESSION=s;if(s){rememberAccount(s);if(s.user.id!==prevUid){U.addAccount=false;adoptCloudOrPush();}}if(LOCK&&LOCK.state==='unlocked'&&U.modal==='settings')render();});}catch(e){console.log('initSupa',e);}}
+function initSupa(){const c=supaCfg();if(!c.url||!c.key||!window.supabase)return;try{supa=window.supabase.createClient(c.url,c.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});supa.auth.onAuthStateChange((_e,s)=>{const prevUid=SESSION&&SESSION.user?SESSION.user.id:null;SESSION=s;if(s){rememberAccount(s);if(s.user.id!==prevUid){U.addAccount=false;adoptCloudOrPush().then(()=>{ensureIngestToken();drainQuickTxns();});}}if(LOCK&&LOCK.state==='unlocked'&&U.modal==='settings')render();});}catch(e){console.log('initSupa',e);}}
 function schedulePush(){if(!supaReady())return;clearTimeout(_pushT);_pushT=setTimeout(pushCloud,1500);}
 async function pushCloud(){if(!supaReady())return;try{await supa.from('ledgers').upsert({user_id:SESSION.user.id,data:D,updated_at:new Date(D.updatedAt||Date.now()).toISOString()});}catch(e){console.log('pushCloud',e);}}
 async function pullCloud(){if(!supaReady())return null;try{const{data,error}=await supa.from('ledgers').select('data').eq('user_id',SESSION.user.id).maybeSingle();if(error){console.log('pullCloud',error);return null;}return data?data.data:null;}catch(e){console.log('pullCloud',e);return null;}}
@@ -534,7 +534,7 @@ async function switchAccount(id){if(!supa){toast('云同步未就绪');return;}i
 function addAnotherAccount(){U.addAccount=true;render();}
 function cancelAddAccount(){U.addAccount=false;render();}
 function removeAccount(id){const acc=accounts().find(a=>a.id===id);confirmSheet('从这台设备移除该账号？',(acc&&acc.email?acc.email+'\n':'')+'只是不在这台设备保留登录，云端数据不受影响，以后还能重新登录。',async()=>{const others=accounts().filter(a=>a.id!==id);forgetAccount(id);if(SESSION&&SESSION.user&&SESSION.user.id===id){if(others.length){await switchAccount(others[0].id);}else{try{await supa.auth.signOut({scope:'local'});}catch(e){}SESSION=null;render();}}else render();toast('已移除');},{danger:true,okText:'移除'});}
-async function syncNow(){if(!supaReady()){toast('未登录');return;}toast('同步中…');await pushCloud();toast('✓ 已上传到云端');}
+async function syncNow(){if(!supaReady()){toast('未登录');return;}toast('同步中…');await pushCloud();await ensureIngestToken();await drainQuickTxns();toast('✓ 已同步');}
 function saveSupaCfg(){const url=v('supa-url').replace(/\/$/,''),key=v('supa-key');if(!url||!key){toast('填入 URL 和 anon key');return;}localStorage.setItem('rm_supa_url',url);localStorage.setItem('rm_supa_key',key);initSupa();closeModal();setTimeout(()=>openModal('settings'),60);toast('✓ 云同步已配置，请登录');}
 function acctSwitcherHTML(curId){const list=accounts();if(!list.length)return '';let h=`<div style="font-size:12px;color:var(--text3);margin:0 2px 8px">${curId?'点其他账号即可切换（免密码、各自独立、不会丢）':'选择账号登录'}</div>`;list.forEach(a=>{const on=a.id===curId;h+=`<button class="btn" style="width:100%;justify-content:space-between;padding:13px;margin-bottom:8px;font-size:14px;${on?'border-color:var(--green)':''}" onclick="${on?'':`switchAccount('${a.id}')`}"><span style="display:flex;align-items:center;gap:9px;min-width:0"><i class="ti ti-user-circle" style="color:${on?'var(--green)':'var(--accent)'};font-size:19px"></i><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a.email||'账号'}</span></span><span style="display:flex;align-items:center;gap:11px;flex-shrink:0">${on?'<span style="font-size:12px;color:var(--green);font-weight:700">● 使用中</span>':'<span style="font-size:12px;color:var(--accent)">切换</span>'}<i class="ti ti-x" onclick="event.stopPropagation();removeAccount('${a.id}')" style="color:var(--text3);font-size:17px"></i></span></button>`;});return h;}
 function cloudSettingsHTML(){const c=supaCfg();
@@ -635,7 +635,7 @@ async function pinKeyPress(key){
       else{LOCK.pinAttempts++;LOCK.pinError=LOCK.pinAttempts>=5?'尝试次数过多':'PIN 错误，请重试';LOCK.pinInput='';renderLock();}}}
 }
 function pinDel(){if(LOCK.state==='setup_pin'){LOCK.setupPin=LOCK.setupPin.slice(0,-1);renderLock();}else if(LOCK.state==='locked_pin'){LOCK.pinInput=LOCK.pinInput.slice(0,-1);renderLock();}}
-function unlock(){LOCK.state='unlocked';LOCK.pinInput='';LOCK.pinError='';LOCK.pinAttempts=0;LOCK.faceAutoTried=false;render();if(_quickAdd)setTimeout(processQuickAdd,500);}
+function unlock(){LOCK.state='unlocked';LOCK.pinInput='';LOCK.pinError='';LOCK.pinAttempts=0;LOCK.faceAutoTried=false;render();if(_quickAdd)setTimeout(processQuickAdd,500);if(supaReady())setTimeout(drainQuickTxns,400);}
 function lockApp(){const hasCred=SEC.hasSavedCred();LOCK.state=hasCred?'locked_face':(SEC.hasPIN()?'locked_pin':'setup_choice');LOCK.pinInput='';LOCK.pinError='';LOCK.faceAutoTried=true;/*manual lock → no auto face*/renderLock();}
 // ── 锁屏设置（在设置里开关 Face ID / PIN）──
 async function enableFaceId(){if(!SEC.isWebAuthnAvailable()){toast('此设备不支持 Face ID / 指纹');return;}const ok=await SEC.setupWebAuthn();if(ok){toast('✓ 已开启 Face ID 解锁');render();}else toast('设置未完成或被取消');}
@@ -714,7 +714,7 @@ function buildPinPad(){
 const closeModal=()=>{U.modal=null;U.selIconId=null;U.selCustomImg=null;U.selCatId=null;U.selPayId=null;U.selSavId=null;U.selPaidBy='me';U.selSplit=2;U.editId=null;U.editCardId=null;U.selFace=null;U.tfFrom=null;U.tfTo=null;U.activePersonId=null;U.activeEditTxnId=null;U._presel=false;render();};
 const setTab=t=>{if(t!==U.tab)haptic();if(t==='history')U.histMonth=0;U.tab=t;U.modal=null;U.expandedId=null;render();};
 const setHistMonth=d=>{U.histMonth=Math.min(0,(U.histMonth||0)+d);haptic();render();};
-const openModal=(m,ex={})=>{U.modal=m;U.selIconId=null;U.selCustomImg=null;U.selFace=null;U.tfFrom=null;U.tfTo=null;Object.assign(U,ex);U.selColor=ex.selColor||COLORS[0];U._presel=false;render();};
+const openModal=(m,ex={})=>{U.modal=m;U.selIconId=null;U.selCustomImg=null;U.selFace=null;U.tfFrom=null;U.tfTo=null;Object.assign(U,ex);U.selColor=ex.selColor||COLORS[0];U._presel=false;if((m==='bgcfg'||m==='shortcuts')&&typeof supaReady==='function'&&supaReady())ensureIngestToken();render();};
 const sTfFrom=id=>{U.tfFrom=id;render();};
 const sTfTo=id=>{U.tfTo=id;render();};
 const toggle=id=>{U.expandedId=U.expandedId===id?null:id;render();};
@@ -832,6 +832,46 @@ function processQuickAdd(){if(!_quickAdd)return;const q=_quickAdd;_quickAdd=null
   const a=document.getElementById('sp-amt');if(a&&q.amt>0)a.value=q.amt;const dd=document.getElementById('sp-desc');if(dd&&q.desc)dd.value=q.desc;const dt=document.getElementById('sp-date');if(dt)dt.value=iso;
   toast('已带入信息，确认后保存');}
 function copyShortcutUrl(){const url=quickBaseUrl()+'?amt=';const done=()=>toast('✓ 网址已复制');try{navigator.clipboard.writeText(url).then(done,()=>{const t=document.getElementById('sc-url');if(t){t.select();document.execCommand('copy');done();}});}catch(e){const t=document.getElementById('sc-url');if(t){t.select();document.execCommand('copy');done();}}}
+// ══════════ 全后台快捷记账：快捷指令联网写云端「收件箱」，app 自动收件 ══════════
+function copyFromEl(id,label){const el=document.getElementById(id);if(!el)return;try{el.focus();el.select();el.setSelectionRange(0,99999);}catch(e){}const v=el.value;const done=()=>toast('✓ '+(label||'已复制'));try{navigator.clipboard.writeText(v).then(done,()=>{try{document.execCommand('copy');}catch(e){}done();});}catch(e){try{document.execCommand('copy');}catch(e2){}done();}}
+function genToken(){return Array.from(crypto.getRandomValues(new Uint8Array(18))).map(b=>b.toString(16).padStart(2,'0')).join('');}
+function ingestToken(){let t=localStorage.getItem('rm_ingest_token');if(!t){t=genToken();localStorage.setItem('rm_ingest_token',t);}return t;}
+async function ensureIngestToken(){if(!supaReady())return;const t=ingestToken();try{await supa.from('ingest_tokens').upsert({token:t,user_id:SESSION.user.id});}catch(e){console.log('ingestToken',e);}}
+async function drainQuickTxns(){if(!supaReady())return;let rows;try{const res=await supa.from('quick_txns').select('*').order('created_at',{ascending:true});if(res.error){console.log('drain',res.error);return;}rows=res.data;}catch(e){console.log('drain',e);return;}
+  if(!rows||!rows.length)return;
+  const m=(s,arr,key)=>{if(!s)return null;const t=(''+s).toLowerCase();return arr.find(x=>x[key]===s)||arr.find(x=>x[key].toLowerCase()===t)||arr.find(x=>x[key].toLowerCase().indexOf(t)>-1||t.indexOf(x[key].toLowerCase())>-1)||null;};
+  const ids=[];rows.forEach(r=>{const amt=parseFloat(r.amount)||0;ids.push(r.id);if(amt<=0)return;const cat=m(r.cat,D.spendCats,'label')||D.spendCats[D.spendCats.length-1];const pay=m(r.pay,D.cards,'name');const iso=(r.created_at||'').slice(0,10)||todayISO();if(!recordQuick(amt,r.note||'',cat,pay,iso))recordQuick(amt,r.note||'',cat,null,iso);});
+  save();try{await supa.from('quick_txns').delete().in('id',ids);}catch(e){console.log('drainDel',e);}
+  if(LOCK&&LOCK.state==='unlocked')render();toast('☁️ 收到 '+ids.length+' 笔快捷记账');}
+const SQL_SETUP=`-- RinggitMe 全后台快捷记账：建收件箱 + 接口（在 Supabase SQL Editor 跑一次）
+create table if not exists quick_txns(
+  id bigint generated always as identity primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  amount numeric not null, cat text, pay text, note text,
+  created_at timestamptz not null default now());
+alter table quick_txns enable row level security;
+drop policy if exists qt_sel on quick_txns;
+create policy qt_sel on quick_txns for select using (auth.uid()=user_id);
+drop policy if exists qt_del on quick_txns;
+create policy qt_del on quick_txns for delete using (auth.uid()=user_id);
+
+create table if not exists ingest_tokens(
+  token text primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now());
+alter table ingest_tokens enable row level security;
+drop policy if exists it_all on ingest_tokens;
+create policy it_all on ingest_tokens for all using (auth.uid()=user_id) with check (auth.uid()=user_id);
+
+create or replace function add_quick_txn(p_token text,p_amount numeric,p_cat text default null,p_pay text default null,p_note text default null)
+returns void language plpgsql security definer set search_path=public as $$
+declare uid uuid;
+begin
+  select user_id into uid from ingest_tokens where token=p_token;
+  if uid is null then raise exception 'invalid token'; end if;
+  insert into quick_txns(user_id,amount,cat,pay,note) values(uid,p_amount,p_cat,p_pay,p_note);
+end; $$;
+grant execute on function add_quick_txn(text,numeric,text,text,text) to anon, authenticated;`;
 // 一键安装快捷指令（填入 iCloud 分享链接后即生效；否则带去手动建的图文教程）
 const SHORTCUT_URL='';
 function openTut(key){U.tutKey=key;openModal('tut');}
@@ -846,6 +886,8 @@ function tutHTML(key){const back=`<div class="ma"><button class="ok" onclick="op
   if(key==='backtap')return `${mhd('ti-device-mobile-vibration','var(--accent)','① 轻触背面触发')}${tutStep('步骤 1：设置 → 辅助功能','',iosGrp(iosRow('ti-layout-grid','#ff9500','主屏幕与 App 资源库')+iosRow('ti-accessible','#007aff','辅助功能',true)))}${tutStep('步骤 2：点「触控」','',iosGrp(iosRow('ti-hand-finger','#007aff','触控',true)+iosRow('ti-face-id','#34c759','面容 ID 与注视')))}${tutStep('步骤 3：滑到底，点「轻点背面」','',iosGrp(iosRow('ti-device-mobile','#8e8e93','轻点背面',true,'关闭 ›')),'轻点两下或三下 iPhone 背面以快速执行操作。')}${tutStep('步骤 4：选「轻点两下」→ 选你的「记一笔」','',iosGrp(iosRow('ti-hand-finger','#8e8e93','轻点两下',false,'记一笔 ›')+iosRow('ti-hand-finger','#8e8e93','轻点三下',false,'无 ›')))}${back}`;
   if(key==='at')return `${mhd('ti-pointer','var(--accent)','② 辅助触控（小白点）')}${tutStep('步骤 1：设置 → 辅助功能','',iosGrp(iosRow('ti-accessible','#007aff','辅助功能',true)))}${tutStep('步骤 2：点「触控」','',iosGrp(iosRow('ti-hand-finger','#007aff','触控',true)))}${tutStep('步骤 3：点「辅助触控」→ 打开它','',iosGrp(iosRow('ti-pointer','#007aff','辅助触控',true,'关闭 ›')))}${tutStep('步骤 4：自定义动作','在「单点 / 双点 / 长按」里挑一个 → 选「<b>快捷指令</b>」→ 选你的「记一笔」。以后点小白点就能记。')}${back}`;
   if(key==='ab')return `${mhd('ti-square','var(--accent)','③ 操作按钮（iPhone 15 Pro 以上）')}${tutStep('步骤 1：设置 → 操作按钮','',iosGrp(iosRow('ti-square','#007aff','操作按钮',true)))}${tutStep('步骤 2：滑到「快捷指令」','左右滑到「<b>快捷指令</b>」那一屏 → 点「选取快捷指令」→ 选你的「记一笔」。以后按一下侧边操作按钮就能记账。')}${back}`;
+  if(key==='sql')return `${mhd('ti-database','var(--accent)','① 建后端（跑一次 SQL）')}<div class="ib b"><i class="ti ti-info-circle"></i>打开你的 Supabase 项目 → 左边 <b>SQL Editor</b> → 新建查询 → 粘贴下面这段 → 点 <b>Run</b>。只需跑这一次。</div><textarea id="sql-box" readonly style="font-size:10.5px;font-family:monospace;min-height:200px;line-height:1.5">${SQL_SETUP.replace(/</g,'&lt;')}</textarea><button class="btn" style="width:100%;justify-content:center;padding:12px;margin-top:8px;font-size:13.5px" onclick="copyFromEl('sql-box','SQL 已复制')"><i class="ti ti-copy" style="color:var(--accent)"></i> 复制 SQL</button><div class="ib g" style="margin-top:12px"><i class="ti ti-check"></i>跑出 Success 就好了。它建了一个「收件箱」表和一个安全接口，快捷指令往这里写，app 自动收。</div>${back}`;
+  if(key==='bgbuild')return `${mhd('ti-plus','var(--accent)','③ 创建快捷指令')}<div class="ib b"><i class="ti ti-info-circle"></i>先去「② 我的记账接口」把网址 / apikey / token / 请求体都复制好备用。下面 4 个动作：</div>${tutStep('动作 1：要求输入','搜「<b>要求输入</b>」→ 输入类型选 <b>数字</b>，提示「多少钱？」')}${tutStep('动作 2：从菜单中选择（类别）','搜「<b>从菜单中选择</b>」→ 菜单项填你的类别：餐厅、Grab、超市、油费…（随你常用的）')}${tutStep('动作 3：从菜单中选择（付款）','再加一个「<b>从菜单中选择</b>」→ 菜单项填你的卡：Maybank、Touch n Go、现金…')}${tutStep('动作 4：获取 URL 内容（联网发送）','搜「<b>获取 URL 内容</b>」，按「②接口」里的值设置：<br>• 网址 = 接口网址<br>• 方法 = <b>POST</b><br>• 请求头加一条：<b>apikey</b> = 你的 apikey<br>• 请求体选 <b>JSON</b>，粘贴请求体模板，然后把 <code>金额</code> 换成动作1的「<b>提供的输入</b>」、<code>餐厅</code> 换成动作2的菜单结果、<code>Maybank</code> 换成动作3的菜单结果')}<div class="ib w"><i class="ti ti-alert-triangle"></i>不要再加「打开URL」。「获取URL内容」是在后台联网，不会打开浏览器——这就是"全后台"。</div>${tutStep('命名保存','起名「记一笔」→ 保存 → 自己先运行一次测试 → 打开 app 看有没有收到。')}<div class="ib g"><i class="ti ti-share"></i>成了就把它「⋯ → 分享 → 拷贝 iCloud 链接」发我，做成一键安装。</div>${back}`;
   return back;}
 function savePay(ccId){const amt=pf('p-amt');if(!amt){toast('请输入金额');return;}const cc=D.cards.find(c=>c.id===ccId);if(U.selSavId&&U.selSavId>0){const sav=D.cards.find(c=>c.id===U.selSavId);if(sav){if(sav.balance<amt){toast('储蓄余额不足');return;}sav.balance=parseFloat((sav.balance-amt).toFixed(2));}}cc.owed=parseFloat(Math.max(0,cc.owed-amt).toFixed(2));save();closeModal();toast('✓ 已还款 '+fmtR(amt));}
 function saveTopup(savId){const amt=pf('t-amt');if(!amt){toast('请输入金额');return;}const s=D.cards.find(c=>c.id===savId);s.balance=parseFloat((s.balance+amt).toFixed(2));save();closeModal();toast('✓ 入账 '+fmtR(amt));}
@@ -904,15 +946,23 @@ else if(U.modal==='theme'){b=`${mt('ti-palette','var(--accent)','外观与主题
 else if(U.modal==='transfer'){b=`${mt('ti-transfer','var(--accent)','账户转账')}<div class="ib b"><i class="ti ti-info-circle"></i>在储蓄 / 电子钱包之间转移余额，两边同时更新。</div><div class="field"><label>从（转出）</label>${transferOpts('from')}</div><div class="field"><label>到（转入）</label>${transferOpts('to')}</div><div class="field"><label>金额 (RM)</label><input id="tf-amt" type="number" inputmode="decimal" class="big" placeholder="0.00"/></div><div class="ma"><button onclick="closeModal()">取消</button><button class="ok" onclick="saveTransfer()">确认转账</button></div>`;}
 else if(U.modal==='addGoal'){const e=U.editId?D.goals.find(g=>g.id===U.editId):null;if(e&&!U._presel){setTimeout(()=>{U.selColor=e.color;U._presel=true;render();},0);}b=`${mt('ti-target-arrow','var(--accent)',e?'编辑目标':'新储蓄目标')}<div class="field"><label>目标名称</label><input id="g-name" placeholder="e.g. 买房首付 / 日本旅行 / 应急金" value="${e?e.name:''}"/></div><div class="field-row"><div class="field"><label>目标金额 (RM)</label><input id="g-target" type="number" inputmode="decimal" placeholder="50000" value="${e?e.target:''}"/></div><div class="field"><label>已存 (RM)</label><input id="g-saved" type="number" inputmode="decimal" placeholder="0" value="${e?e.saved:''}"/></div></div><div class="field"><label>颜色</label>${colorPicker()}</div><div class="ma"><button onclick="closeModal()">取消</button><button class="ok" onclick="saveGoal()">${e?'保存修改':'创建目标'}</button></div>`;}
 else if(U.modal==='contributeGoal'){const g=D.goals.find(x=>x.id===U.editId);const savs=D.cards.filter(c=>c.type==='saving');b=`${mt('ti-pig-money','var(--accent)','存入 — '+g.name)}<div class="ib g"><i class="ti ti-info-circle"></i>${fmt(g.saved)} / ${fmt(g.target)} · 还差 ${fmt(Math.max(0,g.target-g.saved))}</div><div class="field"><label>存入金额 (RM)</label><input id="gc-amt" type="number" inputmode="decimal" class="big" placeholder="0.00"/></div><div class="field"><label>从哪个储蓄账户扣？<span style="color:var(--text3);font-weight:400">可选</span></label><div class="pill-row">${savs.map(s=>`<div class="pill ${U.selSavId===s.id?'og':''}" onclick="sSav(${s.id})">${s.name} (${fmtR(s.balance)})</div>`).join('')}<div class="pill ${U.selSavId===0?'on':''}" onclick="sSav(0)">不扣账</div></div></div><div class="ma"><button onclick="closeModal()">取消</button><button class="ok g" onclick="contributeGoal(${g.id})">确认存入</button></div>`;}
-else if(U.modal==='shortcuts'){b=`${mt('ti-bolt','var(--accent)','自动记账')}<div class="ib b"><i class="ti ti-info-circle"></i>装一个快捷指令，配合敲背面 / 小白点 / 操作按钮，问你金额就自动记一笔——免费、不用 AI。</div>
-<div class="sc-sec">第一步：安装「记一笔」快捷指令</div>
-<div class="sc-card"><div style="min-width:0"><div class="sc-card-t">记一笔</div><div class="sc-card-s">输入金额 → 自动记账</div></div><button class="btn" style="width:auto;padding:9px 17px;font-size:14px;background:var(--accent);color:#fff;border-color:transparent;margin:0" onclick="installShortcut()"><i class="ti ti-plus"></i> 安装</button></div>
-${SHORTCUT_URL?'':`<div style="font-size:11.5px;color:var(--text3);margin:7px 2px 2px;line-height:1.5">点「安装」会带你按图文建一个（2 分钟）。</div>`}
-<div class="sc-sec" style="margin-top:18px">第二步：设置触发方式</div>
+else if(U.modal==='shortcuts'){const nav=(ic,t,oc)=>`<button class="btn" style="width:100%;justify-content:space-between;padding:14px;margin-bottom:9px;font-size:14px" onclick="${oc}"><span style="display:flex;align-items:center;gap:10px"><i class="ti ${ic}" style="color:var(--accent);font-size:18px"></i>${t}</span><i class="ti ti-chevron-right" style="color:var(--text3)"></i></button>`;
+b=`${mt('ti-bolt','var(--accent)','全后台自动记账')}<div class="ib b"><i class="ti ti-info-circle"></i>设好后：敲背面 → 选金额 / 类别 / 卡 → <b>直接写进云端，完全不打开 app</b>。下次打开 app 自动收进来、扣对应余额。</div>
+${supaReady()?'':`<div class="ib w"><i class="ti ti-alert-triangle"></i>要先<b>登录账号</b>（上面那块云同步）才能用——接口靠你的账号。</div>`}
+<div class="sc-sec">① 建后端（Supabase 跑一次 SQL）</div>${nav('ti-database','查看 SQL 和步骤',"openTut('sql')")}
+<div class="sc-sec" style="margin-top:14px">② 我的记账接口（复制给快捷指令）</div>${nav('ti-key','查看我的接口信息',"openModal('bgcfg')")}
+<div class="sc-sec" style="margin-top:14px">③ 创建快捷指令</div>${nav('ti-plus','查看创建步骤',"openTut('bgbuild')")}
+<div class="sc-sec" style="margin-top:14px">④ 设置触发方式</div>
 ${scTrigRow('ti-device-mobile-vibration','轻触手机背面触发','backtap')}
 ${scTrigRow('ti-pointer','辅助触控（小白点）触发','at')}
 ${scTrigRow('ti-square','操作按钮触发','ab')}
-<div class="ib w" style="margin-top:6px"><i class="ti ti-cloud"></i>保持<b>登录账号</b>，不管从哪记都会同步云端、所有设备都看得到。</div><div class="ma"><button class="ok" onclick="closeModal()">完成</button></div>`;}
+<div class="ma"><button class="ok" onclick="closeModal()">完成</button></div>`;}
+else if(U.modal==='bgcfg'){const url=supaCfg().url+'/rest/v1/rpc/add_quick_txn';const key=supaCfg().key;const tok=ingestToken();const body=`{"p_token":"${tok}","p_amount":金额,"p_cat":"餐厅","p_pay":"Maybank"}`;b=`${mt('ti-key','var(--accent)','我的记账接口')}${supaReady()?'':`<div class="ib w"><i class="ti ti-alert-triangle"></i>还没登录，token 不会生效。请先登录账号。</div>`}<div class="ib b"><i class="ti ti-info-circle"></i>下面这些填进「获取URL内容」动作里。token 是你的专属钥匙，别外传。</div>
+<div class="field"><label>① 接口网址 (URL)</label><textarea id="bg-url" readonly style="font-size:11px;font-family:monospace;min-height:54px">${url}</textarea><button class="btn" style="width:100%;justify-content:center;padding:10px;margin-top:6px;font-size:13px" onclick="copyFromEl('bg-url','网址已复制')"><i class="ti ti-copy" style="color:var(--accent)"></i> 复制网址</button></div>
+<div class="field"><label>② 请求头 apikey</label><textarea id="bg-key" readonly style="font-size:11px;font-family:monospace;min-height:54px">${key}</textarea><button class="btn" style="width:100%;justify-content:center;padding:10px;margin-top:6px;font-size:13px" onclick="copyFromEl('bg-key','apikey 已复制')"><i class="ti ti-copy" style="color:var(--accent)"></i> 复制 apikey</button></div>
+<div class="field"><label>③ 我的 token</label><textarea id="bg-tok" readonly style="font-size:11px;font-family:monospace;min-height:40px">${tok}</textarea><button class="btn" style="width:100%;justify-content:center;padding:10px;margin-top:6px;font-size:13px" onclick="copyFromEl('bg-tok','token 已复制')"><i class="ti ti-copy" style="color:var(--accent)"></i> 复制 token</button></div>
+<div class="field"><label>④ 请求体模板 (JSON)</label><textarea id="bg-body" readonly style="font-size:11px;font-family:monospace;min-height:64px">${body}</textarea><button class="btn" style="width:100%;justify-content:center;padding:10px;margin-top:6px;font-size:13px" onclick="copyFromEl('bg-body','请求体已复制')"><i class="ti ti-copy" style="color:var(--accent)"></i> 复制请求体</button></div>
+<div class="ib g"><i class="ti ti-bulb"></i>建快捷指令时，把「金额」换成「提供的输入」变量，「餐厅 / Maybank」换成你的菜单选择变量。</div><div class="ma"><button class="ok" onclick="openModal('shortcuts')"><i class="ti ti-arrow-left"></i> 返回</button></div>`;}
 else if(U.modal==='tut'){b=tutHTML(U.tutKey);}
 else if(U.modal==='supacfg'){b=`${mt('ti-cloud-cog','var(--accent)','配置云同步')}<div class="ib b"><i class="ti ti-info-circle"></i>到 supabase.com 免费建一个项目，在 Project Settings → API Keys 里复制 Project URL 和 anon public key，粘贴到这里（只存本机）。配置一次后就能用账号登录同步。</div><div class="field"><label>Project URL</label><input id="supa-url" placeholder="https://xxxx.supabase.co" value="${(supaCfg().url||'').replace(/"/g,'&quot;')}"/></div><div class="field"><label>anon public key</label><input id="supa-key" type="password" placeholder="eyJhbGci..." value="${(supaCfg().key||'').replace(/"/g,'&quot;')}"/></div><div class="ma"><button onclick="closeModal()">取消</button><button class="ok" onclick="saveSupaCfg()">保存并启用</button></div>`;}
 else if(U.modal==='resist'){b=`${mt('ti-hand-stop','var(--green)','忍住没买 💪')}<div class="ib g"><i class="ti ti-info-circle"></i>把想买、但最终忍住没买的东西记下来，累积你帮自己省下的钱。</div><div class="field"><label>想买的东西</label><input id="r-item" placeholder="e.g. 一双新鞋 / 奶茶 / 限量手办"/></div><div class="field"><label>价格 (RM)</label><input id="r-amt" type="number" inputmode="decimal" class="big" placeholder="0.00"/></div><div class="field"><label>备注 <span style="color:var(--text3);font-weight:400">可选</span></label><input id="r-note" placeholder="e.g. 家里还有 / 不是必需品 / 等打折"/></div><div class="ma"><button onclick="closeModal()">取消</button><button class="ok g" onclick="saveResist()">忍住了！</button></div>`;}
@@ -1035,7 +1085,7 @@ function render(){
   if(LOCK.state!=='unlocked'){renderLock();return;}
   const TABS=[{id:'home',i:'ti-home',l:'首页'},{id:'cards',i:'ti-credit-card',l:'卡片'},{id:'record',i:'ti-circle-plus',l:'记账'},{id:'history',i:'ti-calendar',l:'记录'},{id:'fixed',i:'ti-repeat',l:'固定'},{id:'aa',i:'ti-users',l:'AA'}];
   const TITLES={home:'RinggitMe',cards:'卡片管理',record:'收入 & 记账',history:'消费记录',fixed:'固定支出',aa:'AA 分账'};
-  const SUBS={home:'马来西亚理财 · 数据存本机 · v52',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
+  const SUBS={home:'马来西亚理财 · 数据存本机 · v53',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
   // preserve scroll on same-tab re-render (no more jumping to top on every tap); fade only on tab switch
   const tabChanged=U.tab!==_lastRenderedTab;
   const prevContent=document.querySelector('.content');
