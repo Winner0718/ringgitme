@@ -490,7 +490,7 @@ let D=load();
 
 // ══════════ 云同步 Cloud sync (Supabase) ══════════
 // 配置后填入：从 supabase 项目 Settings → API 复制 Project URL 与 anon public key
-const SUPA_URL='';const SUPA_KEY='';
+const SUPA_URL='https://fefburlpnmyaiuwccbpw.supabase.co';const SUPA_KEY='sb_publishable_bPOhWwpVPQ8_pio1GrDmqw_5aEaAMFS';
 let supa=null,SESSION=null,_pushT=null,_syncing=false;
 function supaCfg(){return {url:SUPA_URL||localStorage.getItem('rm_supa_url')||'',key:SUPA_KEY||localStorage.getItem('rm_supa_key')||''};}
 function supaReady(){return !!(supa&&SESSION);}
@@ -978,7 +978,7 @@ function render(){
   if(LOCK.state!=='unlocked'){renderLock();return;}
   const TABS=[{id:'home',i:'ti-home',l:'首页'},{id:'cards',i:'ti-credit-card',l:'卡片'},{id:'record',i:'ti-circle-plus',l:'记账'},{id:'history',i:'ti-calendar',l:'记录'},{id:'fixed',i:'ti-repeat',l:'固定'},{id:'aa',i:'ti-users',l:'AA'}];
   const TITLES={home:'RinggitMe',cards:'卡片管理',record:'收入 & 记账',history:'消费记录',fixed:'固定支出',aa:'AA 分账'};
-  const SUBS={home:'马来西亚理财 · 数据存本机 · v43',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
+  const SUBS={home:'马来西亚理财 · 数据存本机 · v44',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
   // preserve scroll on same-tab re-render (no more jumping to top on every tap); fade only on tab switch
   const tabChanged=U.tab!==_lastRenderedTab;
   const prevContent=document.querySelector('.content');
