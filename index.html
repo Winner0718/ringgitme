@@ -511,7 +511,7 @@ async function adoptCloudOrPush(){if(!supaReady())return;const uid=SESSION.user.
 async function flushCurrent(){if(supaReady()){clearTimeout(_pushT);await pushCloud();}}
 async function authSignUp(){if(!supa){toast('请先配置云同步');return;}const email=v('au-email'),pw=v('au-pw');if(!email||pw.length<6){toast('邮箱 + 至少6位密码');return;}await flushCurrent();toast('注册中…');const{data,error}=await supa.auth.signUp({email,password:pw});if(error){toast('注册失败：'+error.message);return;}if(data.session){toast('✓ 注册成功，已登录');}else{toast('✓ 注册成功，请到邮箱点确认链接后登录');}}
 async function authSignIn(){if(!supa){toast('请先配置云同步');return;}const email=v('au-email'),pw=v('au-pw');if(!email||!pw){toast('填邮箱和密码');return;}await flushCurrent();toast('登录中…');const{error}=await supa.auth.signInWithPassword({email,password:pw});if(error){toast('登录失败：'+error.message);return;}toast('✓ 登录成功');}
-async function authGoogle(){if(!supa){toast('请先配置云同步');return;}await flushCurrent();const{error}=await supa.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.href.split('#')[0]}});if(error)toast('Google 登录失败：'+error.message);}
+async function authGoogle(){if(!supa){toast('请先配置云同步');return;}await flushCurrent();const{error}=await supa.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.href.split('#')[0],queryParams:{prompt:'select_account'}}});if(error)toast('Google 登录失败：'+error.message);}
 async function switchAccount(id){if(!supa){toast('云同步未就绪');return;}if(SESSION&&SESSION.user&&SESSION.user.id===id)return;const acc=accounts().find(a=>a.id===id);if(!acc){toast('账号信息丢失，请重新登录');return;}toast('切换中…');await flushCurrent();const{data,error}=await supa.auth.setSession({access_token:acc.access_token,refresh_token:acc.refresh_token});if(error||!data||!data.session){toast('该账号登录已过期，请重新登录');forgetAccount(id);U.addAccount=true;render();return;}/* onAuthStateChange 会因 uid 变化自动 adoptCloudOrPush */}
 function addAnotherAccount(){U.addAccount=true;render();}
 function cancelAddAccount(){U.addAccount=false;render();}
@@ -966,7 +966,7 @@ function render(){
   if(LOCK.state!=='unlocked'){renderLock();return;}
   const TABS=[{id:'home',i:'ti-home',l:'首页'},{id:'cards',i:'ti-credit-card',l:'卡片'},{id:'record',i:'ti-circle-plus',l:'记账'},{id:'history',i:'ti-calendar',l:'记录'},{id:'fixed',i:'ti-repeat',l:'固定'},{id:'aa',i:'ti-users',l:'AA'}];
   const TITLES={home:'RinggitMe',cards:'卡片管理',record:'收入 & 记账',history:'消费记录',fixed:'固定支出',aa:'AA 分账'};
-  const SUBS={home:'马来西亚理财 · 数据存本机 · v46',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
+  const SUBS={home:'马来西亚理财 · 数据存本机 · v47',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
   // preserve scroll on same-tab re-render (no more jumping to top on every tap); fade only on tab switch
   const tabChanged=U.tab!==_lastRenderedTab;
   const prevContent=document.querySelector('.content');
