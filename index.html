@@ -833,7 +833,7 @@ function processQuickAdd(){if(!_quickAdd)return;const q=_quickAdd;_quickAdd=null
   toast('已带入信息，确认后保存');}
 function copyShortcutUrl(){const url=quickBaseUrl()+'?auto=1&amt=金额&cat=餐厅 Restaurant&desc=备注&pay=付款方式';const done=()=>toast('✓ 网址模板已复制');try{navigator.clipboard.writeText(url).then(done,()=>{const t=document.getElementById('sc-url');if(t){t.select();document.execCommand('copy');done();}});}catch(e){const t=document.getElementById('sc-url');if(t){t.select();document.execCommand('copy');done();}}}
 // 一键安装快捷指令（填入 iCloud 分享链接后即生效；否则带去手动建的图文教程）
-const SHORTCUT_URL='';
+const SHORTCUT_URL='https://www.icloud.com/shortcuts/596fdbdda1fe464592c382eeb79a2318';
 function openTut(key){U.tutKey=key;openModal('tut');}
 function installShortcut(){if(SHORTCUT_URL){location.href=SHORTCUT_URL;return;}openTut('build');}
 function iosRow(ic,bg,title,hl,trail){return `<div class="ios-row"><span class="ios-ic" style="background:${bg}"><i class="ti ${ic}"></i></span><span class="ios-tl ${hl?'hl':''}">${title}</span><span class="ios-tr">${trail||'›'}</span></div>`;}
@@ -1035,7 +1035,7 @@ function render(){
   if(LOCK.state!=='unlocked'){renderLock();return;}
   const TABS=[{id:'home',i:'ti-home',l:'首页'},{id:'cards',i:'ti-credit-card',l:'卡片'},{id:'record',i:'ti-circle-plus',l:'记账'},{id:'history',i:'ti-calendar',l:'记录'},{id:'fixed',i:'ti-repeat',l:'固定'},{id:'aa',i:'ti-users',l:'AA'}];
   const TITLES={home:'RinggitMe',cards:'卡片管理',record:'收入 & 记账',history:'消费记录',fixed:'固定支出',aa:'AA 分账'};
-  const SUBS={home:'马来西亚理财 · 数据存本机 · v50',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
+  const SUBS={home:'马来西亚理财 · 数据存本机 · v51',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
   // preserve scroll on same-tab re-render (no more jumping to top on every tap); fade only on tab switch
   const tabChanged=U.tab!==_lastRenderedTab;
   const prevContent=document.querySelector('.content');
