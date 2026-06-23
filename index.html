@@ -379,7 +379,7 @@ input,textarea,select{-webkit-user-select:text;user-select:text}
 .fav-ic i{font-size:19px}
 .tap-badge{font-size:11px;background:var(--green-bg);color:var(--green);padding:4px 11px;border-radius:99px;font-weight:700}
 
-.toast{position:absolute;bottom:calc(var(--safe-bot) + 96px);left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);font-size:13.5px;font-weight:600;padding:12px 22px;border-radius:99px;white-space:nowrap;pointer-events:none;z-index:99;box-shadow:var(--shadow-lg);animation:toastin .25s}
+.toast{position:fixed;bottom:calc(var(--safe-bot) + 96px);left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);font-size:13.5px;font-weight:600;padding:12px 22px;border-radius:99px;white-space:nowrap;pointer-events:none;z-index:9999;box-shadow:var(--shadow-lg);animation:toastin .25s}
 @keyframes toastin{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
 
 /* ── MODE SWITCH ── */
@@ -575,7 +575,7 @@ const itemIcon=(obj,size,radius)=>iconHTML(obj&&obj.img?{img:obj.img}:gi(obj?obj
 let _tt;
 // light haptic — buzzes on Android; iOS ignores silently (harmless)
 function haptic(ms){try{if(navigator.vibrate)navigator.vibrate(ms||8);}catch(e){}}
-function toast(msg){clearTimeout(_tt);haptic(12);const o=document.getElementById('_t');if(o)o.remove();const el=document.createElement('div');el.id='_t';el.className='toast';el.textContent=msg;document.getElementById('app').appendChild(el);_tt=setTimeout(()=>el.remove(),2200);}
+function toast(msg){clearTimeout(_tt);haptic(12);const o=document.getElementById('_t');if(o)o.remove();const el=document.createElement('div');el.id='_t';el.className='toast';el.textContent=msg;document.body.appendChild(el);_tt=setTimeout(()=>el.remove(),2200);}
 // in-app confirm dialog (replaces ugly native confirm)
 function confirmSheet(title,msg,onYes,opts){opts=opts||{};const el=document.createElement('div');el.className='confirm-wrap';el.innerHTML=`<div class="confirm-box"><div class="confirm-title">${title}</div>${msg?`<div class="confirm-msg">${msg}</div>`:''}<div class="confirm-acts"><button class="confirm-btn" data-no>取消</button><button class="confirm-btn ${opts.danger?'danger':'ok'}" data-yes>${opts.okText||'确认'}</button></div></div>`;document.getElementById('app').appendChild(el);el.querySelector('[data-no]').onclick=()=>el.remove();el.querySelector('[data-yes]').onclick=()=>{el.remove();haptic(14);onYes&&onYes();};el.onclick=e=>{if(e.target===el)el.remove();};}
 
@@ -981,7 +981,7 @@ function render(){
   if(LOCK.state!=='unlocked'){renderLock();return;}
   const TABS=[{id:'home',i:'ti-home',l:'首页'},{id:'cards',i:'ti-credit-card',l:'卡片'},{id:'record',i:'ti-circle-plus',l:'记账'},{id:'history',i:'ti-calendar',l:'记录'},{id:'fixed',i:'ti-repeat',l:'固定'},{id:'aa',i:'ti-users',l:'AA'}];
   const TITLES={home:'RinggitMe',cards:'卡片管理',record:'收入 & 记账',history:'消费记录',fixed:'固定支出',aa:'AA 分账'};
-  const SUBS={home:'马来西亚理财 · 数据存本机 · v54',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
+  const SUBS={home:'马来西亚理财 · 数据存本机 · v55',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
   // preserve scroll on same-tab re-render (no more jumping to top on every tap); fade only on tab switch
   const tabChanged=U.tab!==_lastRenderedTab;
   const prevContent=document.querySelector('.content');
