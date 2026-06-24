@@ -908,7 +908,7 @@ function colorPicker(){return`<div class="cdots">${COLORS.map(c=>`<div class="cd
 function facePicker(){return`<div class="face-grid">${CARD_FACES.map(f=>`<div class="face-sw ${U.selFace===f.id?'on':''}" style="background:linear-gradient(135deg,${f.g[0]},${f.g[1]})" onclick="sFace('${f.id}')"><span>${f.name}</span></div>`).join('')}</div>`;}
 function payOpts(incSav){const ccs=D.cards.filter(c=>c.type==='cc'),ews=D.cards.filter(c=>c.type==='ew'),savs=D.cards.filter(c=>c.type==='saving');let h='';
   const sec=(t,arr,subFn)=>{if(!arr.length)return'';let s=`<div class="po-lbl">${t}</div>`;arr.forEach(c=>{s+=`<div class="po ${U.selPayId===c.id?'on':''}" onclick="sPay(${c.id})">${itemIcon(c,34,10)}<div style="flex:1;min-width:0"><div class="po-n">${c.name}</div><div class="po-s">${subFn(c)}</div></div>${U.selPayId===c.id?'<i class="ti ti-circle-check-filled" style="color:var(--accent);font-size:20px"></i>':'<i class="ti ti-circle" style="color:var(--border2);font-size:20px"></i>'}</div>`;});return s;};
-  h+=sec('信用卡',ccs,c=>'欠 '+fmtR(c.owed)+(c.limit?' · 可用 '+fmtR(Math.max(0,c.limit-c.owed)):''));
+  h+=sec('信用卡',ccs,c=>'欠 '+fmtR(c.owed)+(c.limit?' · 可用 '+fmtR(Math.max(0,c.limit-c.owed))+' · 总额度 '+fmtR(c.limit):''));
   h+=sec('eWallet',ews,c=>'余额 '+fmtR(c.balance));
   if(incSav)h+=sec('储蓄',savs,c=>'余额 '+fmtR(c.balance));
   if(!h)h=`<div style="font-size:13px;color:var(--text3);padding:10px 0">还没有卡片 — 先去「卡片」添加</div>`;
@@ -1085,7 +1085,7 @@ function render(){
   if(LOCK.state!=='unlocked'){renderLock();return;}
   const TABS=[{id:'home',i:'ti-home',l:'首页'},{id:'cards',i:'ti-credit-card',l:'卡片'},{id:'record',i:'ti-circle-plus',l:'记账'},{id:'history',i:'ti-calendar',l:'记录'},{id:'fixed',i:'ti-repeat',l:'固定'},{id:'aa',i:'ti-users',l:'AA'}];
   const TITLES={home:'RinggitMe',cards:'卡片管理',record:'收入 & 记账',history:'消费记录',fixed:'固定支出',aa:'AA 分账'};
-  const SUBS={home:'马来西亚理财 · 数据存本机 · v61',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
+  const SUBS={home:'马来西亚理财 · 数据存本机 · v62',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
   // preserve scroll on same-tab re-render (no more jumping to top on every tap); fade only on tab switch
   const tabChanged=U.tab!==_lastRenderedTab;
   const prevContent=document.querySelector('.content');
