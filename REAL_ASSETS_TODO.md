@@ -44,12 +44,16 @@ Add real, legally obtained PNG files at the exact paths below. Transparent-backg
 
 ### Maybank
 
-- [ ] `assets/cards/maybank-visa-platinum.png`
+- [x] `assets/cards/maybank-visa-platinum.png` (added)
 - [ ] `assets/cards/maybank-2-cards-gold.png`
 - [ ] `assets/cards/maybank-2-cards-platinum.png`
 - [ ] `assets/cards/maybank-world-mastercard.png`
 - [ ] `assets/cards/maybank-world-elite-mastercard.png`
 - [ ] `assets/cards/maybank-visa-infinite.png`
+- [x] `assets/cards/maybank-amex-platinum.png` (added → preset `mb-amex-plat`)
+- [x] `assets/cards/maybank-fc-barcelona-visa-signature.png` (added → preset `mb-barca-sig`)
+- [x] `assets/cards/maybank-global-access-mastercard-world.png` (added → preset `mb-global-world`)
+- [x] `assets/cards/maybank-islamic-petronas-ikhwan-visa-platinum.png` (added → preset `mb-islamic-petronas`)
 
 ### CIMB
 
