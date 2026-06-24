@@ -276,16 +276,19 @@ input,textarea,select{-webkit-user-select:text;user-select:text}
 .face-sw span{font-size:9.5px;color:#fff;font-weight:600;opacity:.92;line-height:1.1}
 .face-sw.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent)}
 
-.po{border:1.5px solid var(--border);border-radius:13px;padding:11px 13px;cursor:pointer;display:flex;align-items:center;gap:11px;margin-bottom:8px;background:var(--bg2)}
-.po.on{border-color:var(--accent);background:var(--blue-bg)}
+.po{border:1.5px solid var(--border);border-radius:13px;padding:11px 13px;cursor:pointer;display:flex;align-items:center;gap:11px;margin-bottom:8px;position:relative;overflow:hidden;background:linear-gradient(135deg,color-mix(in srgb,var(--poc,#7a7a7a) 13%,var(--bg2)),var(--bg2) 72%)}
+.po::after{content:'';position:absolute;top:-45%;right:-10%;width:130px;height:130px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--poc,#fff) 26%,transparent),transparent 70%);pointer-events:none;z-index:0}
+.po>*{position:relative;z-index:1}
+.po.on{border-color:var(--accent);background:linear-gradient(135deg,color-mix(in srgb,var(--poc,var(--accent)) 26%,var(--bg2)),var(--bg2));box-shadow:0 3px 16px color-mix(in srgb,var(--poc,var(--accent)) 28%,transparent)}
 .po-n{font-size:14px;font-weight:650}
 .po-s{font-size:11.5px;color:var(--text3);margin-top:1px}
 .po-lbl{font-size:10px;color:var(--text3);font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin:11px 0 6px}
 
 .cat-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:6px}
-.cat-btn{padding:11px 12px;border-radius:12px;border:1.5px solid var(--border);background:var(--bg2);cursor:pointer;font-size:12.5px;color:var(--text2);display:flex;align-items:center;gap:8px;text-align:left;font-weight:600;position:relative}
-.cat-btn i{font-size:17px;flex-shrink:0}
-.cat-btn.on{background:var(--orange-bg);color:var(--orange);border-color:transparent}
+.cat-btn{padding:11px 12px;border-radius:12px;border:1.5px solid var(--border);background:linear-gradient(135deg,color-mix(in srgb,var(--cc,var(--accent)) 10%,var(--bg2)),var(--bg2) 78%);cursor:pointer;font-size:12.5px;color:var(--text2);display:flex;align-items:center;gap:8px;text-align:left;font-weight:600;position:relative;overflow:hidden}
+.cat-btn i{font-size:17px;flex-shrink:0;color:var(--cc,var(--accent))}
+.cat-btn.on{background:linear-gradient(135deg,var(--cc,var(--accent)),color-mix(in srgb,var(--cc,var(--accent)) 68%,#000));color:#fff;border-color:transparent;box-shadow:0 3px 14px color-mix(in srgb,var(--cc,var(--accent)) 34%,transparent)}
+.cat-btn.on i{color:#fff}
 .cat-btn.add-c{border-style:dashed;color:var(--accent);border-color:var(--accent)}
 .cat-del{position:absolute;top:3px;right:4px;font-size:13px;color:var(--red);padding:2px}
 
@@ -907,14 +910,16 @@ function iconPicker(filter){
 function colorPicker(){return`<div class="cdots">${COLORS.map(c=>`<div class="cdot ${U.selColor===c?'on':''}" style="background:${c}" onclick="sColor('${c}')"></div>`).join('')}</div>`;}
 function facePicker(){return`<div class="face-grid">${CARD_FACES.map(f=>`<div class="face-sw ${U.selFace===f.id?'on':''}" style="background:linear-gradient(135deg,${f.g[0]},${f.g[1]})" onclick="sFace('${f.id}')"><span>${f.name}</span></div>`).join('')}</div>`;}
 function payOpts(incSav){const ccs=D.cards.filter(c=>c.type==='cc'),ews=D.cards.filter(c=>c.type==='ew'),savs=D.cards.filter(c=>c.type==='saving');let h='';
-  const sec=(t,arr,subFn)=>{if(!arr.length)return'';let s=`<div class="po-lbl">${t}</div>`;arr.forEach(c=>{s+=`<div class="po ${U.selPayId===c.id?'on':''}" onclick="sPay(${c.id})">${itemIcon(c,34,10)}<div style="flex:1;min-width:0"><div class="po-n">${c.name}</div><div class="po-s">${subFn(c)}</div></div>${U.selPayId===c.id?'<i class="ti ti-circle-check-filled" style="color:var(--accent);font-size:20px"></i>':'<i class="ti ti-circle" style="color:var(--border2);font-size:20px"></i>'}</div>`;});return s;};
+  const sec=(t,arr,subFn)=>{if(!arr.length)return'';let s=`<div class="po-lbl">${t}</div>`;arr.forEach(c=>{const bc=(gi(c.iconId)&&gi(c.iconId).bg)||c.color||'#64748b';s+=`<div class="po ${U.selPayId===c.id?'on':''}" style="--poc:${bc}" onclick="sPay(${c.id})">${itemIcon(c,34,10)}<div style="flex:1;min-width:0"><div class="po-n">${c.name}</div><div class="po-s">${subFn(c)}</div></div>${U.selPayId===c.id?'<i class="ti ti-circle-check-filled" style="color:var(--accent);font-size:20px"></i>':'<i class="ti ti-circle" style="color:var(--border2);font-size:20px"></i>'}</div>`;});return s;};
   h+=sec('信用卡',ccs,c=>'欠 '+fmtR(c.owed)+(c.limit?' · 可用 '+fmtR(Math.max(0,c.limit-c.owed))+' · 总额度 '+fmtR(c.limit):''));
   h+=sec('eWallet',ews,c=>'余额 '+fmtR(c.balance));
   if(incSav)h+=sec('储蓄',savs,c=>'余额 '+fmtR(c.balance));
   if(!h)h=`<div style="font-size:13px;color:var(--text3);padding:10px 0">还没有卡片 — 先去「卡片」添加</div>`;
-  h+=`<div class="po ${(U.selPayId===null||U.selPayId===undefined)?'on':''}" onclick="sPay(null)"><div style="width:34px;height:34px;border-radius:10px;background:var(--bg4);display:flex;align-items:center;justify-content:center;color:var(--text3)"><i class="ti ti-cash"></i></div><div style="flex:1"><div class="po-n">现金 / 不指定</div></div>${(U.selPayId===null||U.selPayId===undefined)?'<i class="ti ti-circle-check-filled" style="color:var(--accent);font-size:20px"></i>':'<i class="ti ti-circle" style="color:var(--border2);font-size:20px"></i>'}</div>`;
+  h+=`<div class="po ${(U.selPayId===null||U.selPayId===undefined)?'on':''}" style="--poc:#16a34a" onclick="sPay(null)"><div style="width:34px;height:34px;border-radius:10px;background:var(--green-bg);display:flex;align-items:center;justify-content:center;color:var(--green)"><i class="ti ti-cash"></i></div><div style="flex:1"><div class="po-n">现金 / 不指定</div></div>${(U.selPayId===null||U.selPayId===undefined)?'<i class="ti ti-circle-check-filled" style="color:var(--accent);font-size:20px"></i>':'<i class="ti ti-circle" style="color:var(--border2);font-size:20px"></i>'}</div>`;
   return h;}
-function catPicker(){const groups=[...new Set(D.spendCats.map(c=>c.group))];let h='';groups.forEach(g=>{h+=`<div class="po-lbl">${g}</div><div class="cat-grid">`;D.spendCats.filter(c=>c.group===g).forEach(c=>{h+=`<button class="cat-btn ${U.selCatId===c.id?'on':''}" onclick="sCat('${c.id}')"><i class="ti ${c.icon}"></i>${c.label}${c.custom?`<span class="cat-del" onclick="event.stopPropagation();delSpendCat('${c.id}')"><i class="ti ti-x"></i></span>`:''}</button>`;});h+=`</div>`;});h+=`<div class="cat-grid" style="margin-top:8px"><button class="cat-btn add-c" onclick="openModal('addSpendCat')"><i class="ti ti-plus"></i>自定义添加</button></div>`;return h;}
+const GROUP_COL={'食 Food':'#e0712f','购 Shopping':'#2563eb','行 Transport':'#0d9488','乐 Entertainment':'#7c3aed','健 Health':'#16a34a','杂 Others':'#64748b'};
+function catCol(g){return GROUP_COL[g]||'#7c5cd0';}
+function catPicker(){const groups=[...new Set(D.spendCats.map(c=>c.group))];let h='';groups.forEach(g=>{const gc=catCol(g);h+=`<div class="po-lbl">${g}</div><div class="cat-grid">`;D.spendCats.filter(c=>c.group===g).forEach(c=>{h+=`<button class="cat-btn ${U.selCatId===c.id?'on':''}" style="--cc:${gc}" onclick="sCat('${c.id}')"><i class="ti ${c.icon}"></i>${c.label}${c.custom?`<span class="cat-del" onclick="event.stopPropagation();delSpendCat('${c.id}')"><i class="ti ti-x"></i></span>`:''}</button>`;});h+=`</div>`;});h+=`<div class="cat-grid" style="margin-top:8px"><button class="cat-btn add-c" onclick="openModal('addSpendCat')"><i class="ti ti-plus"></i>自定义添加</button></div>`;return h;}
 function aaBal(p){let they=0,me=0;p.txns.filter(t=>!t.settled).forEach(t=>{const s=t.total/t.split;if(t.paidBy==='me')they+=s*(t.split-1);else me+=s;});return{they,me,net:they-me};}
 
 function buildModal(){if(!U.modal)return'';const LTYPES=['车贷 Car loan','房贷 Home loan','房租 Rent','PTPTN','个人贷款','其他'];const GROUPS=['食 Food','购 Shopping','行 Transport','乐 Entertainment','健 Health','杂 Others'];let b='';
@@ -1085,7 +1090,7 @@ function render(){
   if(LOCK.state!=='unlocked'){renderLock();return;}
   const TABS=[{id:'home',i:'ti-home',l:'首页'},{id:'cards',i:'ti-credit-card',l:'卡片'},{id:'record',i:'ti-circle-plus',l:'记账'},{id:'history',i:'ti-calendar',l:'记录'},{id:'fixed',i:'ti-repeat',l:'固定'},{id:'aa',i:'ti-users',l:'AA'}];
   const TITLES={home:'RinggitMe',cards:'卡片管理',record:'收入 & 记账',history:'消费记录',fixed:'固定支出',aa:'AA 分账'};
-  const SUBS={home:'马来西亚理财 · 数据存本机 · v62',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
+  const SUBS={home:'马来西亚理财 · 数据存本机 · v63',cards:'信用卡 · 储蓄 · eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
   // preserve scroll on same-tab re-render (no more jumping to top on every tap); fade only on tab switch
   const tabChanged=U.tab!==_lastRenderedTab;
   const prevContent=document.querySelector('.content');
