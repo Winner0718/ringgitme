@@ -303,6 +303,13 @@ input,textarea,select{-webkit-user-select:text;user-select:text}
 .preset-pick.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 7%,var(--bg2))}
 .preset-pick-m{flex:1;min-width:0}.preset-pick-n{display:block;font-size:12.5px;font-weight:700;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.preset-pick-s{display:block;font-size:10.5px;color:var(--text3);margin-top:2px}
 .preset-asset-note{font-size:11px;color:var(--text3);line-height:1.45;margin:-5px 1px 13px}
+.swipe-opt{position:relative;overflow:hidden;border-radius:14px;touch-action:pan-y}
+.swipe-main{position:relative;z-index:2;transition:transform .18s ease}
+.swipe-opt.show-del .swipe-main{transform:translateX(-62px)}
+.swipe-del{position:absolute;z-index:1;right:0;top:0;bottom:0;width:58px;border:0;border-radius:12px;background:var(--red);color:#fff;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.bank-swipe{width:78px;min-width:78px;flex-shrink:0}.bank-swipe .bank-pick{width:78px;min-width:0;height:100%}
+.ig-swipe{border-radius:14px}.ig-swipe .ig-item{width:100%;height:100%}.ig-swipe.show-del .swipe-main{transform:translateX(-48px)}.ig-swipe .swipe-del{width:46px;font-size:11px;border-radius:12px}
+.preset-reset{border:0;background:transparent;color:var(--accent);font-size:11.5px;font-weight:700;padding:5px 2px 0;margin:-4px 0 8px;display:inline-flex;align-items:center;gap:4px;cursor:pointer}
 .preset-card-preview{position:relative;overflow:hidden;border-radius:14px;padding:11px 11px 13px;margin:4px 0 14px;color:#fff;background:linear-gradient(155deg,#2c2e34,#161719)}
 .preset-card-preview::after{content:"";position:absolute;top:-70px;right:-55px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,var(--cc-glow,rgba(255,255,255,.10)),transparent 70%);pointer-events:none}
 .preset-card-preview .real-asset.card-art{position:relative;width:100%;aspect-ratio:1.586/1;height:auto;border-radius:11px;box-shadow:0 8px 22px rgba(0,0,0,.4)}
@@ -350,17 +357,17 @@ input,textarea,select{-webkit-user-select:text;user-select:text}
 .acct-real-limrow{position:relative;display:flex;justify-content:space-between;font-size:10.5px;color:rgba(255,255,255,.78);margin:12px 0 7px}
 .acct-real-foot{position:relative;display:flex;justify-content:space-between;font-size:10.5px;color:rgba(255,255,255,.82);margin-top:7px}
 .acct-real .cc-bar{position:relative}
-/* ── Premium section module header ── */
-.sec-mod{display:flex;align-items:center;gap:8px;margin:22px 2px 12px}
-.sec-mod-head{flex:1;min-width:0;display:flex;align-items:center;gap:8px;cursor:pointer;-webkit-tap-highlight-color:transparent}
-.sec-mod-cv{font-size:17px;color:var(--text3);flex-shrink:0}
-.sec-mod-bar{width:3px;height:17px;border-radius:2px;background:var(--accent);flex-shrink:0}
-.sec-mod-t{display:flex;align-items:baseline;gap:7px;min-width:0;overflow:hidden}
-.sec-mod-zh{font-size:16px;font-weight:750;letter-spacing:-.01em;color:var(--text);white-space:nowrap;flex-shrink:0}
-.sec-mod-en{font-size:10.5px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sec-mod-c{font-size:10.5px;font-weight:700;color:var(--text2);background:var(--bg3);border-radius:99px;padding:2px 8px;flex-shrink:0;margin-left:auto}
-.sec-mod-tot{font-size:11px;font-weight:700;color:var(--text3);font-family:var(--font-display);flex-shrink:0;white-space:nowrap}
-.sec-mod-a{font-size:12.5px;color:var(--accent);cursor:pointer;font-weight:650;display:flex;align-items:center;gap:3px;flex-shrink:0}
+/* ── Card management tab selector ── */
+.card-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:16px 0 13px}
+.card-tab{min-width:0;border:1.5px solid var(--border);border-radius:15px;background:linear-gradient(135deg,var(--bg2),var(--bg3));padding:10px 8px;text-align:left;color:var(--text2);cursor:pointer;box-shadow:none}
+.card-tab.on{border-color:var(--accent);background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 13%,var(--bg2)),var(--bg2));box-shadow:0 5px 18px color-mix(in srgb,var(--accent) 15%,transparent)}
+.card-tab-zh{font-size:13px;font-weight:800;line-height:1.15;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card-tab-en{font-size:9.5px;font-weight:700;color:var(--text3);margin-top:2px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card-tab-sum{font-size:10.5px;color:var(--text2);font-weight:650;line-height:1.25;margin-top:7px;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.card-tab.on .card-tab-sum{color:var(--accent)}
+.card-list-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:4px 2px 12px}
+.card-list-title{min-width:0}.card-list-zh{font-size:16px;font-weight:800;color:var(--text);line-height:1.2}.card-list-en{font-size:10.5px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin-top:2px}
+.card-list-add{font-size:12.5px;color:var(--accent);cursor:pointer;font-weight:750;display:flex;align-items:center;gap:3px;flex-shrink:0;border:1px solid var(--border);background:var(--bg2);border-radius:99px;padding:8px 12px}
 
 .po{border:1.5px solid var(--border);border-radius:13px;padding:11px 13px;cursor:pointer;display:flex;align-items:center;gap:11px;margin-bottom:8px;position:relative;overflow:hidden;background:linear-gradient(135deg,color-mix(in srgb,var(--poc,#7a7a7a) 13%,var(--bg2)),var(--bg2) 72%)}
 .po::after{content:'';position:absolute;top:-45%;right:-10%;width:130px;height:130px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--poc,#fff) 26%,transparent),transparent 70%);pointer-events:none;z-index:0}
@@ -729,9 +736,11 @@ function setAccent(id){D.accent=id;save();applyTheme();render();}
 applyTheme();
 if(window.matchMedia)try{window.matchMedia('(prefers-color-scheme:dark)').addEventListener('change',()=>{applyTheme();if(LOCK.state==='unlocked')render();});}catch(e){}
 let U={tab:'home',modal:null,expandedId:null,selIconId:null,selCustomImg:null,selColor:COLORS[0],selCatId:null,selPayId:null,selSavId:null,selPaidBy:'me',selSplit:2,editId:null,activePersonId:null,activeEditTxnId:null,_presel:false};
-// Card-management section open/closed state (persisted). Default: credit cards open, others collapsed.
-let cardSecState=(()=>{try{const s=JSON.parse(localStorage.getItem('rm_cards_sections_v1'));if(s&&typeof s==='object')return{cc:!!s.cc,sav:!!s.sav,ew:!!s.ew};}catch(e){}return{cc:true,sav:false,ew:false};})();
-function toggleCardSec(k){cardSecState[k]=!cardSecState[k];try{localStorage.setItem('rm_cards_sections_v1',JSON.stringify(cardSecState));}catch(e){}haptic();render();}
+// Card-management selected tab. Old accordion state is intentionally ignored.
+let cardActiveTab=(()=>{try{const s=localStorage.getItem('rm_cards_active_tab_v1');if(['cc','sav','ew'].includes(s))return s;}catch(e){}return'cc';})();
+function setCardTab(k){if(!['cc','sav','ew'].includes(k))k='cc';cardActiveTab=k;try{localStorage.setItem('rm_cards_active_tab_v1',k);}catch(e){}haptic();render();}
+const PRESET_DELETE_KEYS={card:'rm_deleted_card_presets_v1',cc_bank:'rm_deleted_bank_presets_v1',account_bank:'rm_deleted_account_bank_presets_v1',ewallet:'rm_deleted_ewallet_presets_v1',merchant:'rm_deleted_merchant_presets_v1'};
+let _swipePreset={x:0,y:0,moved:false};
 
 // ── Lock state ──
 let LOCK={state:'checking',pinInput:'',pinError:'',pinAttempts:0,setupPin:'',setupPinStep:1,setupPinFirst:'',faceAutoTried:false};
@@ -782,6 +791,18 @@ const itemIcon=(obj,size,radius)=>{if(obj&&obj.img)return iconHTML({img:obj.img}
 let _tt;
 // light haptic — buzzes on Android; iOS ignores silently (harmless)
 function haptic(ms){try{if(navigator.vibrate)navigator.vibrate(ms||8);}catch(e){}}
+function deletedPresets(kind){const key=PRESET_DELETE_KEYS[kind];if(!key)return[];try{return JSON.parse(localStorage.getItem(key)||'[]').filter(Boolean);}catch(e){return[];}}
+function isPresetDeleted(kind,id){return deletedPresets(kind).includes(id);}
+function visiblePresets(list,kind){const gone=new Set(deletedPresets(kind));return(list||[]).filter(x=>!gone.has(x.id));}
+function closeSwipeMenus(){document.querySelectorAll('.swipe-opt.show-del').forEach(el=>el.classList.remove('show-del'));}
+function presetSwipeStart(e,kind,id){const t=e.touches&&e.touches[0];if(!t)return;_swipePreset={x:t.clientX,y:t.clientY,moved:false};}
+function presetSwipeMove(e,kind,id){const t=e.touches&&e.touches[0];if(!t)return;const dx=t.clientX-_swipePreset.x,dy=t.clientY-_swipePreset.y;if(Math.abs(dx)>28&&Math.abs(dx)>Math.abs(dy)*1.25){const row=e.currentTarget;if(dx<0){closeSwipeMenus();row.classList.add('show-del');}else row.classList.remove('show-del');_swipePreset.moved=true;try{e.preventDefault();}catch(_){}}}
+function presetSwipeEnd(e){if(_swipePreset.moved)window._presetTapGuard=Date.now();}
+function presetClickGuard(e){if(Date.now()-(window._presetTapGuard||0)<420){if(e){e.preventDefault();e.stopPropagation();}return true;}return false;}
+function swipeWrap(kind,id,label,inner,cls=''){return`<div class="swipe-opt ${cls}" ontouchstart="presetSwipeStart(event,'${kind}','${id}')" ontouchmove="presetSwipeMove(event,'${kind}','${id}')" ontouchend="presetSwipeEnd(event)"><div class="swipe-main">${inner}</div><button type="button" class="swipe-del" onclick="event.stopPropagation();deletePreset('${kind}','${id}')">删除</button></div>`;}
+function deletePreset(kind,id){const key=PRESET_DELETE_KEYS[kind];if(!key)return;confirmSheet('删除这个预设？','之后可在重置预设恢复。',()=>{const arr=deletedPresets(kind);if(!arr.includes(id))arr.push(id);try{localStorage.setItem(key,JSON.stringify(arr));}catch(e){}if(kind==='card'&&U.selCardPreset===id){U.selCardPreset=null;U.ccDraft=null;}if(kind==='cc_bank'&&U.selBankId===id){U.selBankId=null;U.selCardPreset=null;U.ccDraft=null;}if((kind==='account_bank'||kind==='ewallet'||kind==='merchant')&&U.selIconId===id)U.selIconId=null;closeSwipeMenus();haptic();render();toast('已删除预设');},{danger:true,okText:'删除'});}
+function resetDeletedPresets(kind){const key=PRESET_DELETE_KEYS[kind];if(!key)return;confirmSheet('恢复所有已删除预设？','之前删除的预设会重新出现在这个选择器里。',()=>{try{localStorage.removeItem(key);}catch(e){}haptic();render();toast('已恢复预设');},{okText:'恢复'});}
+function presetResetHTML(kind){return`<button type="button" class="preset-reset" onclick="resetDeletedPresets('${kind}')"><i class="ti ti-restore"></i>重置预设</button>`;}
 // ── 记账提示音（Web Audio 实时合成，无需音频文件）──
 let _actx=null;
 function _ac(){try{if(!_actx)_actx=new (window.AudioContext||window.webkitAudioContext)();if(_actx.state==='suspended')_actx.resume();}catch(e){}return _actx;}
@@ -1093,22 +1114,25 @@ function useFav(id){const f=D.favs.find(f=>f.id===id);if(!f)return;const payCard
 // ── Pickers ──
 function iconPicker(filter){
   let icons=ICONS;
+  let delKind=null;
   if(filter==='bank')icons=ICONS.filter(i=>i.cat==='bank'||i.cat==='gen');
   else if(filter==='ew')icons=ICONS.filter(i=>i.cat==='ew'||i.cat==='gen');
   else if(filter==='app')icons=ICONS.filter(i=>i.cat==='app'||i.cat==='gen');
+  if(filter==='bank')delKind='account_bank';else if(filter==='ew')delKind='ewallet';else if(filter==='app')delKind='merchant';
+  if(delKind)icons=visiblePresets(icons,delKind);
   let h=`<div class="icon-grid">`;
   h+=`<label class="ig-item ${U.selCustomImg?'sel':''}" style="cursor:pointer">
     <input type="file" accept="image/*" style="display:none" onchange="onIconUpload(this)"/>
     ${U.selCustomImg?`<img src="${U.selCustomImg}" style="width:42px;height:42px;border-radius:12px;object-fit:cover"/>`:`<div style="width:42px;height:42px;border-radius:12px;background:var(--bg4);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:20px"><i class="ti ti-camera-plus"></i></div>`}
     <div class="ig-label" style="color:var(--accent)">上传图片</div></label>`;
-  icons.forEach(ic=>{h+=`<div class="ig-item ${(!U.selCustomImg&&U.selIconId===ic.id)?'sel':''}" onclick="sIcon('${ic.id}')">${presetIconHTML(ic,42,12)}<div class="ig-label">${ic.l}</div></div>`;});
-  h+=`</div>`;return h;
+  icons.forEach(ic=>{const tile=`<div class="ig-item ${(!U.selCustomImg&&U.selIconId===ic.id)?'sel':''}" onclick="if(presetClickGuard(event))return;sIcon('${ic.id}')">${presetIconHTML(ic,42,12)}<div class="ig-label">${ic.l}</div></div>`;h+=delKind?swipeWrap(delKind,ic.id,ic.l,tile,'ig-swipe'):tile;});
+  h+=`</div>${delKind?presetResetHTML(delKind):''}`;return h;
 }
 function colorPicker(){return`<div class="cdots">${COLORS.map(c=>`<div class="cdot ${U.selColor===c?'on':''}" style="background:${c}" onclick="sColor('${c}')"></div>`).join('')}</div>`;}
 function themeColorPicker(){const cur=U.selThemeColor||'';return`<div class="cdots"><div class="cdot cdot-auto ${cur===''?'on':''}" onclick="sThemeColor('')" title="默认主题"><i class="ti ti-sparkles"></i></div>${COLORS.map(c=>`<div class="cdot ${cur===c?'on':''}" style="background:${c}" onclick="sThemeColor('${c}')"></div>`).join('')}</div>`;}
 function facePicker(){return`<div class="face-grid">${CARD_FACES.map(f=>`<div class="face-sw ${U.selFace===f.id?'on':''}" style="background:linear-gradient(135deg,${f.g[0]},${f.g[1]})" onclick="sFace('${f.id}')"><span>${f.name}</span></div>`).join('')}</div>`;}
-function bankPickerHTML(){return`<div class="bank-strip">${CARD_BANKS.map(b=>`<button type="button" class="bank-pick ${U.selBankId===b.id?'on':''}" onclick="selectCardBank('${b.id}')">${realAssetHTML(REAL_ASSETS.brands[b.id],'bank',b.name,40,11)}<span>${b.name}</span></button>`).join('')}</div>`;}
-function cardPresetPickerHTML(){if(!U.selBankId)return`<div class="ib b"><i class="ti ti-hand-click"></i>先选择银行，再选择具体信用卡。</div>`;const ps=CARD_PRESETS.filter(p=>p.bankId===U.selBankId);if(!ps.length)return`<div class="ib w"><i class="ti ti-photo-off"></i>这个银行暂未列入信用卡预设。可切换到「手动创建」。</div>`;return`<div class="preset-list">${ps.map(p=>`<button type="button" class="preset-pick ${U.selCardPreset===p.id?'on':''}" onclick="selectCardPreset('${p.id}')">${realAssetHTML(p.cardAsset,'thumb',p.cardName)}<span class="preset-pick-m"><span class="preset-pick-n">${p.cardName}</span><span class="preset-pick-s">${p.network}</span></span>${U.selCardPreset===p.id?'<i class="ti ti-circle-check-filled" style="color:var(--accent);font-size:19px"></i>':'<i class="ti ti-chevron-right" style="color:var(--text3)"></i>'}</button>`).join('')}</div>`;}
+function bankPickerHTML(){const banks=visiblePresets(CARD_BANKS,'cc_bank');return`<div class="bank-strip">${banks.map(b=>swipeWrap('cc_bank',b.id,b.name,`<button type="button" class="bank-pick ${U.selBankId===b.id?'on':''}" onclick="if(presetClickGuard(event))return;selectCardBank('${b.id}')">${realAssetHTML(REAL_ASSETS.brands[b.id],'bank',b.name,40,11)}<span>${b.name}</span></button>`,'bank-swipe')).join('')}</div>${presetResetHTML('cc_bank')}`;}
+function cardPresetPickerHTML(){if(!U.selBankId)return`<div class="ib b"><i class="ti ti-hand-click"></i>先选择银行，再选择具体信用卡。</div>`;const ps=visiblePresets(CARD_PRESETS.filter(p=>p.bankId===U.selBankId),'card');if(!ps.length)return`<div class="ib w"><i class="ti ti-photo-off"></i>这个银行暂无可用信用卡预设。可重置预设或切换到「手动创建」。</div>${presetResetHTML('card')}`;return`<div class="preset-list">${ps.map(p=>swipeWrap('card',p.id,p.cardName,`<button type="button" class="preset-pick ${U.selCardPreset===p.id?'on':''}" onclick="if(presetClickGuard(event))return;selectCardPreset('${p.id}')">${realAssetHTML(p.cardAsset,'thumb',p.cardName)}<span class="preset-pick-m"><span class="preset-pick-n">${p.cardName}</span><span class="preset-pick-s">${p.network}</span></span>${U.selCardPreset===p.id?'<i class="ti ti-circle-check-filled" style="color:var(--accent);font-size:19px"></i>':'<i class="ti ti-chevron-right" style="color:var(--text3)"></i>'}</button>`)).join('')}</div>${presetResetHTML('card')}`;}
 function cardPresetPreviewHTML(){const p=CARD_PRESETS.find(x=>x.id===U.selCardPreset);if(!p)return'';const th=ccTheme(p);return`<div class="preset-card-preview" style="background:linear-gradient(155deg,${th.g1},${th.g2});--cc-glow:${th.glow}">${realAssetHTML(p.cardAsset,'card-art',p.cardName)}<div class="preset-card-preview-name">${p.cardName}</div><div class="preset-card-preview-meta">${p.bankName} · ${p.network}</div></div><div class="preset-asset-note"><i class="ti ti-info-circle"></i> 图片从本机路径载入；若显示待添加，请按资产清单放入真实图片。</div>`;}
 function ccDetailsHTML(e,mode){const d=U.ccDraft||{},name=e?e.name:(d.name||''),network=e?(e.network||''):(d.network||''),bankName=e?(e.bankName||''):(d.bankName||'');const preset=U.selCardPreset?CARD_PRESETS.find(x=>x.id===U.selCardPreset):null;const assetPath=e?(e.cardAsset||''):(preset?preset.cardAsset:'');const tc=(U.selThemeColor!==undefined)?U.selThemeColor:(e?(e.themeColor||''):'');const themeObj={themeColor:tc||undefined,themeId:e?e.themeId:(preset?preset.themeId:undefined),presetId:e?e.presetId:(preset?preset.id:undefined),bankId:e?e.bankId:(preset?preset.bankId:undefined)};const th=ccTheme(themeObj);const cap=name||(preset?preset.cardName:'');const meta=[bankName||(preset?preset.bankName:''),network||(preset?preset.network:'')].filter(Boolean).join(' · ');return`<div class="field"><label>卡面图片 Card image <span style="color:var(--text3);font-weight:400">点击上传 / 更换</span></label><div class="preset-card-preview" style="background:linear-gradient(155deg,${th.g1},${th.g2});--cc-glow:${th.glow}">${cardArtUploaderHTML(assetPath)}${cap?`<div class="preset-card-preview-name">${cap}</div>`:''}${meta?`<div class="preset-card-preview-meta">${meta}</div>`:''}</div>${mode==='preset'?`<div class="preset-asset-note"><i class="ti ti-info-circle"></i> 共享图片来自本机 assets/cards；也可上传你自己的图片覆盖。</div>`:''}</div><div class="field"><label>卡片主题色 Theme / 封面颜色 <span style="color:var(--text3);font-weight:400">默认跟随卡片</span></label>${themeColorPicker()}</div><div class="field"><label>银行 Bank</label><input id="m-bank-name" placeholder="Maybank" value="${bankName}"/></div><div class="field"><label>卡名 Card name</label><input id="m-name" placeholder="Maybank Visa Platinum" value="${name}"/></div><div class="field"><label>卡组织 Network</label><input id="m-network" placeholder="Visa / Mastercard / Amex" value="${network}"/></div>${mode==='manual'?`<div class="field"><label>卡面风格 <span style="color:var(--text3);font-weight:400">无图片时使用</span></label>${facePicker()}</div><div class="field"><label>强调色（进度条）</label>${colorPicker()}</div>`:''}<div class="field-row"><div class="field"><label>额度 (RM)</label><input id="m-limit" type="number" inputmode="decimal" placeholder="5000" value="${e?e.limit:''}"/></div><div class="field"><label>结单日</label><input id="m-due" type="number" inputmode="numeric" min="1" max="31" placeholder="15" value="${e?e.dueDay:''}"/></div></div><div class="field"><label>当前欠额 (RM)</label><input id="m-owed" type="number" inputmode="decimal" placeholder="0" value="${e?e.owed:''}"/></div>`;}
 function payOpts(incSav){const ccs=D.cards.filter(c=>c.type==='cc'),ews=D.cards.filter(c=>c.type==='ew'),savs=D.cards.filter(c=>c.type==='saving');let h='';
@@ -1213,20 +1237,20 @@ function accountCardHTML(c){const isEw=c.type==='ew',th=acctTheme(c),art=c.custo
   h+=`<div class="acct-real-bal-l">余额 Balance</div><div class="acct-real-bal">${fmt(c.balance)}</div>`;
   if(hasLimit){const avail=Math.max(0,c.limit-c.owed);h+=`<div class="acct-real-limrow"><span>PayLater 额度 ${fmt(c.limit)}</span><span>可用 ${fmt(avail)}</span></div><div class="cc-bar"><i style="width:${p}%"></i></div><div class="acct-real-foot"><span>已用 ${p}%</span><span>${fmt(c.owed)} / ${fmt(c.limit)}</span></div>`;}
   h+=`</div>`;return h;}
-function secMod(zh,en,countLabel,addModal,key,open,total){return`<div class="sec-mod ${open?'open':''}"><div class="sec-mod-head" onclick="toggleCardSec('${key}')"><i class="ti ti-chevron-${open?'down':'right'} sec-mod-cv"></i><span class="sec-mod-bar"></span><div class="sec-mod-t"><span class="sec-mod-zh">${zh}</span><span class="sec-mod-en">${en}</span></div>${countLabel?`<span class="sec-mod-c">${countLabel}</span>`:''}${total?`<span class="sec-mod-tot">${total}</span>`:''}</div><span class="sec-mod-a" onclick="event.stopPropagation();openModal('${addModal}')"><i class="ti ti-plus" style="font-size:14px"></i>添加</span></div>`;}
 function renderCards(){
   const ccs=D.cards.filter(c=>c.type==='cc'),savs=D.cards.filter(c=>c.type==='saving'),ews=D.cards.filter(c=>c.type==='ew');
   let h='';
   if(savs.length+ews.length>=2)h+=`<button class="add-btn" style="border-style:solid;border-color:var(--border2);color:var(--text);margin:4px 0 6px" onclick="openModal('transfer')"><i class="ti ti-transfer" style="color:var(--accent)"></i>账户转账</button>`;
   const ccTot=ccs.reduce((a,c)=>a+(c.owed||0),0),savTot=savs.reduce((a,c)=>a+(c.balance||0),0),ewTot=ews.reduce((a,c)=>a+(c.balance||0),0);
-  h+=secMod('信用卡','Credit Cards',ccs.length?ccs.length+' 张':'','addcc','cc',cardSecState.cc,ccs.length?'欠 '+fmt(ccTot):'');
-  if(cardSecState.cc){if(!ccs.length)h+=`<div class="empty"><div class="empty-ic"><i class="ti ti-credit-card"></i></div><div class="et">还没有信用卡</div><div class="es">添加后像真实卡片一样追踪欠额</div></div>`;
+  const tabs=[{id:'cc',zh:'信用卡',en:'Credit Cards',sum:`${ccs.length}张 · 欠 ${fmt(ccTot)}`,add:'addcc'},{id:'sav',zh:'储蓄',en:'Savings',sum:`${savs.length}个 · ${fmt(savTot)}`,add:'addsaving'},{id:'ew',zh:'钱包',en:'eWallets',sum:`${ews.length}个 · ${fmt(ewTot)}`,add:'addew'}];
+  const cur=tabs.find(t=>t.id===cardActiveTab)||tabs[0];
+  h+=`<div class="card-tabs">${tabs.map(t=>`<button type="button" class="card-tab ${cardActiveTab===t.id?'on':''}" onclick="setCardTab('${t.id}')"><div class="card-tab-zh">${t.zh}</div><div class="card-tab-en">${t.en}</div><div class="card-tab-sum">${t.sum}</div></button>`).join('')}</div>`;
+  h+=`<div class="card-list-head"><div class="card-list-title"><div class="card-list-zh">${cur.zh}</div><div class="card-list-en">${cur.en}</div></div><button type="button" class="card-list-add" onclick="openModal('${cur.add}')"><i class="ti ti-plus" style="font-size:14px"></i>添加</button></div>`;
+  if(cardActiveTab==='cc'){if(!ccs.length)h+=`<div class="empty"><div class="empty-ic"><i class="ti ti-credit-card"></i></div><div class="et">还没有信用卡</div><div class="es">添加后像真实卡片一样追踪欠额</div></div>`;
   ccs.forEach(c=>{h+=`${creditCardFaceHTML(c)}<div class="cc-acts"><button class="btn pay" onclick="openModal('pay',{editId:${c.id}})"><i class="ti ti-arrow-up"></i>还款</button><button class="btn spd" onclick="openModal('spend',{selPayId:${c.id}})"><i class="ti ti-plus"></i>记消费</button><button class="btn" onclick="openModal('addcc',{editCardId:${c.id}})"><i class="ti ti-pencil"></i>编辑</button><button class="btn del" onclick="delCard(${c.id})"><i class="ti ti-trash"></i></button></div>`;});}
-  h+=secMod('储蓄账户','Savings',savs.length?savs.length+' 个':'','addsaving','sav',cardSecState.sav,savs.length?fmt(savTot):'');
-  if(cardSecState.sav){if(!savs.length)h+=`<div class="empty"><div class="empty-ic"><i class="ti ti-building-bank"></i></div><div class="et">还没有储蓄账户</div></div>`;
+  else if(cardActiveTab==='sav'){if(!savs.length)h+=`<div class="empty"><div class="empty-ic"><i class="ti ti-building-bank"></i></div><div class="et">还没有储蓄账户</div></div>`;
   savs.forEach(c=>{h+=`${accountCardHTML(c)}<div class="acct-acts"><button class="btn topup" onclick="openModal('topup',{editId:${c.id}})"><i class="ti ti-plus"></i>入账</button><button class="btn" onclick="openModal('addsaving',{editCardId:${c.id}})"><i class="ti ti-pencil"></i>编辑</button><button class="btn del" onclick="delCard(${c.id})"><i class="ti ti-trash"></i>删除</button></div>`;});}
-  h+=secMod('电子钱包','eWallets',ews.length?ews.length+' 个':'','addew','ew',cardSecState.ew,ews.length?fmt(ewTot):'');
-  if(cardSecState.ew){if(!ews.length)h+=`<div class="empty"><div class="empty-ic"><i class="ti ti-wallet"></i></div><div class="et">还没有电子钱包</div></div>`;
+  else{if(!ews.length)h+=`<div class="empty"><div class="empty-ic"><i class="ti ti-wallet"></i></div><div class="et">还没有电子钱包</div></div>`;
   ews.forEach(c=>{h+=`${accountCardHTML(c)}<div class="acct-acts"><button class="btn spd" onclick="openModal('ewtopup',{editId:${c.id}})"><i class="ti ti-bolt"></i>充值</button><button class="btn pay" onclick="openModal('spend',{selPayId:${c.id}})"><i class="ti ti-plus"></i>记消费</button><button class="btn" onclick="openModal('addew',{editCardId:${c.id}})"><i class="ti ti-pencil"></i>编辑</button><button class="btn del" onclick="delCard(${c.id})"><i class="ti ti-trash"></i></button></div>`;});}
   return h;
 }
