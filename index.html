@@ -1970,6 +1970,149 @@ function renderAA(){
   window.render=function(){prevRender();setTimeout(fillQuickSpend,300);};
 })();
 
+
+// ══════════════════════════════════════════════════════
+// SHORTCUT DIRECT CLOUD API PATCH
+// iPhone Shortcuts can POST to Supabase RPC without opening Safari/PWA.
+// RinggitMe imports pending quick_entries on next app open/sync.
+// Requires running supabase_shortcut_direct_api.sql once in Supabase SQL editor.
+// ══════════════════════════════════════════════════════
+(function(){
+  const TOKEN_KEY='rm_shortcut_direct_token_v1';
+  const DEFAULT_PAY_KEY='rm_shortcut_default_pay_id_v1';
+  const AUTO_IMPORT_KEY='rm_shortcut_auto_import_v1';
+  let _shortcutSyncing=false,_shortcutLastSync=0;
+  const same=(a,b)=>String(a)===String(b);
+  const norm=s=>String(s||'').toLowerCase().replace(/[^a-z0-9\u4e00-\u9fff]+/g,'');
+  const endpoint=()=> (typeof SUPA_URL==='string'&&SUPA_URL?SUPA_URL.replace(/\/$/,''):'') + '/rest/v1/rpc/rm_submit_quick_entry';
+  function shortcutDirectStyle(){
+    if(document.getElementById('rm-shortcut-direct-style'))return;
+    const st=document.createElement('style');st.id='rm-shortcut-direct-style';st.textContent=`
+      .rm-shortcut-cloud{margin:15px 0 12px;border:1px solid color-mix(in srgb,var(--accent) 24%,var(--border));background:linear-gradient(155deg,color-mix(in srgb,var(--accent) 11%,var(--bg2)),var(--bg2) 74%);border-radius:18px;padding:14px;box-shadow:var(--shadow)}
+      .rm-shortcut-cloud h3{font-size:15.5px;margin:0 0 5px;font-weight:850;color:var(--text);letter-spacing:-.2px}.rm-shortcut-cloud p{font-size:12px;color:var(--text2);line-height:1.5;margin:0 0 10px}.rm-shortcut-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}.rm-shortcut-cloud .btn{justify-content:center;margin:0;width:100%}.rm-shortcut-mini{font-size:10.8px;color:var(--text3);line-height:1.45;margin-top:9px}.rm-shortcut-chip{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:800;border-radius:99px;padding:4px 8px;background:var(--green-bg);color:var(--green);margin-bottom:8px}.rm-shortcut-chip.warn{background:var(--orange-bg);color:var(--orange)}.rm-shortcut-field{margin:9px 0 0}.rm-shortcut-field label{display:block;font-size:11px;color:var(--text3);font-weight:750;margin-bottom:5px}.rm-shortcut-field select{width:100%;border-radius:12px;border:1.5px solid var(--border2);padding:11px 12px;font-size:13.5px;color:var(--text);background:var(--bg2);outline:none}.rm-shortcut-code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:10.8px;line-height:1.5;background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:9px;word-break:break-all;color:var(--text2);max-height:126px;overflow:auto;margin-top:8px}
+    `;document.head.appendChild(st);
+  }
+  function shortcutPayOptions(){
+    const cur=localStorage.getItem(DEFAULT_PAY_KEY)||'';
+    const cards=(D.cards||[]).filter(c=>c.type==='cc'||c.type==='saving'||c.type==='ew');
+    return `<div class="rm-shortcut-field"><label>默认扣款来源（Shortcut 没传付款方式时使用）</label><select onchange="rmSetShortcutDefaultPay(this.value)"><option value="">不设默认（找不到就只补录）</option>${cards.map(c=>`<option value="${c.id}" ${same(cur,c.id)?'selected':''}>${c.name} · ${c.type==='cc'?'信用卡':(c.type==='ew'?'eWallet':'Savings')}</option>`).join('')}</select></div>`;
+  }
+  function shortcutCloudHTML(){
+    shortcutDirectStyle();
+    const token=localStorage.getItem(TOKEN_KEY)||'';
+    const auto=localStorage.getItem(AUTO_IMPORT_KEY)!=='0';
+    const ready=!!token;
+    const cloudReady=(typeof supaReady==='function'&&supaReady());
+    return `<div class="rm-shortcut-cloud" id="rm-shortcut-cloud"><span class="rm-shortcut-chip ${ready?'':'warn'}"><i class="ti ${ready?'ti-cloud-check':'ti-cloud-exclamation'}"></i>${ready?'直写云端已准备':'先生成 Shortcut Token'}</span><h3>真正爽版：不打开 Safari 也能记账</h3><p>三下敲手机跑 iPhone 快捷指令，Shortcut 直接 POST 到 Supabase。下次打开 RinggitMe 会自动导入并更新卡片金额。</p>${shortcutPayOptions()}<div class="rm-shortcut-grid"><button class="btn pay" onclick="rmGenerateShortcutToken()"><i class="ti ti-key" style="color:var(--accent)"></i>${ready?'重新生成 Token':'生成 Token'}</button><button class="btn" onclick="rmCopyShortcutApiGuide()"><i class="ti ti-copy" style="color:var(--accent)"></i>复制 Shortcut 设置</button><button class="btn" onclick="rmSyncShortcutEntries(true)"><i class="ti ti-refresh" style="color:var(--accent)"></i>拉取云端记录</button><button class="btn" onclick="rmToggleShortcutAutoImport()"><i class="ti ${auto?'ti-toggle-right':'ti-toggle-left'}" style="color:var(--accent)"></i>${auto?'自动导入开':'自动导入关'}</button></div>${!cloudReady?'<div class="rm-shortcut-mini">⚠️ 需要先登录 RinggitMe 云同步账号，才能生成 token / 拉取记录。</div>':''}${ready?`<div class="rm-shortcut-code">POST ${endpoint()}<br/>token: ${token.slice(0,10)}...${token.slice(-6)}</div>`:''}<div class="rm-shortcut-mini">安全规则：Shortcut 只拿 token 写入 quick_entries，不会拿你的登录密码。Token 可以随时重新生成。</div></div>`;
+  }
+  window.rmSetShortcutDefaultPay=function(id){localStorage.setItem(DEFAULT_PAY_KEY,id||'');toast(id?'已设置默认扣款来源':'已清除默认来源');};
+  window.rmToggleShortcutAutoImport=function(){localStorage.setItem(AUTO_IMPORT_KEY,localStorage.getItem(AUTO_IMPORT_KEY)==='0'?'1':'0');render();toast(localStorage.getItem(AUTO_IMPORT_KEY)==='0'?'已关闭自动导入':'已开启自动导入');};
+  window.rmGenerateShortcutToken=async function(){
+    if(!(typeof supaReady==='function'&&supaReady())){toast('先登录云同步');return;}
+    try{
+      toast('生成中…');
+      const {data,error}=await supa.rpc('rm_create_shortcut_token',{p_label:'iPhone Shortcut'});
+      if(error)throw error;
+      localStorage.setItem(TOKEN_KEY,String(data||''));
+      render();
+      toast('✓ Token 已生成');
+    }catch(e){console.log('rmGenerateShortcutToken',e);toast('生成失败：先运行 Supabase SQL');}
+  };
+  function shortcutGuideText(){
+    const token=localStorage.getItem(TOKEN_KEY)||'先在 RinggitMe 生成 Token';
+    const key=(typeof SUPA_KEY==='string'&&SUPA_KEY)?SUPA_KEY:'SUPABASE_ANON_KEY';
+    return `RinggitMe 快速记账 Shortcut 设置\n\n动作 1：Choose from Menu\n- 支出 Expense\n- 收入 Income\n\n动作 2：Ask for Input\nPrompt: 金额\nType: Number\n\n动作 3：Ask for Input\nPrompt: 备注 / 商家\nType: Text\n\n动作 4：Choose from Menu\nMaybank / TNG / Cash / Other（文字要尽量和 RinggitMe 里的卡名接近）\n\n动作 5：Get Contents of URL\nURL:\n${endpoint()}\n\nMethod: POST\nHeaders:\napikey: ${key}\nAuthorization: Bearer ${key}\nContent-Type: application/json\n\nRequest Body JSON:\n{\n  "p_token": "${token}",\n  "p_kind": "expense",\n  "p_amount": 金额,\n  "p_note": 备注 / 商家,\n  "p_payment": 付款方式,\n  "p_category": "",\n  "p_date": 当前日期,\n  "p_time": 当前时间\n}\n\n收入的话 p_kind 改成 income。`;
+  }
+  window.rmCopyShortcutApiGuide=function(){try{navigator.clipboard.writeText(shortcutGuideText());toast('已复制 Shortcut 设置');}catch(e){toast('复制失败');}};
+  function findDefaultPay(){const id=localStorage.getItem(DEFAULT_PAY_KEY)||'';return (D.cards||[]).find(c=>same(c.id,id))||null;}
+  function resolvePay(payment){
+    const p=norm(payment);
+    if(p){
+      const exact=(D.cards||[]).find(c=>norm(c.name)===p || p.includes(norm(c.name)) || norm(c.name).includes(p));
+      if(exact)return exact;
+      const loose=(D.cards||[]).find(c=>{
+        const n=norm(c.name);return (p.includes('maybank')&&n.includes('maybank'))||(p.includes('tng')&&n.includes('tng'))||(p.includes('touchngo')&&n.includes('tng'))||(p.includes('grab')&&n.includes('grab'))||(p.includes('cash')&&/cash|现金/.test(n));
+      });
+      if(loose)return loose;
+    }
+    return findDefaultPay();
+  }
+  function guessSpendCat(text){
+    const s=norm(text);
+    const cats=D.spendCats||[];
+    const want=(rx)=>cats.find(c=>rx.test(norm(c.label)));
+    if(/kfc|mcd|mcdonald|starbucks|tealive|food|restaurant|cafe|kopitiam|mamak|餐|吃|喝/.test(s))return want(/餐|food|mamak|kopitiam|restaurant|咖啡/)||cats[0];
+    if(/grab|petrol|shell|petronas|toll|parking|car|油|停车|过路/.test(s))return want(/油|petrol|grab|transport|parking|toll|车/)||cats[0];
+    if(/shopee|lazada|mall|shopping|guardian|watson|购物|网购/.test(s))return want(/shopee|lazada|购物|网购|shopping|guardian|watson/)||cats[0];
+    if(/netflix|spotify|icloud|youtube|subscription|订阅/.test(s))return want(/订阅|subscription/)||cats[0];
+    return cats.find(c=>/其他|others/i.test(c.label))||cats[0];
+  }
+  function importExpense(e){
+    const amt=round2(e.amount);if(!amt)return true;
+    if((D.txns||[]).some(t=>t.shortcutEntryId===e.id))return true;
+    const desc=e.note||e.raw?.note||'Shortcut expense';
+    const cat=guessSpendCat((e.category||'')+' '+desc)||{id:null,label:'其他 Others',icon:'ti-receipt'};
+    const pay=resolvePay(e.payment||'');
+    const iso=e.occurred_date||todayISO();
+    const time=e.occurred_time||'';
+    const txn={id:nid(),amt,desc,catId:cat.id,catLabel:cat.label,catIcon:cat.icon||'ti-receipt',payId:pay?pay.id:null,payName:pay?pay.name:null,postingMode:pay?'normal':'recordOnly',date:new Date(iso).toLocaleDateString('en-MY',{month:'short',day:'numeric'}),isoDate:iso,time,files:[],source:'shortcut_cloud',shortcutEntryId:e.id};
+    if(pay&& !applyTransactionBalanceEffect(txn)){txn.postingMode='recordOnly';txn.desc=desc+'（余额不足，已补录）';}
+    if(pay&&pay.type==='cc')ensureCardCycle(pay,iso);
+    D.txns.unshift(txn);return true;
+  }
+  function importIncome(e){
+    const amt=round2(e.amount);if(!amt)return true;
+    if((D.incomes||[]).some(i=>i.shortcutEntryId===e.id))return true;
+    const cat=(D.incomeCats||[])[0]||{id:'i1',label:'收入',icon:'ti-trending-up'};
+    const iso=e.occurred_date||todayISO();
+    D.incomes.unshift({id:nid(),amt,catId:cat.id,desc:e.note||'Shortcut income',date:new Date(iso).toLocaleDateString('en-MY',{month:'short',day:'numeric'}),isoDate:iso,files:[],source:'shortcut_cloud',shortcutEntryId:e.id});
+    return true;
+  }
+  function importEntry(e){
+    const k=String(e.kind||'expense').toLowerCase();
+    if(k==='income')return importIncome(e);
+    return importExpense(e);
+  }
+  window.rmSyncShortcutEntries=async function(show){
+    if(_shortcutSyncing)return;
+    if(!(typeof supaReady==='function'&&supaReady())){if(show)toast('先登录云同步');return;}
+    _shortcutSyncing=true;
+    try{
+      const {data,error}=await supa.from('quick_entries').select('*').eq('status','pending').order('created_at',{ascending:true}).limit(30);
+      if(error)throw error;
+      const imported=[];
+      (data||[]).forEach(e=>{try{if(importEntry(e))imported.push(e.id);}catch(err){console.log('quick import skipped',e,err);}});
+      if(imported.length){
+        if(window.rmRefreshDerived)rmRefreshDerived();
+        save();
+        await supa.from('quick_entries').update({status:'imported',imported_at:new Date().toISOString()}).in('id',imported);
+        render();
+        toast('✓ 已导入 '+imported.length+' 笔 Shortcut 记录');
+      }else if(show)toast('没有新的 Shortcut 记录');
+      _shortcutLastSync=Date.now();
+    }catch(e){console.log('rmSyncShortcutEntries',e);if(show)toast('拉取失败：确认 SQL 已运行');}
+    _shortcutSyncing=false;
+  };
+  function maybeAutoSync(){
+    if(localStorage.getItem(AUTO_IMPORT_KEY)==='0')return;
+    if(Date.now()-_shortcutLastSync<45000)return;
+    setTimeout(()=>rmSyncShortcutEntries(false),1200);
+  }
+  const baseBuildModal=window.buildModal||buildModal;
+  window.buildModal=function(){
+    let html=baseBuildModal();
+    if(U.modal==='autoLedger'&&html&&!html.includes('rm-shortcut-cloud')){
+      html=html.replace('<div class="ma"><button onclick="closeModal()">关闭</button><button class="ok" onclick="openModal(\'spend\')">直接记一笔</button></div>',shortcutCloudHTML()+'<div class="ma"><button onclick="closeModal()">关闭</button><button class="ok" onclick="openModal(\'spend\')">直接记一笔</button></div>');
+    }
+    return html;
+  };
+  const baseRender=window.render||render;
+  window.render=function(){baseRender();maybeAutoSync();};
+  const baseUnlock=window.unlock||unlock;
+  window.unlock=function(){baseUnlock();maybeAutoSync();};
+  window.addEventListener('online',maybeAutoSync);
+})();
+
 initSecurity();
 initSupa();
 </script>
