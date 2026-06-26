@@ -1833,6 +1833,143 @@ function renderAA(){
   window.render=function(){rmRefreshDerived();origRender();setTimeout(enhanceNumericCalculators,0);};
 })();
 
+
+// ══════════════════════════════════════════════════════
+// AUTO LEDGER SHORTCUT SETUP PAGE PATCH
+// Adds an in-app Shortcuts setup hub without changing finance logic.
+// ══════════════════════════════════════════════════════
+(function(){
+  // IMPORTANT: replace this with the real iCloud Shortcut share link after you create/share it from iPhone Shortcuts.
+  const AUTO_LEDGER_SHORTCUT_URL = '';
+  window.AUTO_LEDGER_SHORTCUT_URL = AUTO_LEDGER_SHORTCUT_URL;
+  const QUICK_URL = () => location.origin + location.pathname + '?quick=expense';
+  const comingToast = () => toast('这个功能稍后开放');
+  const modalTitle = (ic,col,txt)=>`<div class="md-title"><div class="md-ic" style="background:${col}1f;color:${col}"><i class="ti ${ic}"></i></div>${txt}</div>`;
+  const wrapModal = b => {const anim=U._modalAnim?' anim':'';U._modalAnim=false;return `<div class="mb${anim}" onclick="if(event.target===this)closeModal()"><div class="md${anim}"><div class="md-handle"></div>${b}</div></div>`;};
+  function autoSaveImageNote(){return localStorage.getItem('rm_auto_save_img_note')!=='0';}
+  window.rmToggleAutoSaveImageNote=function(){localStorage.setItem('rm_auto_save_img_note',autoSaveImageNote()?'0':'1');render();toast(autoSaveImageNote()?'已开启':'已关闭');};
+  function autoLedgerStyle(){
+    if(document.getElementById('rm-auto-ledger-style'))return;
+    const st=document.createElement('style');st.id='rm-auto-ledger-style';st.textContent=`
+      .rm-auto-hero{background:linear-gradient(155deg,color-mix(in srgb,var(--accent) 16%,var(--bg2)),var(--bg2) 72%);border:1px solid var(--border);border-radius:20px;padding:15px 15px;margin-bottom:14px;box-shadow:var(--shadow)}
+      .rm-auto-kicker{font-size:11px;color:var(--text3);font-weight:800;letter-spacing:.06em;text-transform:uppercase;margin-bottom:5px}.rm-auto-title{font-size:18px;font-weight:800;color:var(--text);letter-spacing:-.3px}.rm-auto-desc{font-size:12.5px;color:var(--text2);line-height:1.55;margin-top:6px}
+      .rm-auto-row{display:flex;align-items:center;gap:11px;border:1px solid var(--border);background:var(--bg2);border-radius:14px;padding:12px 12px;margin-bottom:9px;box-shadow:var(--shadow)}
+      .rm-auto-row.disabled{opacity:.58}.rm-auto-ic{width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--accent) 13%,var(--bg2));color:var(--accent);flex-shrink:0}.rm-auto-main{flex:1;min-width:0}.rm-auto-name{font-size:14px;font-weight:750;color:var(--text);line-height:1.25}.rm-auto-sub{font-size:11.5px;color:var(--text3);line-height:1.4;margin-top:3px}.rm-auto-actions{display:flex;gap:7px;align-items:center;flex-shrink:0}.rm-auto-q,.rm-auto-plus{border:0;width:32px;height:32px;border-radius:99px;display:flex;align-items:center;justify-content:center;font-weight:850;cursor:pointer}.rm-auto-q{background:var(--bg3);color:var(--text3)}.rm-auto-plus{background:var(--accent);color:#fff;font-size:20px;box-shadow:0 4px 14px color-mix(in srgb,var(--accent) 30%,transparent)}.rm-auto-plus:active,.rm-auto-q:active{transform:scale(.94)}
+      .rm-auto-method{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--border);border-radius:14px;background:var(--bg2);padding:13px 12px;margin-bottom:9px;box-shadow:var(--shadow)}.rm-auto-method strong{font-size:14px}.rm-auto-method small{display:block;font-size:11.5px;color:var(--text3);margin-top:3px;line-height:1.35}.rm-auto-method .btn{width:auto;margin:0;background:color-mix(in srgb,var(--accent) 12%,var(--bg2));color:var(--accent);border-color:transparent}
+      .rm-auto-toggle{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--border);background:var(--bg2);border-radius:14px;padding:13px 13px;margin:12px 0 2px}.rm-auto-switch{width:45px;height:27px;border-radius:99px;background:var(--bg4);position:relative;flex-shrink:0}.rm-auto-switch:after{content:"";position:absolute;top:3px;left:3px;width:21px;height:21px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:left .16s}.rm-auto-switch.on{background:var(--accent)}.rm-auto-switch.on:after{left:21px}.rm-auto-step{border-left:3px solid var(--accent);padding:8px 0 8px 12px;margin:8px 0;font-size:13px;line-height:1.55;color:var(--text2)}.rm-auto-code{font-size:11.5px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:10px;word-break:break-all;color:var(--text2)}
+    `;document.head.appendChild(st);
+  }
+  function shortcutRows(){
+    const rows=[
+      {id:'auto',name:'自动记账',sub:'先做最稳版：快速打开 RinggitMe 快捷记账',ic:'ti-bolt',open:true},
+      {id:'borderless',name:'无边记',sub:'稍后开放：更轻量的悬浮入口',ic:'ti-infinity'},
+      {id:'aiShot',name:'AI 截图记账',sub:'稍后开放：截图识别金额 / 商家',ic:'ti-screenshot'},
+      {id:'aiPhoto',name:'AI 拍照记账',sub:'稍后开放：拍收据自动识别',ic:'ti-camera'},
+      {id:'aiText',name:'AI 文字记账',sub:'稍后开放：贴文字自动解析',ic:'ti-text-recognition'},
+      {id:'aiVoice',name:'AI 语音记账',sub:'稍后开放：讲一句自动记账',ic:'ti-microphone-2'}
+    ];
+    return rows.map(r=>`<div class="rm-auto-row ${r.open?'':'disabled'}"><div class="rm-auto-ic"><i class="ti ${r.ic}"></i></div><div class="rm-auto-main"><div class="rm-auto-name">${r.name}</div><div class="rm-auto-sub">${r.sub}</div></div><div class="rm-auto-actions"><button class="rm-auto-q" onclick="rmAutoInfo('${r.id}')">?</button><button class="rm-auto-plus" onclick="${r.open?`rmOpenAutoShortcut('${r.id}')`:'rmAutoComingSoon()'}">+</button></div></div>`).join('');
+  }
+  window.rmAutoComingSoon=comingToast;
+  window.rmAutoInfo=function(id){openModal('autoLedgerInfo',{autoInfo:id});};
+  window.rmOpenAutoShortcut=function(id){
+    if(id!=='auto'){comingToast();return;}
+    if(AUTO_LEDGER_SHORTCUT_URL && !/REPLACE/i.test(AUTO_LEDGER_SHORTCUT_URL)){
+      try{window.location.href=AUTO_LEDGER_SHORTCUT_URL;}catch(e){toast('无法打开快捷指令链接，请稍后再试');}
+      return;
+    }
+    openModal('autoLedgerManual');
+  };
+  window.rmAutoTutorial=function(kind){openModal('autoLedgerTutorial',{autoTutorial:kind});};
+  function autoLedgerHTML(){
+    autoLedgerStyle();
+    return `${modalTitle('ti-bolt','var(--accent)','自动记账')}
+      <div class="rm-auto-hero"><div class="rm-auto-kicker">Shortcuts Hub</div><div class="rm-auto-title">用快捷指令触发 RinggitMe</div><div class="rm-auto-desc">先把快捷指令装好，再用轻点背面 / 小白点 / 操作按钮触发。PWA 不能静默安装 shortcut，所以这里负责打开安装入口和教程。</div></div>
+      <div class="sec" style="margin:14px 2px 10px">第一步：安装快捷指令</div>${shortcutRows()}
+      <button class="btn" style="width:100%;justify-content:center;padding:12px;margin:6px 0 8px;font-size:13px" onclick="openModal('autoLedgerManual')"><i class="ti ti-list-check" style="color:var(--accent)"></i>没有安装链接？看手动设置</button>
+      <div class="sec" style="margin:18px 2px 10px">第二步：设置自动记账触发方式</div>
+      <div class="rm-auto-method"><div><strong>方法一：轻点手机背部触发</strong><small>推荐：Triple Tap / 轻点三下，不容易误触。</small></div><button class="btn" onclick="rmAutoTutorial('backTap')">看教程</button></div>
+      <div class="rm-auto-method"><div><strong>方法二：辅助触控（小白点）触发</strong><small>适合你不想敲手机，直接点小白点。</small></div><button class="btn" onclick="rmAutoTutorial('assistiveTouch')">看教程</button></div>
+      <div class="rm-auto-method"><div><strong>方法三：操作按钮触发</strong><small>iPhone 15 Pro / 16 Pro 系列可以用 Action Button。</small></div><button class="btn" onclick="rmAutoTutorial('actionButton')">看教程</button></div>
+      <div class="rm-auto-toggle" onclick="rmToggleAutoSaveImageNote()"><div><div style="font-size:14px;font-weight:750">保存图片为备注</div><div style="font-size:11.5px;color:var(--text3);line-height:1.4;margin-top:3px">先保存开关状态，AI 图片记账开放后会用到。</div></div><span class="rm-auto-switch ${autoSaveImageNote()?'on':''}"></span></div>
+      <div class="ma"><button onclick="closeModal()">关闭</button><button class="ok" onclick="openModal('spend')">直接记一笔</button></div>`;
+  }
+  function infoHTML(){
+    autoLedgerStyle();
+    const id=U.autoInfo||'auto';
+    const map={auto:['自动记账','目前先做最稳版：打开 RinggitMe 快捷记账入口。等你把 iPhone Shortcuts 的分享链接发我后，+ 按钮就可以直接跳去添加。'],borderless:['无边记','未来可以做成更轻的入口，但 PWA 限制比较多，先不做假功能。'],aiShot:['AI 截图记账','未来可以上传截图识别金额、商家、付款方式。'],aiPhoto:['AI 拍照记账','未来可以拍 receipt 自动识别。'],aiText:['AI 文字记账','未来可以贴银行通知文字自动解析。'],aiVoice:['AI 语音记账','未来可以语音说“KFC 十块 Maybank”，自动填。']};
+    const m=map[id]||map.auto;
+    return `${modalTitle('ti-info-circle','var(--accent)',m[0])}<div class="ib b"><i class="ti ti-info-circle"></i>${m[1]}</div><div class="ma"><button onclick="openModal('autoLedger')">返回</button><button class="ok" onclick="closeModal()">知道了</button></div>`;
+  }
+  function manualHTML(){
+    autoLedgerStyle();
+    const q=QUICK_URL();
+    return `${modalTitle('ti-list-check','var(--accent)','手动建立 RinggitMe 快捷指令')}
+      <div class="ib w"><i class="ti ti-alert-circle"></i>我现在还没有你的 iCloud Shortcut 分享链接，所以 + 不能直接安装。先按下面做一次，之后你分享快捷指令链接给我，我再帮你塞进 + 按钮。</div>
+      <div class="rm-auto-step"><b>1.</b> 打开 iPhone「快捷指令」→ 右上角 + → 名字放：RinggitMe 自动记账</div>
+      <div class="rm-auto-step"><b>2.</b> Add Action → 选「Ask for Input」→ 问：金额</div>
+      <div class="rm-auto-step"><b>3.</b> 再加一个「Ask for Input」→ 问：备注</div>
+      <div class="rm-auto-step"><b>4.</b> Add Action → 选「Open URLs」→ URL 用这个格式：</div>
+      <div class="rm-auto-code">${q}&amount=【金额】&note=【备注】</div>
+      <div class="rm-auto-step"><b>5.</b> 保存后，把这个快捷指令绑定去轻点三下 / 小白点 / 操作按钮。</div>
+      <button class="btn" style="width:100%;justify-content:center;padding:13px;margin:12px 0 8px" onclick="rmCopyQuickURL()"><i class="ti ti-copy" style="color:var(--accent)"></i>复制 Quick URL 格式</button>
+      <div class="ma"><button onclick="openModal('autoLedger')">返回</button><button class="ok" onclick="closeModal()">完成</button></div>`;
+  }
+  window.rmCopyQuickURL=function(){const url=QUICK_URL()+'&amount=【金额】&note=【备注】';try{navigator.clipboard.writeText(url);toast('已复制');}catch(e){toast(url);}};
+  function tutorialHTML(){
+    autoLedgerStyle();
+    const k=U.autoTutorial||'backTap';
+    const data={
+      backTap:{title:'轻点手机背部触发',icon:'ti-hand-click',steps:['设置 Settings → 辅助功能 Accessibility','触控 Touch → 轻点背面 Back Tap','选择 Triple Tap / 轻点三下','在 Shortcuts / 快捷指令 里面选 RinggitMe 自动记账']},
+      assistiveTouch:{title:'辅助触控（小白点）触发',icon:'ti-accessible',steps:['设置 Settings → 辅助功能 Accessibility','触控 Touch → AssistiveTouch 辅助触控','打开 AssistiveTouch','自定顶层菜单 / 自定操作 → 选择 RinggitMe 自动记账']},
+      actionButton:{title:'操作按钮触发',icon:'ti-device-mobile-bolt',steps:['设置 Settings → 操作按钮 Action Button','滑到 Shortcut / 快捷指令','Choose a Shortcut','选择 RinggitMe 自动记账']}
+    }[k];
+    return `${modalTitle(data.icon,'var(--accent)',data.title)}<div class="rm-auto-hero"><div class="rm-auto-title">照着这个路径设置</div><div class="rm-auto-desc">先确认你已经在 Shortcuts 里做好 / 装好 RinggitMe 自动记账。</div></div>${data.steps.map((s,i)=>`<div class="rm-auto-step"><b>步骤 ${i+1}：</b>${s}</div>`).join('')}<div class="ma"><button onclick="openModal('autoLedger')">返回</button><button class="ok" onclick="closeModal()">完成</button></div>`;
+  }
+  const prevBuildModal=window.buildModal||buildModal;
+  window.buildModal=function(){
+    if(U.modal==='autoLedger')return wrapModal(autoLedgerHTML());
+    if(U.modal==='autoLedgerInfo')return wrapModal(infoHTML());
+    if(U.modal==='autoLedgerManual')return wrapModal(manualHTML());
+    if(U.modal==='autoLedgerTutorial')return wrapModal(tutorialHTML());
+    let html=prevBuildModal();
+    if(U.modal==='settings'&&html&&!html.includes('rm-auto-settings-entry')){
+      const entry=`<button class="btn rm-auto-settings-entry" style="width:100%;justify-content:space-between;padding:14px;margin-bottom:16px;font-size:14px" onclick="openModal('autoLedger')"><span style="display:flex;align-items:center;gap:9px"><i class="ti ti-bolt" style="color:var(--accent);font-size:17px"></i>自动记账 / 快捷指令</span><i class="ti ti-chevron-right" style="color:var(--text3)"></i></button>`;
+      html=html.replace('<div style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin:0 2px 10px">账号 & 云同步 ☁️</div>',entry+'<div style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin:0 2px 10px">账号 & 云同步 ☁️</div>');
+    }
+    return html;
+  };
+  const prevRenderHome=window.renderHome||renderHome;
+  window.renderHome=function(){
+    let h=prevRenderHome();
+    if(!h||h.includes('rm-auto-home-entry'))return h;
+    const entry=`<div class="budget budget-set rm-auto-home-entry" style="border-style:solid;background:linear-gradient(155deg,color-mix(in srgb,var(--accent) 9%,var(--bg2)),var(--bg2));color:var(--text);justify-content:space-between;text-align:left" onclick="openModal('autoLedger')"><span style="display:flex;align-items:center;gap:8px"><i class="ti ti-bolt" style="color:var(--accent);font-size:18px"></i><span><b>自动记账</b><span style="display:block;font-size:11px;color:var(--text3);font-weight:600;margin-top:1px">安装快捷指令 / 设置三下触发</span></span></span><i class="ti ti-chevron-right" style="color:var(--text3)"></i></div>`;
+    if(h.includes('<div class="budget'))return h.replace('<div class="budget',entry+'<div class="budget');
+    return entry+h;
+  };
+  function fillQuickSpend(){
+    try{
+      const p=new URLSearchParams(location.search);
+      const q=p.get('quick')||p.get('rmQuick');
+      if(!q||window._rmQuickHandled)return;
+      window._rmQuickHandled=true;
+      if(q==='expense'||q==='spend'){
+        openModal('spend');
+        setTimeout(()=>{const amt=p.get('amount')||p.get('amt')||'';const note=p.get('note')||p.get('desc')||'';const a=document.getElementById('sp-amt'),d=document.getElementById('sp-desc');if(a&&amt)a.value=amt;if(d&&note)d.value=note;},250);
+      }else if(q==='income'){
+        openModal('addincome');
+        setTimeout(()=>{const amt=p.get('amount')||p.get('amt')||'';const note=p.get('note')||p.get('desc')||'';const a=document.getElementById('m-amt'),d=document.getElementById('m-desc');if(a&&amt)a.value=amt;if(d&&note)d.value=note;},250);
+      }
+      const clean=location.origin+location.pathname+(location.hash||'');
+      history.replaceState(null,'',clean);
+    }catch(e){console.log('quick params skipped',e);}
+  }
+  const prevUnlock=window.unlock||unlock;
+  window.unlock=function(){prevUnlock();setTimeout(fillQuickSpend,450);};
+  const prevRender=window.render||render;
+  window.render=function(){prevRender();setTimeout(fillQuickSpend,300);};
+})();
+
 initSecurity();
 initSupa();
 </script>
