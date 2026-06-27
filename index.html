@@ -1462,7 +1462,6 @@ function renderFixed(){
   const thisMo=todayISO().slice(0,7);
   const totalSub=D.subs.reduce((a,s)=>a+s.amt,0),totalLoan=D.loans.reduce((a,l)=>a+l.monthly,0),ccObs=getCreditCardMonthlyObligations(),totalCardPay=ccObs.filter(o=>o.countInTotal!==false).reduce((a,o)=>a+money(o.amount),0);
   let h=`<div class="sg"><div class="sc"><div class="sl">月订阅</div><div class="sv b">${fmt(totalSub)}</div></div><div class="sc"><div class="sl">月贷款 / 租金</div><div class="sv r">${fmt(totalLoan)}</div></div><div class="sc"><div class="sl">信用卡月供</div><div class="sv r">${fmt(totalCardPay)}</div></div></div>`;
-  if(totalSub+totalLoan+totalCardPay>0)h+=`<div class="sc" style="margin-bottom:14px"><div class="sl">月固定压力含信用卡</div><div class="sv r" style="font-size:24px">${fmt(totalSub+totalLoan+totalCardPay)}</div></div>`;
   h+=`<div class="sec">订阅 Subscriptions <span class="sec-a" onclick="openModal('addsub')"><i class="ti ti-plus" style="font-size:13px"></i>添加</span></div>`;
   if(!D.subs.length)h+=`<div class="empty"><div class="empty-ic"><i class="ti ti-repeat"></i></div><div class="et">还没有订阅</div></div>`;
   D.subs.forEach(s=>{const paid=s.lastPaid===thisMo;h+=`<div class="acctcard" style="--tint:${(gi(s.iconId)&&gi(s.iconId).bg)||s.color||'var(--accent)'}"><div class="acct-top">${itemIcon(s,44,13)}<div class="acct-m"><div class="acct-n">${s.name}</div><div class="acct-s">每月 ${s.day} 号扣款${paid?' · 本月已付 ✓':''}</div>${aaFixedBadge(s.aaSplit,s.amt)}</div><div class="acct-b"><div class="acct-v b">${fmt(s.amt)}</div><div style="font-size:10.5px;color:var(--text3)">/ 月</div></div></div><div class="acct-acts"><button class="btn ${paid?'':'spd'}" onclick="postSub(${s.id})"><i class="ti ti-${paid?'check':'receipt'}"></i>${paid?'已记本月':'记本月'}</button><button class="btn del" onclick="delSub(${s.id})"><i class="ti ti-trash"></i>删除</button></div></div>`;});
@@ -1668,7 +1667,6 @@ function renderFixed(){
   syncAllFixedAAReceivables();
   const thisMo=todayISO().slice(0,7),totalSub=D.subs.reduce((a,s)=>a+money(s.amt),0),totalLoan=D.loans.reduce((a,l)=>a+money(l.monthly),0),ccObs=getCreditCardMonthlyObligations(),totalCardPay=ccObs.filter(o=>o.countInTotal!==false).reduce((a,o)=>a+money(o.amount),0);
   let h=`<div class="sg"><div class="sc"><div class="sl">月订阅</div><div class="sv b">${fmt(totalSub)}</div></div><div class="sc"><div class="sl">月贷款 / 租金</div><div class="sv r">${fmt(totalLoan)}</div></div><div class="sc"><div class="sl">信用卡月供</div><div class="sv r">${fmt(totalCardPay)}</div></div></div>`;
-  if(totalSub+totalLoan+totalCardPay>0)h+=`<div class="sc" style="margin-bottom:14px"><div class="sl">月固定压力含信用卡</div><div class="sv r" style="font-size:24px">${fmt(totalSub+totalLoan+totalCardPay)}</div></div>`;
   h+=`<div class="sec">订阅 Subscriptions <span class="sec-a" onclick="openModal('addsub')"><i class="ti ti-plus" style="font-size:13px"></i>添加</span></div>`;
   if(!D.subs.length)h+=`<div class="empty"><div class="empty-ic"><i class="ti ti-repeat"></i></div><div class="et">还没有订阅</div></div>`;
   D.subs.forEach(s=>{const paid=s.lastPaid===thisMo;h+=`<div class="acctcard" style="--tint:${(gi(s.iconId)&&gi(s.iconId).bg)||s.color||'var(--accent)'}"><div class="acct-top">${itemIcon(s,44,13)}<div class="acct-m"><div class="acct-n">${s.name}</div><div class="acct-s">每月 ${s.day||1} 号扣款${paid?' · 本月已付 ✓':''}</div>${aaFixedBadge(s.aaSplit,s.amt)}</div><div class="acct-b"><div class="acct-v b">${fmt(s.amt)}</div><div style="font-size:10.5px;color:var(--text3)">/ 月</div></div></div><div class="acct-acts"><button class="btn ${paid?'':'spd'}" onclick="postSub(${s.id})"><i class="ti ti-${paid?'check':'receipt'}"></i>${paid?'已记本月':'记本月'}</button><button class="btn" onclick="openModal('addsub',{editSubId:${s.id}})"><i class="ti ti-pencil"></i>编辑</button><button class="btn del" onclick="delSub(${s.id})"><i class="ti ti-trash"></i>删除</button></div></div>`;});
@@ -2894,6 +2892,83 @@ function renderAA(){
 })();
 
 
+// ══════════════════════════════════════════════════════
+// PHASE 11.1 — FIXED PAGE TABS + CLEAN SUMMARY
+// - Remove duplicate “月固定压力含信用卡” card.
+// - Split fixed page into tabs: Subscriptions / Loans & Rent / Credit Card monthly payments.
+// - Reuses the existing card-tab visual language so the page is shorter and cleaner.
+// ══════════════════════════════════════════════════════
+(function(){
+  try{
+    if(!document.getElementById('rm-phase111-fixed-tabs-css')){
+      const st=document.createElement('style');
+      st.id='rm-phase111-fixed-tabs-css';
+      st.textContent=`
+        .fixed-tabs{margin:15px 0 14px}.fixed-tabs .card-tab{min-height:78px}.fixed-tabs .card-tab-zh{font-size:13.5px}.fixed-tabs .card-tab-sum{font-size:11px;line-height:1.35}.fixed-tab-body{animation:contentIn .22s cubic-bezier(.2,.85,.25,1)}.fixed-empty-note{font-size:11.5px;color:var(--text3);line-height:1.5;margin-top:6px}.fixed-quick-hint{display:flex;align-items:center;gap:7px;margin:-3px 0 13px;padding:10px 12px;border-radius:14px;background:var(--bg2);border:1px solid var(--border);font-size:11.5px;color:var(--text2);line-height:1.45}.fixed-quick-hint i{color:var(--accent);font-size:16px}`;
+      document.head.appendChild(st);
+    }
+  }catch(_e){}
+  const m=n=>Math.round((Number(n)||0)*100)/100;
+  const safeArr=a=>Array.isArray(a)?a:[];
+  const e=v=>String(v==null?'':v).replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]));
+  function fixedTab(){
+    const k=(U&&U.fixedTab)||(()=>{try{return localStorage.getItem('rm_fixed_active_tab_v1')}catch(_e){return null}})();
+    return ['subs','loans','cards'].includes(k)?k:'subs';
+  }
+  window.setFixedTab11=function(k){
+    if(!['subs','loans','cards'].includes(k))k='subs';
+    U.fixedTab=k;
+    try{localStorage.setItem('rm_fixed_active_tab_v1',k)}catch(_e){}
+    try{haptic&&haptic()}catch(_e){}
+    render();
+  };
+  function tabBtn(id,zh,en,sum,on){
+    return `<button class="card-tab ${on?'on':''}" onclick="setFixedTab11('${id}')"><div class="card-tab-zh">${zh}</div><div class="card-tab-en">${en}</div><div class="card-tab-sum">${sum}</div></button>`;
+  }
+  function subCard(s,thisMo){
+    const paid=s.lastPaid===thisMo;
+    const tint=(typeof gi==='function'&&gi(s.iconId)&&gi(s.iconId).bg)||s.color||'var(--accent)';
+    return `<div class="acctcard" style="--tint:${e(tint)}"><div class="acct-top">${itemIcon(s,44,13)}<div class="acct-m"><div class="acct-n">${e(s.name)}</div><div class="acct-s">每月 ${e(s.day||1)} 号扣款${paid?' · 本月已付 ✓':''}</div>${typeof aaFixedBadge==='function'?aaFixedBadge(s.aaSplit,s.amt):''}</div><div class="acct-b"><div class="acct-v b">${fmt(s.amt)}</div><div style="font-size:10.5px;color:var(--text3)">/ 月</div></div></div><div class="acct-acts"><button class="btn ${paid?'':'spd'}" onclick="postSub(${s.id})"><i class="ti ti-${paid?'check':'receipt'}"></i>${paid?'已记本月':'记本月'}</button><button class="btn" onclick="openModal('addsub',{editSubId:${s.id}})"><i class="ti ti-pencil"></i>编辑</button><button class="btn del" onclick="delSub(${s.id})"><i class="ti ti-trash"></i>删除</button></div></div>`;
+  }
+  function loanCard(l,thisMo){
+    const p=l.total>0?pct(l.total-l.remaining,l.total):0;
+    return `<div class="card" style="background:linear-gradient(155deg,color-mix(in srgb,${e(l.color||'var(--accent)')} 10%,var(--bg2)),var(--bg2) 68%)"><div class="row">${iconHTML(gi(l.iconId||'loan'),42,12)}<div class="name">${e(l.name)}</div><span class="badge bloan">${e(String(l.type||'贷款').split(' ')[0])}</span></div><div class="dg"><div class="db"><div class="dl">月供</div><div class="dv r">${fmt(l.monthly)}</div></div><div class="db"><div class="dl">还款日</div><div class="dv">${e(l.dueDay||1)} 号</div></div>${l.remaining?`<div class="db" style="grid-column:span 2"><div class="dl">剩余贷款</div><div class="dv">${fmt(l.remaining)}</div></div>`:''}</div>${typeof aaFixedBadge==='function'?aaFixedBadge(l.aaSplit,l.monthly):''}${l.total>0&&l.remaining?`<div class="prog"><div class="pl"><span>已还 ${p}%</span><span>剩 ${fmt(l.remaining)}</span></div><div class="pt"><div class="pf" style="width:${p}%;background:${e(l.color||'var(--accent)')}"></div></div></div>`:''}<div class="acts"><button class="btn ${l.lastPaid===thisMo?'':'spd'}" onclick="postLoan(${l.id})"><i class="ti ti-${l.lastPaid===thisMo?'check':'receipt'}"></i>${l.lastPaid===thisMo?'本月已记':'记本月还款'}</button><button class="btn" onclick="openModal('addloan',{editLoanId:${l.id}})"><i class="ti ti-pencil"></i>编辑</button><button class="btn del" onclick="delLoan(${l.id})"><i class="ti ti-trash"></i>删除</button></div></div>`;
+  }
+  function ccPayCard(o){
+    const aa=o.aaSplit&&o.aaSplit.enabled?`<span class="mini-badge">AA待收 ${fmtR(o.aaSplit.owedAmount||o.aaSplit.amount||0)}</span>`:'';
+    const edit=o.type==='installment'?`openModal('addInst',{editId:${o.cardId},activeEditTxnId:${o.id}})`:`openModal('addcc',{editCardId:${o.cardId}})`;
+    return `<div class="acctcard" style="--tint:var(--blue)"><div class="acct-top"><div class="acct-ic"><i class="ti ${o.type==='installment'?'ti-calendar-dollar':'ti-credit-card-pay'}"></i></div><div class="acct-m"><div class="acct-n">${e(o.name)}${o.cardName?' · '+e(o.cardName):''}</div><div class="acct-s">${o.type==='installment'?`剩 ${e(o.remainingMonths)} / ${e(o.tenureMonths)} 期 · 剩余 ${fmt(o.remainingBalance)}`:`还款日 ${e(o.dueDate||'未设置')} 号`}</div>${aa?`<div class="mini-badges" style="margin-top:5px">${aa}</div>`:''}</div><div class="acct-b"><div class="acct-v r">${fmt(o.amount)}</div><div style="font-size:10.5px;color:var(--text3)">/ 月</div></div></div><div class="acct-acts"><button class="btn" onclick="${edit}"><i class="ti ti-pencil"></i>编辑</button></div></div>`;
+  }
+  window.renderFixed=renderFixed=function(){
+    const thisMo=todayISO().slice(0,7);
+    const subs=safeArr(D.subs), loans=safeArr(D.loans);
+    const ccObs=(typeof getCreditCardMonthlyObligations==='function'?getCreditCardMonthlyObligations():[]);
+    const totalSub=subs.reduce((a,s)=>a+m(s.amt),0);
+    const totalLoan=loans.reduce((a,l)=>a+m(l.monthly),0);
+    const totalCardPay=ccObs.filter(o=>o.countInTotal!==false).reduce((a,o)=>a+m(o.amount),0);
+    const active=fixedTab();
+    let h=`<div class="sg"><div class="sc"><div class="sl">月订阅</div><div class="sv b">${fmt(totalSub)}</div></div><div class="sc"><div class="sl">月贷款 / 租金</div><div class="sv r">${fmt(totalLoan)}</div></div><div class="sc"><div class="sl">信用卡月供</div><div class="sv r">${fmt(totalCardPay)}</div></div></div>`;
+    h+=`<div class="card-tabs fixed-tabs">${tabBtn('subs','订阅','Subscriptions',`${subs.length} 项 · ${fmt(totalSub)}`,active==='subs')}${tabBtn('loans','贷款 / 租金','Loans & Rent',`${loans.length} 项 · ${fmt(totalLoan)}`,active==='loans')}${tabBtn('cards','信用卡月供','Card Payments',`${ccObs.length} 项 · ${fmt(totalCardPay)}`,active==='cards')}</div>`;
+    h+=`<div class="fixed-quick-hint"><i class="ti ti-layout-tabs"></i><span>固定支出已改成 tabs，避免一直往下滑；上面三个金额已经是总览，不再重复显示“月固定压力含信用卡”。</span></div><div class="fixed-tab-body">`;
+    if(active==='subs'){
+      h+=`<div class="sec">订阅 Subscriptions <span class="sec-a" onclick="openModal('addsub')"><i class="ti ti-plus" style="font-size:13px"></i>添加</span></div>`;
+      if(!subs.length)h+=`<div class="empty"><div class="empty-ic"><i class="ti ti-repeat"></i></div><div class="et">还没有订阅</div><div class="fixed-empty-note">例如 Netflix、iCloud、Spotify、n8n 等每月固定扣款。</div></div>`;
+      subs.forEach(s=>{h+=subCard(s,thisMo)});
+    }else if(active==='loans'){
+      h+=`<div class="sec">贷款 / 租金 <span class="sec-a" onclick="openModal('addloan')"><i class="ti ti-plus" style="font-size:13px"></i>添加</span></div>`;
+      if(!loans.length)h+=`<div class="empty"><div class="empty-ic"><i class="ti ti-home"></i></div><div class="et">还没有贷款 / 租金</div><div class="fixed-empty-note">例如车贷、房租、房贷、保险月供。</div></div>`;
+      loans.forEach(l=>{h+=loanCard(l,thisMo)});
+    }else{
+      h+=`<div class="sec">信用卡月供 Card Payments <span class="sec-a" onclick="setTab('cards')"><i class="ti ti-credit-card" style="font-size:13px"></i>去卡片页</span></div>`;
+      if(!ccObs.length)h+=`<div class="empty"><div class="empty-ic"><i class="ti ti-credit-card-pay"></i></div><div class="et">本月没有待还信用卡月供</div><div class="fixed-empty-note">这里会自动读取信用卡本月待还和分期月供。</div></div>`;
+      ccObs.forEach(o=>{h+=ccPayCard(o)});
+    }
+    h+=`</div>`;
+    return h;
+  };
+})();
+
+
 initSecurity();
 initSupa();
 
@@ -2935,6 +3010,74 @@ initSupa();
   window.saveSpend=saveSpend=function(){const editId=U.editId;const oldTx=editId?(D.txns||[]).find(t=>same(t.id,editId)):null;const oldCopy=oldTx?JSON.parse(JSON.stringify(oldTx)):null;const res=prevSaveSpend10();setTimeout(()=>{try{const tx=editId?(D.txns||[]).find(t=>same(t.id,editId)):null;if(oldCopy&&tx&&cloudId(tx))syncEdit10(oldCopy,tx);}catch(e){console.log('phase10 saveSpend hook',e);}},800);return res;};
   const prevInfo10=window.aaSourceInfo;
   window.aaSourceInfo=function(r){const info=prevInfo10?prevInfo10(r):{title:r&&r.desc||'AA 分账',meta:r&&r.date||'',icon:'ti-users',edit:''};try{const hist=Array.isArray(r&&r.raw&&r.raw.edit_history)?r.raw.edit_history:[];const last=hist[hist.length-1];if(last){const parts=[];if(m(last.old_amount)!==m(last.new_amount))parts.push(`金额 ${fmtR(last.old_amount)}→${fmtR(last.new_amount)}`);if(last.old_desc!==last.new_desc)parts.push('内容已改');if(last.old_category!==last.new_category)parts.push('类别已改');if(last.old_payment!==last.new_payment)parts.push('付款已改');info.meta=(info.meta||'')+` · ✏️ ${last.time||''}${parts.length?' '+parts.join(' · '):' 已编辑'}`;}else if(r&&r.raw&&r.raw.app_edited){info.meta=(info.meta||'')+' · ✏️ 已编辑';}}catch(e){}return info;};
+})();
+
+
+
+// ══════════════════════════════════════════════════════
+// PHASE 11 — AA RECEIPTS + HISTORY LABEL POLISH
+// - Shows AA repayment receipts in the Record page.
+// - Shows AA split badge in expense history rows.
+// - Keeps display clean without changing core finance calculations.
+// ══════════════════════════════════════════════════════
+(function(){
+  const same=(a,b)=>String(a)===String(b);
+  const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const m=n=>Math.round((Number(n)||0)*100)/100;
+  function cloudId(tx){return tx&&(tx.telegramQuickEntryId||tx.quickEntryId||tx.shortcutEntryId);}
+  function personNameById(id){try{return (D.aaPeople||[]).find(p=>same(p.id,id))?.name||'对方';}catch(_){return'对方';}}
+  function aaInfoForTxn11(t){
+    try{
+      const qid=cloudId(t);
+      let r=(D.aaReceivables||[]).find(x=>(x.sourceType==='txn'&&same(x.sourceId,t.id))||(qid&&same(x.quickEntryId,qid)));
+      if(r){const person=r.personName||personNameById(r.personId);const total=m(r.totalAmount||t.amt);const due=m((r.owedAmount||0)-(r.settledAmount||0));const pct=total?Math.round((m(r.owedAmount||0)/total)*100):50;return{person,due,total,pct,label:`AA · ${person} ${fmtR(Math.max(0,due))}`};}
+      const sp=t.aaSplit;if(sp&&sp.enabled){const total=m(t.amt);const owed=m(sp.owedAmount||calcAAOwed(total,sp));const person=sp.personName||personNameById(sp.personId);const pct=total?Math.round((owed/total)*100):50;return{person,due:owed,total,pct,label:`AA · ${person} ${fmtR(owed)}`};}
+    }catch(e){console.log('aaInfoForTxn11',e)}
+    return null;
+  }
+  function receiptRows11(){
+    const byId={};
+    (Array.isArray(D.aaSettlementReceipts)?D.aaSettlementReceipts:[]).forEach(r=>{if(r&&r.settlementId)byId[String(r.settlementId)]=r;});
+    (Array.isArray(D.incomes)?D.incomes:[]).filter(i=>i&&(i.sourceType==='aa_settlement'||i.source==='telegram_aa_settlement'||i.aaSettlementId||i.settlementId)).forEach(i=>{const key=String(i.settlementId||i.aaSettlementId||i.id);byId[key]={...(byId[key]||{}),settlementId:key,amount:m(i.amt),partnerName:i.partnerName||byId[key]?.partnerName||'AA Partner',cardName:i.receiveCardName||byId[key]?.cardName||'',cardType:i.receiveCardType||byId[key]?.cardType||'',date:i.date||byId[key]?.date||'',isoDate:i.isoDate||byId[key]?.isoDate||'',time:i.time||byId[key]?.time||'',createdAt:i.createdAt||byId[key]?.createdAt||''};});
+    if(D.tgSettlementApplied&&typeof D.tgSettlementApplied==='object')Object.keys(D.tgSettlementApplied).forEach(key=>{const x=D.tgSettlementApplied[key]||{};if(!byId[key]){const at=x.at||'';let dd='',hm='';try{const d=new Date(at||Date.now());dd=d.toLocaleDateString('en-MY',{month:'short',day:'numeric'});hm=d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',hour12:false});}catch(_e){}byId[key]={settlementId:key,amount:m(x.amount),partnerName:x.partnerName||'AA Partner',cardName:x.cardName||'',cardType:x.cardType||'',date:dd,isoDate:(at||'').slice(0,10),time:hm,createdAt:at};}});
+    return Object.values(byId).sort((a,b)=>String(b.createdAt||b.isoDate||'').localeCompare(String(a.createdAt||a.isoDate||'')));
+  }
+  function receiptSection11(){
+    const rows=receiptRows11();
+    if(!rows.length)return '';
+    const total=rows.reduce((a,r)=>a+m(r.amount),0);
+    let h=`<div class="sec">收到还款 <span class="sec-a">AA Repayments · ${fmt(total)}</span></div><div class="card">`;
+    rows.slice(0,8).forEach(r=>{h+=`<div class="txn"><div class="txn-ic" style="background:var(--green-bg);color:var(--green)"><i class="ti ti-users"></i></div><div class="txn-m"><div class="txn-n">${esc(r.partnerName||'AA Partner')} 还款</div><div class="txn-s"><div class="txn-meta">AA 收款 · ${esc(r.cardName||'未指定入账位置')}</div><div class="txn-meta txn-date">${esc(r.date||'')}${r.time?' · '+esc(r.time):''}</div></div></div><div class="txn-x"><div class="txn-a g">+${fmt(m(r.amount))}</div></div></div>`;});
+    h+=`</div>`;return h;
+  }
+  const prevRenderRecord11=window.renderRecord||renderRecord;
+  window.renderRecord=renderRecord=function(){let h=prevRenderRecord11();try{const sec=receiptSection11();if(sec){const marker='<div class="sec">固定收入';h=h.includes(marker)?h.replace(marker,sec+marker):sec+h;}}catch(e){console.log('receipt section 11',e)}return h;};
+
+  window.renderHistory=renderHistory=function(){
+    if(!D.txns.length)return`<div class="empty" style="margin-top:50px"><div class="empty-ic"><i class="ti ti-calendar"></i></div><div class="et">还没有消费记录</div><div class="es">去「记账」开始记第一笔</div></div>`;
+    const base=new Date(),off=U.histMonth||0,tgt=new Date(base.getFullYear(),base.getMonth()+off,1);
+    const inM=(t,mth)=>{const d=new Date(t.isoDate||0);return d.getMonth()===mth.getMonth()&&d.getFullYear()===mth.getFullYear();};
+    const mTx=D.txns.filter(t=>inM(t,tgt));
+    let h=`<div class="search-bar"><div class="search-wrap"><i class="ti ti-search si"></i><input class="search-input" id="hist-q" placeholder="搜索描述 / 类别 / 卡片…" oninput="histFilter(this.value)"/><span class="search-clear" id="hist-clear" style="display:none" onclick="document.getElementById('hist-q').value='';histFilter('')"><i class="ti ti-x"></i></span></div></div>`;
+    h+=`<div class="month-nav"><button class="mn-btn" onclick="setHistMonth(-1)"><i class="ti ti-chevron-left"></i></button><div class="mn-lbl">${tgt.toLocaleDateString('zh-CN',{year:'numeric',month:'long'})}${off===0?' · 本月':''}</div><button class="mn-btn" ${off>=0?'disabled style="opacity:.3"':''} onclick="setHistMonth(1)"><i class="ti ti-chevron-right"></i></button></div>`;
+    if(mTx.length){const days=[...new Set(mTx.map(t=>t.isoDate||todayISO()))].sort();if(days.length>1)h+=`<div class="day-strip">${days.map(dt=>{const d=new Date(dt);return`<button class="day-chip" onclick="jumpDay('${dt}')"><span class="dc-d">${d.getDate()}</span><span class="dc-w">${d.toLocaleDateString('zh-CN',{weekday:'short'}).replace('星期','周')}</span></button>`;}).join('')}</div>`;}
+    h+=`<div class="ins-wrap">`;
+    if(mTx.length){const mTotal=mTx.reduce((a,t)=>a+t.amt,0);const byCat={};mTx.forEach(t=>{const k=t.catLabel||'其他';if(!byCat[k])byCat[k]={sum:0,icon:t.catIcon||'ti-receipt'};byCat[k].sum+=t.amt;});
+      const cats=Object.keys(byCat).map(k=>({label:k,sum:byCat[k].sum,icon:byCat[k].icon})).sort((a,b)=>b.sum-a.sum);const max=cats[0].sum||1;
+      const pm=new Date(tgt.getFullYear(),tgt.getMonth()-1,1);const pTotal=D.txns.filter(t=>inM(t,pm)).reduce((a,t)=>a+t.amt,0);let trend='';if(pTotal>0){const diff=Math.round((mTotal-pTotal)/pTotal*100);const up=diff>0;trend=`<span class="ins-trend" style="background:${up?'var(--red-bg)':'var(--green-bg)'};color:${up?'var(--red)':'var(--green)'}"><i class="ti ti-${up?'arrow-up-right':diff<0?'arrow-down-right':'minus'}"></i>${Math.abs(diff)}% vs 上月</span>`;}
+      h+=`<div class="sec">消费分析</div><div class="card"><div class="ins-head"><div><div class="ins-hl">当月总消费</div><div class="ins-total r">${fmt(mTotal)}</div>${trend}</div><div class="ins-cnt">${mTx.length} 笔 · ${cats.length} 类</div></div>`;
+      const dim=new Date(tgt.getFullYear(),tgt.getMonth()+1,0).getDate();const dpass=off===0?base.getDate():dim;const avg=mTotal/(dpass||1);const proj=off===0?mTotal/(dpass||1)*dim:null;
+      h+=`<div class="ins-mini"><div class="ins-mi"><div class="ins-mil">日均消费</div><div class="ins-miv">${fmt(avg)}</div></div>${proj!==null?`<div class="ins-mi"><div class="ins-mil">预计月底</div><div class="ins-miv">${fmt(proj)}</div></div><div class="ins-mi"><div class="ins-mil">本月剩余</div><div class="ins-miv">${dim-dpass} 天</div></div>`:''}</div>`;
+      cats.slice(0,6).forEach(c=>{const bw=Math.round(c.sum/max*100),pct=Math.round(c.sum/mTotal*100);h+=`<div class="ins-row"><div class="ins-top"><div class="ins-ic"><i class="ti ${c.icon}"></i></div><div class="ins-name">${uiLabel(c.label)}</div><div class="ins-amt r">${fmt(c.sum)}</div><div class="ins-pct">${pct}%</div></div><div class="ins-bar"><i style="width:${D.privacyMode?0:bw}%"></i></div></div>`;});
+      h+=`</div>`;
+    }
+    h+=`</div>`;
+    h+=`<div class="sec cal-sec">消费日历</div><div id="hist-empty" class="empty" style="display:none"><div class="empty-ic"><i class="ti ti-search-off"></i></div><div class="et">没有匹配的记录</div></div>`;
+    if(!mTx.length){h+=`<div class="empty"><div class="empty-ic"><i class="ti ti-calendar-off"></i></div><div class="et">本月没有消费记录</div><div class="es">用上方箭头切换其他月份</div></div>`;}
+    else{const byDate={};mTx.forEach(t=>{const k=t.isoDate||todayISO();(byDate[k]=byDate[k]||[]).push(t);});const sorted=Object.keys(byDate).sort((a,b)=>b.localeCompare(a));
+      sorted.forEach(date=>{const txns=byDate[date],dayTotal=txns.reduce((a,t)=>a+t.amt,0);const d=new Date(date),lbl=d.toLocaleDateString('en-MY',{weekday:'short',month:'short',day:'numeric'});h+=`<div class="dgroup" id="dg-${date}"><div class="dh"><span class="dh-l">${lbl}</span><span class="dh-r">− ${fmtR(dayTotal)}</span></div><div class="card">`;txns.forEach(t=>{const aa=aaInfoForTxn11(t);const sk=((t.desc||'')+' '+(t.catLabel||'')+' '+(t.payName||'')+' '+(aa?aa.person:'')).toLowerCase();const aaLine=aa?`<div class="txn-meta" style="color:var(--green);font-weight:750"><i class="ti ti-users" style="font-size:12px"></i> ${esc(aa.label)}</div>`:'';h+=`<div class="swipe" data-search="${esc(sk)}"><div class="txn-swipe-del" onclick="delTxn(${t.id})"><i class="ti ti-trash"></i></div><div class="swipe-fg txn"><div class="txn-ic"><i class="ti ${t.catIcon||'ti-receipt'}"></i></div><div class="txn-m"><div class="txn-n">${esc(t.desc||uiLabel(t.catLabel))}</div><div class="txn-s">${aaLine}<div class="txn-meta">${esc(uiLabel(t.catLabel))}</div>${t.payName?`<div class="txn-meta txn-pay">${esc(t.payName)}${t.time?' · '+esc(t.time):''}</div>`:t.time?`<div class="txn-meta txn-date">${esc(t.time)}</div>`:''}</div></div><div class="txn-x"><div class="txn-a r">−${fmt(t.amt)}</div>${t.files&&t.files.length?`<i class="ti ti-paperclip" onclick="event.stopPropagation();viewTxn(${t.id})" style="color:var(--accent)"></i>`:''}<i class="ti ti-edit" onclick="openModal('spend',{editId:${t.id}})" style="color:var(--accent)"></i></div></div></div>`;});h+=`</div></div>`;});}
+    return h;
+  };
 })();
 
 </script>
