@@ -1652,7 +1652,7 @@ function render(){
   if(LOCK.state!=='unlocked'){renderLock();return;}
   const TABS=[{id:'home',i:'ti-home',l:'首页'},{id:'cards',i:'ti-credit-card',l:'卡片'},{id:'record',i:'ti-circle-plus',l:'记账'},{id:'history',i:'ti-calendar',l:'记录'},{id:'fixed',i:'ti-repeat',l:'固定'},{id:'aa',i:'ti-users',l:'AA'}];
   const TITLES={home:'RinggitMe',cards:'卡片管理',record:'收入 & 收款',history:'消费记录',fixed:'固定支出',aa:'AA 分账'};
-  const SUBS={home:'马来西亚理财 · 数据存本机 · V91',cards:'信用卡 · 储蓄 · 电子钱包 eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
+  const SUBS={home:'马来西亚理财 · 数据存本机 · V92',cards:'信用卡 · 储蓄 · 电子钱包 eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
   // preserve scroll on same-tab re-render (no more jumping to top on every tap); fade only on tab switch
   const tabChanged=U.tab!==_lastRenderedTab;
   const prevContent=document.querySelector('.content');
@@ -4293,6 +4293,177 @@ function telegramFiles15(raw){
   window.closeAAAddPerson18_3=close;
   try{dedupePeople();}catch(_){ }
 })();
+
+// PHASE 18.4 — AA INSTANT TAB SWITCH PERFORMANCE FIX
+// Keep AA Add Person full-screen fix, then make AA Current / Records tabs respond on first tap.
+(()=>{
+  const PH='18.4';
+  const A=Array.isArray;
+  const arr=x=>A(x)?x:[];
+  const N=x=>Number(x)||0;
+  const idStr=x=>String(x==null?'':x);
+  const same=(a,b)=>idStr(a)===idStr(b);
+  const norm=s=>idStr(s).trim().toLowerCase();
+  const e=s=>idStr(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const money=x=>{try{return typeof fmtR==='function'?fmtR(N(x)):'RM '+N(x).toFixed(2)}catch(_){return 'RM '+N(x).toFixed(2)}};
+  const today=()=>{try{return typeof todayISO==='function'?todayISO():new Date().toISOString().slice(0,10)}catch(_){return new Date().toISOString().slice(0,10)}};
+  const ymOf=iso=>idStr(iso||today()).slice(0,7);
+  const off=()=>Number(U.aaMonthOffset17||0);
+  const ymFromOff=o=>{const d=new Date();d.setDate(1);d.setMonth(d.getMonth()+Number(o||0));return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')};
+  const monthName=o=>{try{return typeof monthTitleFromOffset==='function'?monthTitleFromOffset(o):''}catch(_){const y=ymFromOff(o);return `${Number(y.slice(0,4))}年${Number(y.slice(5,7))}月${Number(o)===0?' · 本月':''}`}};
+  function ensure(){
+    if(!A(D.aaPeople))D.aaPeople=[];
+    if(!A(D.aaReceivables))D.aaReceivables=[];
+    if(!A(D.txns))D.txns=[];
+    if(!A(D.incomes))D.incomes=[];
+    if(!A(D.aaSettlementReceipts))D.aaSettlementReceipts=[];
+    if(!U.dayFilters17||typeof U.dayFilters17!=='object')U.dayFilters17={};
+    if(!U.aaMainTab18)U.aaMainTab18='current';
+    if(!U.aaHistoryPerson18)U.aaHistoryPerson18='all';
+  }
+  function localPersonName(pid){
+    const p=arr(D.aaPeople).find(x=>same(x.id,pid));
+    return p&&p.name?p.name:'女朋友';
+  }
+  function matchesPerson(o,p){
+    if(!o||!p)return false;
+    if(o.personId&&same(o.personId,p.id))return true;
+    if(o.partnerId&&same(o.partnerId,p.id))return true;
+    const names=[o.personName,o.partnerName,o.name].map(norm);
+    return names.includes(norm(p.name));
+  }
+  function aaInfo(t){
+    if(!t)return null;
+    const perm=t.aaPermanent||t.aaMeta;
+    if(perm&&(perm.enabled!==false)){
+      const owed=N(perm.owedAmount||perm.owed||perm.receivable||perm.amount||N(t.amt)/2);
+      const settled=N(perm.settledAmount||perm.settled||0);
+      return {personId:perm.personId||perm.partnerId,partnerId:perm.partnerId,person:perm.personName||perm.partnerName||localPersonName(perm.personId),owed,settled,due:Math.max(0,owed-settled),total:N(perm.totalAmount||perm.total||t.amt)};
+    }
+    if(t.aaSplit&&t.aaSplit.enabled){
+      const owed=N(t.aaSplit.owedAmount||t.aaSplit.amount||N(t.amt)/2);
+      return {personId:t.aaSplit.personId,partnerId:t.aaSplit.partnerId,person:t.aaSplit.personName||t.aaSplit.partnerName||localPersonName(t.aaSplit.personId),owed,settled:0,due:owed,total:N(t.amt)};
+    }
+    return null;
+  }
+  function receiptKey(r){return idStr(r&&((r.settlementId)||(r.aaSettlementId)||(r.id)));}
+  function hiddenReceipt(k){
+    try{return !!(D.aaHiddenSettlementIds&&D.aaHiddenSettlementIds[k])||!!(D.tgSettlementApplied&&D.tgSettlementApplied[k]&&D.tgSettlementApplied[k].hidden)}catch(_){return false}
+  }
+  function isAAIncome(i){return !!(i&&(i.sourceType==='aa_settlement'||i.source==='telegram_aa_settlement'||i.aaSettlementId||i.settlementId));}
+  function receipts(){
+    const by={};
+    arr(D.aaSettlementReceipts).forEach(r=>{const k=receiptKey(r);if(k&&!r.hidden&&!hiddenReceipt(k))by[k]={...r,settlementId:k,type:'receipt'};});
+    arr(D.incomes).filter(isAAIncome).forEach(i=>{const k=receiptKey(i);if(!k||i.hidden||hiddenReceipt(k))return;by[k]={...(by[k]||{}),settlementId:k,type:'receipt',amount:N(i.amt||by[k]?.amount),partnerName:i.partnerName||by[k]?.partnerName||'女朋友',partnerId:i.partnerId||by[k]?.partnerId,cardName:i.receiveCardName||by[k]?.cardName||'',isoDate:i.isoDate||by[k]?.isoDate||'',date:i.date||by[k]?.date||'',time:i.time||by[k]?.time||'',createdAt:i.createdAt||by[k]?.createdAt||''};});
+    return Object.values(by);
+  }
+  function peopleLight(){
+    const map=new Map();
+    function add(p){
+      if(!p)return;
+      const name=p.name||p.personName||p.partnerName||'女朋友';
+      const key=norm(name); if(!key)return;
+      const old=map.get(key)||{};
+      map.set(key,{...old,...p,id:old.id||p.id||p.personId||p.partnerId||('p-'+key),name,color:p.color||old.color||'#0a8a54'});
+    }
+    arr(D.aaPeople).forEach(add);
+    arr(D.aaReceivables).forEach(r=>add({id:r.personId||r.partnerId,name:r.personName||r.partnerName||localPersonName(r.personId),color:'#0a8a54'}));
+    receipts().forEach(r=>add({id:r.partnerId,name:r.partnerName||'女朋友',color:'#0a8a54'}));
+    return [...map.values()];
+  }
+  function currentRowsFor(p,ym,picked){
+    return arr(D.aaReceivables).filter(r=>matchesPerson(r,p)&&N(r.owedAmount)>N(r.settledAmount)&&ymOf(r.isoDate||r.date)===ym&&(!picked||r.isoDate===picked||r.date===picked));
+  }
+  function totalDueFor(p){return arr(D.aaReceivables).filter(r=>matchesPerson(r,p)&&N(r.owedAmount)>N(r.settledAmount)).reduce((s,r)=>s+Math.max(0,N(r.owedAmount)-N(r.settledAmount)),0);}
+  function allHistoryRows(){
+    const out=[];
+    arr(D.txns).forEach(t=>{const aa=aaInfo(t);if(aa)out.push({type:'txn',t,aa,isoDate:t.isoDate||today(),time:t.time||'',key:(t.isoDate||'')+' '+(t.time||'')+' '+idStr(t.id)});});
+    receipts().forEach(r=>out.push({type:'receipt',r,isoDate:r.isoDate||'',time:r.time||'',key:(r.isoDate||'')+' '+(r.time||'')+' '+receiptKey(r)}));
+    return out.sort((a,b)=>idStr(a.key).localeCompare(idStr(b.key)));
+  }
+  function nav(){const o=off();return `<div class="month-nav"><button class="mn-btn" onclick="setAAMonth18_4(-1)"><i class="ti ti-chevron-left"></i></button><div class="mn-lbl" onclick="openCalendar17&&openCalendar17('aa')">${monthName(o)}</div><button class="mn-btn" ${o>=0?'disabled style="opacity:.3"':''} onclick="setAAMonth18_4(1)"><i class="ti ti-chevron-right"></i></button></div>`;}
+  function dayStrip(dates){
+    dates=[...new Set(arr(dates).filter(Boolean))].sort();
+    const picked=U.dayFilters17&&U.dayFilters17.aa||'';
+    if(!dates.length)return'';
+    return `<div class="day-strip phase18-days"><button class="day-chip ${!picked?'on':''}" onclick="clearDay17&&clearDay17('aa')"><span class="dc-d">All</span><span class="dc-w">全部</span></button>${dates.map(dt=>{const d=new Date(dt+'T00:00:00');return `<button class="day-chip ${picked===dt?'on':''}" onclick="pickDay17&&pickDay17('aa','${dt}')"><span class="dc-d">${d.getDate()}</span><span class="dc-w">${d.toLocaleDateString('zh-CN',{weekday:'short'}).replace('星期','周')}</span></button>`}).join('')}</div>`;
+  }
+  function mainTabs(tab){
+    return `<div class="aa-tabs-fast18" id="aa-tabs-fast18"><button type="button" class="aa-fast-tab ${tab==='current'?'on':''}" data-aa-tab="current" onpointerdown="aaSwitchFast18_4(event,'current')" onclick="aaSwitchFast18_4(event,'current')">目前消费</button><button type="button" class="aa-fast-tab ${tab==='history'?'on':''}" data-aa-tab="history" onpointerdown="aaSwitchFast18_4(event,'history')" onclick="aaSwitchFast18_4(event,'history')">记录</button></div>`;
+  }
+  window.aaSwitchFast18_4=function(ev,tab){
+    try{if(ev){ev.preventDefault();ev.stopPropagation();}}catch(_){ }
+    ensure(); tab=tab==='history'?'history':'current';
+    if(U.aaMainTab18===tab)return false;
+    U.aaMainTab18=tab;
+    const bar=document.getElementById('aa-tabs-fast18');
+    if(bar){bar.querySelectorAll('.aa-fast-tab').forEach(b=>b.classList.toggle('on',b.dataset.aaTab===tab));}
+    const body=document.getElementById('aa-fast-content18');
+    if(body){body.innerHTML='<div class="aa-tab-loading18"><i class="ti ti-loader-2"></i> 切换中…</div>';}
+    clearTimeout(U._aaSwitchTimer18);
+    U._aaSwitchTimer18=setTimeout(()=>{try{render();}catch(err){console.error(err)}},16);
+    return false;
+  };
+  window.setAAMonth18_4=function(delta){ensure();U.aaMonthOffset17=Number(U.aaMonthOffset17||0)+Number(delta||0);if(U.aaMonthOffset17>0)U.aaMonthOffset17=0;delete U.dayFilters17.aa;try{render()}catch(_){}};
+  window.setAAHistoryPerson18_4=function(pid){ensure();U.aaHistoryPerson18=idStr(pid||'all');try{render()}catch(_){}};
+  function histMatchesPerson(x,p){return x.type==='receipt'?matchesPerson({partnerId:x.r.partnerId,partnerName:x.r.partnerName},p):matchesPerson({personId:x.aa.personId,partnerId:x.aa.partnerId,personName:x.aa.person},p);}
+  function personFilter(ps,rowsAll){
+    const sel=idStr(U.aaHistoryPerson18||'all');
+    const allOn=sel==='all'||!ps.some(p=>same(p.id,sel));
+    const counts={};
+    rowsAll.forEach(x=>ps.forEach(p=>{if(histMatchesPerson(x,p)){counts[p.id]=(counts[p.id]||0)+1;}}));
+    return `<div class="day-strip phase18-persons"><button class="day-chip ${allOn?'on':''}" onclick="setAAHistoryPerson18_4('all')"><span class="dc-d">全部</span><span class="dc-w">${rowsAll.length}笔</span></button>${ps.map(p=>`<button class="day-chip ${same(p.id,sel)?'on':''}" onclick="setAAHistoryPerson18_4(${JSON.stringify(p.id)})"><span class="dc-d">${e(p.name||'AA对象')}</span><span class="dc-w">${counts[p.id]||0}笔</span></button>`).join('')}</div>`;
+  }
+  function txRow(x){const t=x.t,aa=x.aa,files=arr(t.files).length>0;return `<div class="aa-txn"><div class="aa-txn-ic"><i class="ti ${e(t.catIcon||'ti-receipt')}"></i></div><div class="aa-txn-m"><div class="aa-txn-n">${e(aa.person||'女朋友')} · ${e(t.desc||'AA 消费')}</div><div class="aa-txn-s"><div class="txn-meta">${e(t.catLabel||'其他 Others')} · 总 ${money(t.amt)} · AA ${money(aa.owed)}${aa.due<=0?' · 已结清':''}</div><div class="txn-meta txn-date">${e(t.date||'')}${t.time?' · '+e(t.time):''}${files?' · 有照片/附件':''}</div></div></div><div class="aa-txn-tools">${files?`<i class="ti ti-paperclip" onclick="event.stopPropagation();viewTxn&&viewTxn(${JSON.stringify(t.id)})" style="color:var(--accent);font-size:19px;padding:5px"></i>`:''}<i class="ti ti-trash" onclick="event.stopPropagation();delAAHistory17&&delAAHistory17('txn',${JSON.stringify(t.id)})" style="color:var(--red);font-size:18px;padding:5px"></i></div></div>`;}
+  function recRow(x){const r=x.r;return `<div class="aa-txn"><div class="aa-txn-ic" style="color:var(--green)"><i class="ti ti-cash"></i></div><div class="aa-txn-m"><div class="aa-txn-n">${e(r.partnerName||'女朋友')} 收到还款 ${money(r.amount)}</div><div class="aa-txn-s"><div class="txn-meta">${e(r.cardName||'未指定入账')} · ${e(r.date||'')}${r.time?' · '+e(r.time):''}</div></div></div><div class="aa-txn-tools"><i class="ti ti-trash" onclick="event.stopPropagation();delAAReceipt17&&delAAReceipt17('${e(r.settlementId)}')" style="color:var(--red);font-size:18px;padding:5px"></i></div></div>`;}
+  function currentHtml(ps,ym,picked){
+    let h='';
+    ps.forEach(p=>{
+      const rows=currentRowsFor(p,ym,picked),cur=rows.reduce((a,r)=>a+Math.max(0,N(r.owedAmount)-N(r.settledAmount)),0),open=same(U.expandedId,p.id);
+      h+=`<div class="aa-p" style="--tint:${e(p.color||'var(--accent)')}"><div class="aa-h" onclick="toggle(${JSON.stringify(p.id)})"><div class="aa-av" style="background:${e(p.color||'#0a8a54')}22;color:${e(p.color||'var(--accent)')}">${e((p.name||'AA').slice(0,2).toUpperCase())}</div><div class="aa-info"><div class="aa-name">${e(p.name||'AA对象')}</div><div class="aa-sub">目前 ${rows.length} 笔</div></div><div class="aa-bal"><div class="aa-num" style="color:${cur>0?'var(--green)':'var(--text3)'}">${cur?money(cur):'—'}</div><div class="aa-lbl">${cur?'待收':'已结清'}</div></div><i class="ti ti-chevron-down chevron ${open?'rot':''}"></i></div>`;
+      if(open){
+        h+=`<div class="aa-body">`;
+        if(!rows.length)h+=`<div style="padding:18px 0;text-align:center;font-size:13px;color:var(--text3)">目前没有未结清 AA</div>`;
+        rows.slice(0,15).forEach(r=>{const due=Math.max(0,N(r.owedAmount)-N(r.settledAmount));h+=`<div class="aa-txn"><div class="aa-txn-ic"><i class="ti ti-users"></i></div><div class="aa-txn-m"><div class="aa-txn-n">${e(r.desc||'AA 分账')}</div><div class="aa-txn-s"><div class="txn-meta">${e(r.category||'其他 Others')} · ${e(r.date||r.isoDate||'')}${r.time?' · '+e(r.time):''}</div></div></div><div class="aa-txn-side"><div class="aa-txn-r"><div class="aa-txn-a" style="color:var(--green)">+${money(due)}</div><div class="aa-txn-w">待收</div></div><div class="aa-txn-tools"><i class="ti ti-trash" onclick="event.stopPropagation();window.delAAReceivable14&&window.delAAReceivable14(${JSON.stringify(r.id)})" style="color:var(--red);font-size:19px;padding:4px"></i></div></div></div>`;});
+        if(rows.length>15)h+=`<div style="padding:10px;text-align:center;color:var(--text3);font-size:12px">只显示前 15 笔，去「记录」看全部。</div>`;
+        h+=`<div class="aa-acts"><button class="btn pay" onclick="openAAAddTxn18_2&&openAAAddTxn18_2(${JSON.stringify(p.id)})"><i class="ti ti-plus"></i>加记录</button><button class="btn del" onclick="window.delAAPerson14&&window.delAAPerson14(${JSON.stringify(p.id)})"><i class="ti ti-trash"></i></button></div></div>`;
+      }
+      h+='</div>';
+    });
+    return h+`<button class="add-btn" onclick="openAAAddPerson18_3&&openAAAddPerson18_3()"><i class="ti ti-user-plus"></i>添加分账对象</button>`;
+  }
+  function historyHtml(ps,ym,picked){
+    const rowsAll=allHistoryRows().filter(x=>ymOf(x.isoDate||x.date)===ym&&(!picked||x.isoDate===picked||x.date===picked));
+    const sel=ps.find(p=>same(p.id,U.aaHistoryPerson18));
+    const rows=sel?rowsAll.filter(x=>histMatchesPerson(x,sel)):rowsAll;
+    let h=personFilter(ps,rowsAll)+`<div class="card aa-history-card18">`;
+    if(!rows.length)h+=`<div style="padding:20px 0;text-align:center;font-size:13px;color:var(--text3)">${sel?e(sel.name)+' 这个月份没有记录':'这个月份没有 AA 记录'}</div>`;
+    rows.slice(0,50).forEach(x=>{h+=x.type==='receipt'?recRow(x):txRow(x);});
+    if(rows.length>50)h+=`<div style="padding:12px;text-align:center;color:var(--text3);font-size:12px">只显示前 50 笔，选对象 / 日期更顺。</div>`;
+    return h+`</div><button class="add-btn" onclick="openAAAddPerson18_3&&openAAAddPerson18_3()"><i class="ti ti-user-plus"></i>添加分账对象</button>`;
+  }
+  window.renderAA=renderAA=function(){
+    ensure();
+    const ym=ymFromOff(off()),picked=U.dayFilters17.aa||'',tab=U.aaMainTab18||'current',ps=peopleLight();
+    const total=ps.reduce((a,p)=>a+totalDueFor(p),0);
+    let dateSource=[];
+    if(tab==='history')dateSource=allHistoryRows().map(x=>x.isoDate).filter(x=>ymOf(x)===ym);
+    else dateSource=arr(D.aaReceivables).filter(r=>N(r.owedAmount)>N(r.settledAmount)&&ymOf(r.isoDate||r.date)===ym).map(r=>r.isoDate||r.date);
+    let h=`${nav()}${dayStrip(dateSource)}<div class="sg"><div class="sc" style="--scc:var(--green)"><div class="sl">AA 待收</div><div class="sv g">${money(total)}</div></div></div>${mainTabs(tab)}<div id="aa-fast-content18">`;
+    if(!ps.length){h+=`<div class="empty" style="margin-top:40px"><div class="empty-ic"><i class="ti ti-users"></i></div><div class="et">还没有分账记录</div><div class="es">添加朋友或女朋友<br>开始记录 AA 消费</div></div><button class="add-btn" onclick="openAAAddPerson18_3&&openAAAddPerson18_3()"><i class="ti ti-user-plus"></i>添加分账对象</button>`;}
+    else h+=tab==='history'?historyHtml(ps,ym,picked):currentHtml(ps,ym,picked);
+    return h+'</div>';
+  };
+  try{renderAA=window.renderAA}catch(_){ }
+  try{
+    if(!document.getElementById('phase18-4-css')){
+      const st=document.createElement('style');st.id='phase18-4-css';
+      st.textContent=`.aa-tabs-fast18{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0 12px}.aa-fast-tab{height:52px;border-radius:999px;border:1px solid var(--border);background:var(--card);color:var(--text2);font-size:15px;font-weight:900;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none;cursor:pointer}.aa-fast-tab.on{background:var(--accent);border-color:var(--accent);color:white;box-shadow:0 10px 24px rgba(183,121,31,.20)}#aa-fast-content18{min-height:160px}.aa-tab-loading18{margin:18px 0;padding:26px;border-radius:22px;background:var(--card);border:1px solid var(--border);text-align:center;color:var(--text3);font-size:13px}.aa-tab-loading18 i{display:block;font-size:23px;margin-bottom:8px;animation:spin18 .7s linear infinite}@keyframes spin18{to{transform:rotate(360deg)}}.aa-history-card18 .aa-txn,.aa-p{content-visibility:auto;contain-intrinsic-size:86px}.aa-history-card18{padding:4px 0}.aa-history-card18 .aa-txn{border-bottom:1px solid var(--border);contain:layout paint style}.aa-history-card18 .aa-txn:last-child{border-bottom:0}.phase18-persons{margin:0 0 12px}.phase18-persons .day-chip{min-width:92px}`;
+      document.head.appendChild(st);
+    }
+  }catch(_){ }
+})();
+
 </script>
 
 </body>
