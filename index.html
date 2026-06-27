@@ -2051,11 +2051,12 @@ function renderAA(){
     const amt=round2(e.amount);if(!amt)return true;
     if((D.txns||[]).some(t=>t.shortcutEntryId===e.id))return true;
     const desc=e.note||e.raw?.note||'Shortcut expense';
-    const cat=guessSpendCat((e.category||'')+' '+desc)||{id:null,label:'其他 Others',icon:'ti-receipt'};
-    const pay=resolvePay(e.payment||'');
+    const raw=e.raw||{};
+    const cat=((D.spendCats||[]).find(c=>same(c.id,raw.category_id))||guessSpendCat((e.category||'')+' '+desc)||{id:null,label:'其他 Others',icon:'ti-receipt'});
+    const pay=((D.cards||[]).find(c=>same(c.id,raw.payment_id))||resolvePay(e.payment||''));
     const iso=e.occurred_date||todayISO();
     const time=e.occurred_time||'';
-    const txn={id:nid(),amt,desc,catId:cat.id,catLabel:cat.label,catIcon:cat.icon||'ti-receipt',payId:pay?pay.id:null,payName:pay?pay.name:null,postingMode:pay?'normal':'recordOnly',date:new Date(iso).toLocaleDateString('en-MY',{month:'short',day:'numeric'}),isoDate:iso,time,files:[],source:'shortcut_cloud',shortcutEntryId:e.id};
+    const txn={id:nid(),amt,desc,catId:cat.id,catLabel:cat.label,catIcon:cat.icon||'ti-receipt',payId:pay?pay.id:null,payName:pay?pay.name:null,postingMode:pay?'normal':'recordOnly',date:new Date(iso).toLocaleDateString('en-MY',{month:'short',day:'numeric'}),isoDate:iso,time,files:[],source:e.source||e.raw?.source||'shortcut_cloud',quickEntryId:e.id,shortcutEntryId:e.id,telegramQuickEntryId:(e.source==='telegram_bot'||e.raw?.source==='telegram_bot')?e.id:null};
     if(pay&& !applyTransactionBalanceEffect(txn)){txn.postingMode='recordOnly';txn.desc=desc+'（余额不足，已补录）';}
     if(pay&&pay.type==='cc')ensureCardCycle(pay,iso);
     D.txns.unshift(txn);return true;
@@ -2065,7 +2066,7 @@ function renderAA(){
     if((D.incomes||[]).some(i=>i.shortcutEntryId===e.id))return true;
     const cat=(D.incomeCats||[])[0]||{id:'i1',label:'收入',icon:'ti-trending-up'};
     const iso=e.occurred_date||todayISO();
-    D.incomes.unshift({id:nid(),amt,catId:cat.id,desc:e.note||'Shortcut income',date:new Date(iso).toLocaleDateString('en-MY',{month:'short',day:'numeric'}),isoDate:iso,files:[],source:'shortcut_cloud',shortcutEntryId:e.id});
+    D.incomes.unshift({id:nid(),amt,catId:cat.id,desc:e.note||'Shortcut income',date:new Date(iso).toLocaleDateString('en-MY',{month:'short',day:'numeric'}),isoDate:iso,files:[],source:e.source||e.raw?.source||'shortcut_cloud',quickEntryId:e.id,shortcutEntryId:e.id,telegramQuickEntryId:(e.source==='telegram_bot'||e.raw?.source==='telegram_bot')?e.id:null});
     return true;
   }
   function importEntry(e){
@@ -2203,6 +2204,82 @@ function renderAA(){
     }
     return html;
   };
+})();
+
+
+// ══════════════════════════════════════════════════════
+// TELEGRAM AA PHASE 5 APP SYNC POLISH
+// - Syncs cloud aa_ledger_items into the AA tab
+// - Shows Telegram AA as local AA receivables with time/payment/category
+// - Edits/deletes Telegram-imported records update cloud AA summaries
+// ══════════════════════════════════════════════════════
+(function(){
+  const PENDING=['unpaid','partially_settled','pending_receiver_confirm','pending_payer_confirm'];
+  let _syncing=false,_last=0;
+  const same=(a,b)=>String(a)===String(b);
+  const n=s=>String(s||'');
+  const hmFromTS=ts=>{try{const d=new Date(ts);const my=new Date(d.getTime()+8*60*60*1000);return my.toISOString().slice(11,16);}catch(e){return'';}};
+  function ensureMaps(){if(!D.tgPartnerMap)D.tgPartnerMap={};if(!D.tgAAReceivableMap)D.tgAAReceivableMap={};if(!Array.isArray(D.aaPeople))D.aaPeople=[];if(!Array.isArray(D.aaReceivables))D.aaReceivables=[];}
+  function localPersonForPartner(p){ensureMaps();const key=n(p.id);let lid=D.tgPartnerMap[key];let person=lid?D.aaPeople.find(x=>same(x.id,lid)):null;if(!person){lid=nid();D.tgPartnerMap[key]=lid;person={id:lid,name:p.display_name||'AA Partner',color:'#0a8a54',txns:[],telegramPartnerId:key};D.aaPeople.push(person);}else{person.name=p.display_name||person.name;person.telegramPartnerId=key;}return person;}
+  function recIdForItem(itemId){ensureMaps();const key=n(itemId);if(!D.tgAAReceivableMap[key])D.tgAAReceivableMap[key]=nid();return D.tgAAReceivableMap[key];}
+  async function fetchTelegramAA(){
+    if(!(typeof supaReady==='function'&&supaReady()))return null;
+    const {data:partners,error:e1}=await supa.from('aa_partners').select('id,display_name,status,partner_telegram_username,partner_telegram_first_name').eq('owner_user_id',SESSION.user.id).order('created_at',{ascending:true});
+    if(e1)throw e1;
+    const {data:items,error:e2}=await supa.from('aa_ledger_items').select('id,partner_id,source_type,source_id,item_date,description,category,payment_name,total_amount,receivable_amount,settled_amount,status,direction,raw,created_at,updated_at').eq('owner_user_id',SESSION.user.id).order('item_date',{ascending:false}).limit(200);
+    if(e2)throw e2;
+    return {partners:partners||[],items:items||[]};
+  }
+  window.rmSyncTelegramAA=async function(show){
+    if(_syncing)return;
+    if(!(typeof supaReady==='function'&&supaReady())){if(show)toast('先登录云同步');return;}
+    _syncing=true;
+    try{
+      const data=await fetchTelegramAA();
+      ensureMaps();
+      const partnerMap={};
+      (data.partners||[]).forEach(p=>{if(p.status==='connected'||p.status==='pending')partnerMap[n(p.id)]=localPersonForPartner(p);});
+      D.aaReceivables=D.aaReceivables.filter(r=>r.sourceType!=='telegram_aa');
+      (data.items||[]).forEach(it=>{
+        if(!PENDING.includes(it.status))return;
+        const person=partnerMap[n(it.partner_id)];if(!person)return;
+        const left=Math.max(0,money(it.receivable_amount)-money(it.settled_amount));
+        if(!left)return;
+        const raw=it.raw||{};
+        D.aaReceivables.unshift({
+          id:recIdForItem(it.id),sourceType:'telegram_aa',sourceId:it.id,telegramAAItemId:it.id,quickEntryId:it.source_id,
+          personId:person.id,personName:person.name,desc:it.description||'Telegram AA',owedAmount:money(it.receivable_amount),settledAmount:money(it.settled_amount),status:it.status,
+          date:it.item_date||'',time:raw.ledger_time||raw?.aa?.ledger_time||hmFromTS(it.created_at),category:it.category||'',paymentName:it.payment_name||'',totalAmount:money(it.total_amount),raw
+        });
+      });
+      _last=Date.now();save();if(show)toast('✓ Telegram AA 已同步');
+    }catch(e){console.log('rmSyncTelegramAA',e);if(show)toast('Telegram AA 同步失败');}
+    _syncing=false;
+  };
+  function maybeSyncAA(){if(U.tab!=='aa')return;if(Date.now()-_last<30000)return;setTimeout(()=>window.rmSyncTelegramAA(false),700);}
+  const _baseRender=window.render||render;window.render=function(){_baseRender();maybeSyncAA();};
+  const _baseShortcutSync=window.rmSyncShortcutEntries; if(_baseShortcutSync){window.rmSyncShortcutEntries=async function(show){await _baseShortcutSync(show);await window.rmSyncTelegramAA(false);};}
+  const _baseAAInfo=window.aaSourceInfo||aaSourceInfo; window.aaSourceInfo=function(r){
+    if(r&&r.sourceType==='telegram_aa')return{title:r.desc||'Telegram AA',meta:`Telegram AA · ${r.date||''}${r.time?' '+r.time:''}${r.category?' · '+uiLabel(r.category):''}${r.paymentName?' · '+r.paymentName:''}${r.status==='partially_settled'?' · 部分已还':''}`,icon:'ti-brand-telegram',edit:''};
+    return _baseAAInfo(r);
+  };
+  function txCloudId(tx){return tx&&(tx.telegramQuickEntryId||tx.quickEntryId||tx.shortcutEntryId);}
+  async function syncEditedTelegramTxn(tx){
+    if(!(typeof supaReady==='function'&&supaReady())||!txCloudId(tx))return;
+    try{
+      const qid=txCloudId(tx);const raw={app_edited:true,edited_at:new Date().toISOString(),source:'telegram_bot'};
+      await supa.from('quick_entries').update({amount:money(tx.amt),note:tx.desc||'',payment:tx.payName||'',category:tx.catLabel||'',occurred_date:tx.isoDate||todayISO(),occurred_time:tx.time||'',raw}).eq('id',qid);
+      const rec=(D.aaReceivables||[]).find(r=>r.sourceType==='telegram_aa'&&same(r.quickEntryId,qid));
+      if(rec){const ratio=rec.totalAmount?money(rec.owedAmount)/money(rec.totalAmount):0.5;const newReceivable=round2(money(tx.amt)*ratio);await supa.from('aa_ledger_items').update({description:tx.desc||'',category:tx.catLabel||'',payment_name:tx.payName||'',item_date:tx.isoDate||todayISO(),total_amount:money(tx.amt),receivable_amount:newReceivable,updated_at:new Date().toISOString(),raw:{...(rec.raw||{}),app_edited:true,ledger_time:tx.time||rec.time||''}}).eq('id',rec.telegramAAItemId);}
+      await window.rmSyncTelegramAA(false);
+    }catch(e){console.log('syncEditedTelegramTxn',e);}
+  }
+  async function syncDeletedTelegramTxn(tx){
+    if(!(typeof supaReady==='function'&&supaReady())||!txCloudId(tx))return;
+    try{const qid=txCloudId(tx);await supa.from('quick_entries').update({status:'rejected',raw:{source:'telegram_bot',app_deleted:true,deleted_at:new Date().toISOString()}}).eq('id',qid);await supa.from('aa_ledger_items').update({status:'cancelled',updated_at:new Date().toISOString()}).eq('source_id',qid);await window.rmSyncTelegramAA(false);}catch(e){console.log('syncDeletedTelegramTxn',e);}
+  }
+  const _baseSaveSpend=window.saveSpend||saveSpend;window.saveSpend=function(){const editId=U.editId;const old=editId?(D.txns||[]).find(t=>same(t.id,editId)):null;const wasTg=old&&txCloudId(old);const res=_baseSaveSpend();setTimeout(()=>{if(wasTg){const tx=(D.txns||[]).find(t=>same(t.id,editId));if(tx)syncEditedTelegramTxn(tx);}},650);return res;};
+  const _baseDelTxn=window.delTxn||delTxn;window.delTxn=function(id){const tx=(D.txns||[]).find(t=>same(t.id,id));const wasTg=tx&&txCloudId(tx);const res=_baseDelTxn(id);if(wasTg)setTimeout(()=>syncDeletedTelegramTxn(tx),650);return res;};
 })();
 
 initSecurity();
