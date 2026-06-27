@@ -2552,7 +2552,7 @@ function renderAA(){
     if(window.rmRefreshDerived)window.rmRefreshDerived();
     save();toast(old?'✓ AA 已更新，金额已同步':'✓ AA 已记录');closeModal();render();
   };
-  window.delAATxn=delAATxn=function(pid,tid){
+  window.delAATxn=function(pid,tid){
     const p=findAAPerson93(pid); if(!p)return;
     const idx=(p.txns||[]).findIndex(t=>same(t.id,tid)); if(idx<0)return;
     const old={...p.txns[idx]};
