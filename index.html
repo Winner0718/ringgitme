@@ -544,19 +544,34 @@ input,textarea,select{-webkit-user-select:text;user-select:text}
 <body>
 <div class="app" id="app"></div>
 <script>
-// Phase 9.2 early boot guard: show runtime errors instead of blank screen.
+// Phase 9.5 early boot guard: only block true startup crashes, not harmless late mobile promise errors.
 (function(){
+  var bootAt=Date.now();
+  window.__RM_BOOT_READY=false;
+  function cleanMsg(err){
+    if(!err)return '';
+    var msg=(err && (err.stack||err.message)) ? (err.stack||err.message) : String(err||'');
+    if(!msg || msg==='undefined' || msg==='null' || msg==='[object Event]' || msg==='Unknown error')return '';
+    return msg;
+  }
   function showBootError(err){
     try{
+      var msg=cleanMsg(err);
+      if(!msg)return;
+      if(window.__RM_BOOT_READY || Date.now()-bootAt>7000){
+        console.error('RinggitMe runtime error blocked',err);
+        try{ if(typeof toast==='function')toast('刚刚操作有小错误，已挡住。刷新后再试'); }catch(_e){}
+        return;
+      }
       var app=document.getElementById('app');
-      var msg=(err && (err.stack||err.message)) ? (err.stack||err.message) : String(err||'Unknown error');
       if(app){
         app.innerHTML='<div style="min-height:100%;padding:calc(env(safe-area-inset-top,0px) + 28px) 18px 28px;background:#f5f5f7;color:#111;font-family:-apple-system,BlinkMacSystemFont,sans-serif;overflow:auto"><div style="max-width:420px;margin:0 auto"><div style="font-size:22px;font-weight:800;margin-bottom:8px">RinggitMe 启动保护</div><div style="font-size:13px;line-height:1.55;background:#fff;border:1px solid #ddd;border-radius:16px;padding:14px;margin-bottom:12px">App 启动时有一段代码报错，所以我先挡住白屏。数据没有丢。把下面错误截图给我。</div><pre style="white-space:pre-wrap;font-size:11px;line-height:1.4;background:#111;color:#fff;border-radius:12px;padding:12px;max-height:260px;overflow:auto">'+msg.replace(/[<>&]/g,function(m){return {"<":"&lt;",">":"&gt;","&":"&amp;"}[m]})+'</pre><button onclick="location.reload()" style="width:100%;margin-top:12px;border:0;border-radius:14px;padding:14px;font-size:15px;font-weight:750;background:#0a8a54;color:#fff">重新载入</button></div></div>';
       }
     }catch(e){}
   }
-  window.addEventListener('error',function(e){showBootError(e.error||e.message);},true);
-  window.addEventListener('unhandledrejection',function(e){showBootError(e.reason);},true);
+  window.addEventListener('error',function(e){showBootError(e && (e.error||e.message));},true);
+  window.addEventListener('unhandledrejection',function(e){showBootError(e && e.reason);},true);
+  setTimeout(function(){window.__RM_BOOT_READY=true;},7000);
 })();
 // ══════════════════════════════════════════════════════
 // SECURITY — WebAuthn (optional) + PIN
@@ -2540,7 +2555,7 @@ function renderAA(){
       settled:!!(old&&old.settled)
     };
   }
-  window.saveAATxn=saveAATxn=function(){
+  window.saveAATxn=function(){
     const p=findAAPerson93(U.activePersonId); if(!p){toast('找不到 AA 对象，请刷新后再试');return;}
     const editId=U.activeEditTxnId;
     const idx=editId?(p.txns||[]).findIndex(t=>same(t.id,editId)):-1;
@@ -2667,6 +2682,60 @@ function renderAA(){
     h+=`<button class="add-btn" onclick="openModal('addAAPerson')"><i class="ti ti-user-plus"></i>添加分账对象</button>`;
     return h;
   };
+})();
+
+
+// ══════════════════════════════════════════════════════
+// PHASE 9.5 — AA ADD RECORD STABILITY + SAFE PICKERS
+// Fixes AA add/edit modal crashes caused by older cloud data containing malformed cards/categories.
+// Also keeps late iOS/Safari "Unknown error" promise noise from replacing the whole app.
+// ══════════════════════════════════════════════════════
+(function(){
+  const same95=(a,b)=>String(a)===String(b);
+  const esc95=v=>String(v==null?'':v).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const arg95=v=>JSON.stringify(v);
+  function safeArr95(v){return Array.isArray(v)?v.filter(x=>x&&typeof x==='object'):[];}
+  function ensureLedger95(){try{window.rmSanitizeLedger&&window.rmSanitizeLedger();}catch(e){} if(!Array.isArray(D.cards))D.cards=[]; if(!Array.isArray(D.aaPeople))D.aaPeople=[]; if(!Array.isArray(D.spendCats)||!D.spendCats.length)D.spendCats=JSON.parse(JSON.stringify(DEF_SPEND||[]));}
+  window.payOpts=payOpts=function(incSav){
+    ensureLedger95();
+    const cards=safeArr95(D.cards);
+    const ccs=cards.filter(c=>c.type==='cc'), ews=cards.filter(c=>c.type==='ew'), savs=cards.filter(c=>c.type==='saving');
+    let h='';
+    const sec=(t,arr,subFn)=>{if(!arr.length)return'';let s=`<div class="po-lbl">${esc95(t)}</div>`;arr.forEach(c=>{const id=arg95(c.id),sel=same95(U.selPayId,c.id),bc=(typeof gi==='function'&&gi(c.iconId)&&gi(c.iconId).bg)||c.color||'#64748b';let sub='';try{sub=subFn(c)||'';}catch(e){}s+=`<div class="po ${sel?'on':''}" style="--poc:${esc95(bc)}" onclick="sPay(${id})">${itemIcon(c,34,10)}<div style="flex:1;min-width:0"><div class="po-n">${esc95(c.name||'未命名')}</div><div class="po-s">${sub}</div></div>${sel?'<i class="ti ti-circle-check-filled" style="color:var(--accent);font-size:20px"></i>':'<i class="ti ti-circle" style="color:var(--border2);font-size:20px"></i>'}</div>`;});return s;};
+    h+=sec('信用卡 Credit Cards',ccs,c=>`<span class="po-card-meta"><span class="po-card-meta-line">欠额 ${fmtR(money(c.owed))}${money(c.limit)?' · 可用 '+fmtR(Math.max(0,money(c.limit)-money(c.owed))):''}</span>${money(c.limit)?`<span class="po-card-meta-line">总额度 ${fmtR(c.limit)}</span>`:''}</span>`);
+    h+=sec('电子钱包 eWallet',ews,c=>'余额 '+fmtR(money(c.balance)));
+    if(incSav)h+=sec('储蓄账户 Savings',savs,c=>'余额 '+fmtR(money(c.balance)));
+    if(!h)h=`<div style="font-size:13px;color:var(--text3);padding:10px 0">还没有卡片 — 先去「卡片」添加</div>`;
+    const cashSel=(U.selPayId===null||U.selPayId===undefined||U.selPayId==='');
+    h+=`<div class="po ${cashSel?'on':''}" style="--poc:#16a34a" onclick="sPay(null)"><div style="width:34px;height:34px;border-radius:10px;background:var(--green-bg);display:flex;align-items:center;justify-content:center;color:var(--green);flex-shrink:0"><i class="ti ti-cash"></i></div><div style="flex:1;min-width:0"><div class="po-n">现金 / 不指定 Cash</div></div>${cashSel?'<i class="ti ti-circle-check-filled" style="color:var(--accent);font-size:20px"></i>':'<i class="ti ti-circle" style="color:var(--border2);font-size:20px"></i>'}</div>`;
+    return h;
+  };
+  window.catPicker=catPicker=function(){
+    ensureLedger95();
+    const cats=safeArr95(D.spendCats).filter(c=>c.label);
+    const groups=[...new Set(cats.map(c=>c.group||'杂 Others'))];
+    let h='';
+    groups.forEach(g=>{const gc=(typeof catCol==='function'?catCol(g):'#64748b');h+=`<div class="po-lbl">${esc95(g)}</div><div class="cat-grid">`;cats.filter(c=>(c.group||'杂 Others')===g).forEach(c=>{const id=arg95(c.id),sel=same95(U.selCatId,c.id);h+=`<button class="cat-btn ${sel?'on':''}" style="--cc:${esc95(gc)}" onclick="sCat(${id})"><i class="ti ${esc95(c.icon||'ti-receipt')}"></i><span>${esc95(uiLabel(c.label||'其他'))}</span>${c.custom?`<span class="cat-del" onclick="event.stopPropagation();delSpendCat(${id})"><i class="ti ti-x"></i></span>`:''}</button>`;});h+=`</div>`;});
+    h+=`<div class="cat-grid" style="margin-top:8px"><button class="cat-btn add-c" onclick="openModal('addSpendCat')"><i class="ti ti-plus"></i><span>自定义添加</span></button></div>`;
+    return h;
+  };
+  const baseBuildModal95=window.buildModal||buildModal;
+  window.buildModal=buildModal=function(){
+    try{return baseBuildModal95();}
+    catch(e){
+      console.error('buildModal95 fallback',e);
+      if(U.modal==='addAATxn'){
+        ensureLedger95();
+        const p=safeArr95(D.aaPeople).find(x=>same95(x.id,U.activePersonId));
+        const anim=U._modalAnim?' anim':'';U._modalAnim=false;
+        if(!p)return `<div class="mb${anim}" onclick="if(event.target===this)closeModal()"><div class="md${anim}"><div class="md-handle"></div><div class="md-title"><i class="ti ti-alert-triangle"></i> 找不到 AA 对象</div><div class="ib w">请刷新 AA 页面再试。</div><div class="ma"><button class="ok" onclick="closeModal()">知道了</button></div></div></div>`;
+        return `<div class="mb${anim}" onclick="if(event.target===this)closeModal()"><div class="md${anim}"><div class="md-handle"></div><div class="md-title"><div class="aa-av" style="width:36px;height:36px;border-radius:11px;background:${esc95(p.color||'#0a8a54')}22;color:${esc95(p.color||'#0a8a54')};font-size:13px">${esc95(String(p.name||'AA').slice(0,2).toUpperCase())}</div>记一笔 — ${esc95(p.name||'AA对象')}</div><div class="field"><label>描述</label><input id="aa-desc" placeholder="e.g. Lunch"/></div><div class="field"><label>总金额 (RM)</label><input id="aa-total" type="number" inputmode="decimal" placeholder="0.00" class="big"/></div><div class="field"><label>谁付？</label><div class="pill-row"><div class="pill on" onclick="sPaidBy('me')">我付</div><div class="pill" onclick="sPaidBy('them')">对方付</div></div></div><div class="field"><label>怎么分？</label><div class="pill-row"><div class="pill on" onclick="sSplit(2)">AA ÷2</div><div class="pill" onclick="sSplit(3)">÷3</div><div class="pill" onclick="sSplit(4)">÷4</div></div></div><div class="field"><label>消费类别</label>${catPicker()}</div><div class="field"><label>用哪张卡付？</label>${payOpts(false)}</div><div class="ma"><button onclick="closeModal()">取消</button><button class="ok" onclick="saveAATxn()">记录</button></div></div></div>`;
+      }
+      throw e;
+    }
+  };
+  const baseRender95=window.render||render;
+  window.render=render=function(){try{ensureLedger95();return baseRender95();}catch(e){console.error('render95 prevented',e);try{toast('画面有小错误，已自动挡住');}catch(_e){} return '';}};
 })();
 
 initSecurity();
