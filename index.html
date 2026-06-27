@@ -544,14 +544,17 @@ input,textarea,select{-webkit-user-select:text;user-select:text}
 <body>
 <div class="app" id="app"></div>
 <script>
-// Phase 9.5 early boot guard: only block true startup crashes, not harmless late mobile promise errors.
+// Phase 9.8 early boot guard: ignore iOS Safari share-sheet Script error noise.
 (function(){
   var bootAt=Date.now();
   window.__RM_BOOT_READY=false;
   function cleanMsg(err){
     if(!err)return '';
     var msg=(err && (err.stack||err.message)) ? (err.stack||err.message) : String(err||'');
-    if(!msg || msg==='undefined' || msg==='null' || msg==='[object Event]' || msg==='Unknown error')return '';
+    msg=String(msg||'').trim();
+    // iOS Safari can fire generic cross-origin errors while opening Share Sheet / Add to Home Screen.
+    // Those are browser noise, not RinggitMe startup crashes. Do not cover the app with boot guard.
+    if(!msg || msg==='undefined' || msg==='null' || msg==='[object Event]' || msg==='Unknown error' || msg==='Script error.' || msg==='Script error')return '';
     return msg;
   }
   function showBootError(err){
@@ -568,7 +571,14 @@ input,textarea,select{-webkit-user-select:text;user-select:text}
       }
     }catch(e){}
   }
-  window.addEventListener('error',function(e){showBootError(e && (e.error||e.message));},true);
+  window.addEventListener('error',function(e){
+    try{
+      var msg=String((e && e.message) || '').trim();
+      // Safari Share Sheet / Add to Home Screen sometimes emits this without a real stack.
+      if(msg==='Script error.' || msg==='Script error')return;
+      showBootError(e && (e.error||e.message));
+    }catch(_e){}
+  },true);
   window.addEventListener('unhandledrejection',function(e){showBootError(e && e.reason);},true);
   setTimeout(function(){window.__RM_BOOT_READY=true;},7000);
 })();
@@ -2739,11 +2749,12 @@ function renderAA(){
 
 
 // ══════════════════════════════════════════════════════
-// PHASE 9.7 — AA PERSON + MODAL STABILITY POLISH
+// PHASE 9.8 — SAFARI SHARE SHEET SCRIPT ERROR FIX + AA MODAL STABILITY
 // Fixes:
 // - Empty/new account: Add split person modal was blank/stuck.
 // - saveAAPerson used an undefined variable `color` in older code.
 // - AA add/edit modal now uses a final safe renderer for string/number ids.
+// - Safari Share Sheet / Add to Home Screen Script error no longer triggers boot guard.
 // - Post-boot mobile promise noise no longer blocks the user with scary toast.
 // ══════════════════════════════════════════════════════
 (function(){
