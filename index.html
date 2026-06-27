@@ -20,7 +20,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
 
 // ══════════════════════════════════════════════════════
-// PHASE 15 — AA HISTORY TAB + SETTLEMENT RECEIPT RESYNC + TELEGRAM ATTACHMENT VIEWER
+// PHASE 16 — AA HISTORY TAB + SETTLEMENT RECEIPT RESYNC + TELEGRAM ATTACHMENT VIEWER
 // ══════════════════════════════════════════════════════
 function telegramFiles15(raw){
   const atts=Array.isArray(raw&&raw.attachments)?raw.attachments:[];
@@ -3710,5 +3710,189 @@ function telegramFiles15(raw){
 })();
 
 </script>
+
+<script>
+// ══════════════════════════════════════════════════════
+// PHASE 16 — AA DEDUPE + FAST HISTORY + RECEIPT DELETE SYNC + RECORD MONTH FILTER
+// ══════════════════════════════════════════════════════
+(function(){
+  const arr=a=>Array.isArray(a)?a:[];
+  const same=(a,b)=>String(a)===String(b);
+  const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x]));
+  const round=n=>Math.round((Number(n)||0)*100)/100;
+  const receiptKey=x=>String((x&&x.settlementId)||(x&&x.aaSettlementId)||(x&&x.id)||'');
+  const norm=s=>String(s||'').trim().toLowerCase().replace(/\s+/g,'');
+  const cloudId=t=>t&&(t.telegramQuickEntryId||t.quickEntryId||t.shortcutEntryId||t.cloudEntryId);
+  const isAAIncome=i=>!!(i&&(i.sourceType==='aa_settlement'||i.source==='telegram_aa_settlement'||i.aaSettlementId||i.settlementId));
+  const isHiddenSettle=k=>!!(D.aaHiddenSettlementIds&&D.aaHiddenSettlementIds[String(k)])||!!(D.tgSettlementApplied&&D.tgSettlementApplied[String(k)]&&D.tgSettlementApplied[String(k)].hidden);
+  const cardById=id=>arr(D.cards).find(c=>same(c.id,id));
+  const personById=id=>arr(D.aaPeople).find(p=>same(p.id,id));
+  const nowISO=()=>new Date().toISOString();
+  const todayYM=()=>todayISO().slice(0,7);
+  const dateLbl=iso=>{try{return new Date(iso||todayISO()).toLocaleDateString('en-MY',{month:'short',day:'numeric'});}catch(e){return iso||'';}};
+  const timeLbl=()=>new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',hour12:false});
+  function ensure16(){
+    if(!Array.isArray(D.aaPeople))D.aaPeople=[];
+    if(!Array.isArray(D.aaReceivables))D.aaReceivables=[];
+    if(!Array.isArray(D.aaSettlementReceipts))D.aaSettlementReceipts=[];
+    if(!Array.isArray(D.incomes))D.incomes=[];
+    if(!D.tgPartnerMap||typeof D.tgPartnerMap!=='object')D.tgPartnerMap={};
+    if(!D.aaHiddenSettlementIds||typeof D.aaHiddenSettlementIds!=='object')D.aaHiddenSettlementIds={};
+  }
+  function personName(id){return personById(id)?.name||'女朋友';}
+  function mappedLocalPerson(partnerId){const lid=D.tgPartnerMap&&D.tgPartnerMap[String(partnerId)];return lid?personById(lid):null;}
+  function receiptPersonName(r){return r.partnerName||mappedLocalPerson(r.partnerId)?.name||'女朋友';}
+  function matchesPerson(obj,p){
+    if(!obj||!p)return false;
+    const n=norm(p.name);
+    if(obj.personId&&same(obj.personId,p.id))return true;
+    if(obj.partnerId){const lp=mappedLocalPerson(obj.partnerId);if(lp&&same(lp.id,p.id))return true;}
+    const on=norm(obj.personName||obj.partnerName||'');
+    return !!n&&!!on&&n===on;
+  }
+  function aaInfo16(t){
+    try{
+      const qid=cloudId(t);
+      let r=arr(D.aaReceivables).find(x=>(x.sourceType==='txn'&&same(x.sourceId,t.id))||(qid&&(same(x.quickEntryId,qid)||same(x.sourceId,qid))));
+      if(r){const owed=round(r.owedAmount||0),settled=round(r.settledAmount||0);return{personId:r.personId,person:r.personName||personName(r.personId),owed,settled,due:Math.max(0,owed-settled),total:round(r.totalAmount||t.amt),status:r.status,row:r};}
+      if(t.aaPermanent){const p=t.aaPermanent,owed=round(p.owedAmount||0),settled=round(p.settledAmount||0);return{personId:p.personId,person:p.personName||personName(p.personId),owed,settled,due:Math.max(0,owed-settled),total:round(p.totalAmount||t.amt),status:p.status,row:null};}
+      if(t.aaSplit&&t.aaSplit.enabled){const owed=round(t.aaSplit.owedAmount||t.aaSplit.amount||(round(t.amt)/2));return{personId:t.aaSplit.personId,person:t.aaSplit.personName||personName(t.aaSplit.personId),owed,settled:0,due:owed,total:round(t.amt),status:'unpaid',row:null};}
+    }catch(e){}
+    return null;
+  }
+  function collectPeople16(){
+    ensure16();
+    const out=[]; const seenName=new Set(); const seenId=new Set();
+    function add(p){
+      if(!p)return;
+      const name=p.name||p.display_name||p.partnerName||'女朋友';
+      const nk=norm(name); if(!nk)return;
+      if(seenName.has(nk))return;
+      const id=p.id||('p-'+nk);
+      seenName.add(nk); seenId.add(String(id)); out.push({...p,id,name,color:p.color||'#0a8a54',txns:arr(p.txns)});
+    }
+    // Prefer real local AA people first, so no duplicate virtual card below it.
+    arr(D.aaPeople).forEach(add);
+    arr(D.aaReceivables).forEach(r=>{if(r.personId&&!seenId.has(String(r.personId)))add({id:r.personId,name:r.personName||'女朋友',color:'#0a8a54',txns:[]});});
+    arr(D.aaSettlementReceipts).forEach(r=>{const k=receiptKey(r);if(!k||r.hidden||isHiddenSettle(k))return;const lp=mappedLocalPerson(r.partnerId); if(lp)add(lp); else add({id:'receipt-'+(r.partnerId||norm(r.partnerName||'女朋友')),name:receiptPersonName(r),color:'#0a8a54',txns:[]});});
+    return out;
+  }
+  function currentRows16(p){return arr(D.aaReceivables).filter(r=>matchesPerson(r,p)&&round(r.owedAmount)>round(r.settledAmount)).sort((a,b)=>String((a.date||'')+' '+(a.time||'')).localeCompare(String((b.date||'')+' '+(b.time||''))));}
+  function txKey16(t){return `${t.isoDate||''} ${t.time||''} ${t.id||''}`;}
+  function receiptDateKey16(r){return `${r.isoDate||''} ${r.time||''} ${r.createdAt||''}`;}
+  function allReceipts16(){
+    const by={};
+    arr(D.aaSettlementReceipts).forEach(x=>{const k=receiptKey(x); if(!k||x.hidden||isHiddenSettle(k))return; by[k]={...x,settlementId:k};});
+    arr(D.incomes).filter(isAAIncome).forEach(i=>{const k=receiptKey(i); if(!k||i.hidden||isHiddenSettle(k))return; const old=by[k]||{}; by[k]={...old,settlementId:k,amount:round(i.amt||old.amount),partnerName:i.partnerName||old.partnerName||'女朋友',partnerId:i.partnerId||old.partnerId,cardId:i.receiveCardId||old.cardId,cardName:i.receiveCardName||old.cardName||'',cardType:i.receiveCardType||old.cardType||'',date:i.date||old.date||'',isoDate:i.isoDate||old.isoDate||'',time:i.time||old.time||'',createdAt:i.createdAt||old.createdAt||'',edits:old.edits||i.edits||[]};});
+    if(D.tgSettlementApplied&&typeof D.tgSettlementApplied==='object')Object.keys(D.tgSettlementApplied).forEach(k=>{const x=D.tgSettlementApplied[k]||{}; if(x.hidden||isHiddenSettle(k))return; if(!by[k]){const at=x.at||''; let dd='',hm=''; try{const d=new Date(at||Date.now());dd=d.toLocaleDateString('en-MY',{month:'short',day:'numeric'});hm=d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',hour12:false});}catch(_e){} by[k]={settlementId:k,amount:round(x.amount),partnerName:x.partnerName||'女朋友',partnerId:x.partnerId,cardId:x.cardId,cardName:x.cardName||'',cardType:x.cardType||'',date:dd,isoDate:(at||'').slice(0,10),time:hm,createdAt:at};}});
+    return Object.values(by).sort((a,b)=>String(a.createdAt||a.isoDate||'').localeCompare(String(b.createdAt||b.isoDate||'')));
+  }
+  function historyRows16(p){
+    const rows=[];
+    arr(D.txns).forEach(t=>{const aa=aaInfo16(t); if(aa&&(matchesPerson({personId:aa.personId,personName:aa.person},p)))rows.push({type:'txn',t,aa,key:txKey16(t)});});
+    allReceipts16().forEach(r=>{if(matchesPerson({partnerId:r.partnerId,partnerName:r.partnerName},p))rows.push({type:'receipt',r,key:receiptDateKey16(r)});});
+    return rows.sort((a,b)=>String(a.key).localeCompare(String(b.key)));
+  }
+  window.setAASubTab16=function(pid,tab){U.aaSubTabs16=U.aaSubTabs16||{};U.aaSubTabs16[String(pid)]=tab;render();};
+  window.renderAA=function(){
+    ensure16();
+    const people=collectPeople16();
+    if(!people.length)return`<div class="empty" style="margin-top:40px"><div class="empty-ic"><i class="ti ti-users"></i></div><div class="et">还没有分账记录</div><div class="es">添加朋友或女朋友<br>开始记录 AA 消费</div></div><button class="add-btn" onclick="openModal('addAAPerson')"><i class="ti ti-user-plus"></i>添加分账对象</button>`;
+    let total=0;people.forEach(p=>currentRows16(p).forEach(r=>total+=Math.max(0,round(r.owedAmount)-round(r.settledAmount))));
+    let h=`<div class="sg"><div class="sc" style="--scc:var(--green)"><div class="sl">AA 待收</div><div class="sv g">${fmt(total)}</div></div></div>`;
+    people.forEach(p=>{
+      const open=String(U.expandedId)===String(p.id), cur=currentRows16(p), hist=historyRows16(p), curTotal=cur.reduce((a,r)=>a+Math.max(0,round(r.owedAmount)-round(r.settledAmount)),0);
+      const tab=(U.aaSubTabs16&&U.aaSubTabs16[String(p.id)])||(U.aaSubTabs15&&U.aaSubTabs15[String(p.id)])||'current';
+      h+=`<div class="aa-p" style="--tint:${p.color||'var(--accent)'}"><div class="aa-h" onclick="toggle(${JSON.stringify(p.id)})"><div class="aa-av" style="background:${(p.color||'#0a8a54')}22;color:${p.color||'var(--accent)'}">${esc((p.name||'AA').slice(0,2).toUpperCase())}</div><div class="aa-info"><div class="aa-name">${esc(p.name||'AA对象')}</div><div class="aa-sub">目前 ${cur.length} 笔 · 记录 ${hist.length} 笔</div></div><div class="aa-bal"><div class="aa-num" style="color:${curTotal>0?'var(--green)':'var(--text3)'}">${curTotal?fmt(curTotal):'—'}</div><div class="aa-lbl">${curTotal?'待收':'已结清'}</div></div><i class="ti ti-chevron-down chevron ${open?'rot':''}"></i></div>`;
+      if(open){
+        h+=`<div class="aa-body"><div class="pill-row" style="margin-bottom:10px"><div class="pill ${tab==='current'?'on':''}" onclick="event.stopPropagation();setAASubTab16(${JSON.stringify(p.id)},'current')">目前消费</div><div class="pill ${tab==='history'?'on':''}" onclick="event.stopPropagation();setAASubTab16(${JSON.stringify(p.id)},'history')">记录</div></div>`;
+        if(tab==='current'){
+          if(!cur.length)h+=`<div style="padding:18px 0;text-align:center;font-size:13px;color:var(--text3)">目前没有未结清 AA</div>`;
+          cur.slice(0,40).forEach(r=>{const l=Math.max(0,round(r.owedAmount)-round(r.settledAmount));h+=`<div class="aa-txn"><div class="aa-txn-ic"><i class="ti ti-users"></i></div><div class="aa-txn-m"><div class="aa-txn-n">${esc(r.desc||'AA 分账')}</div><div class="aa-txn-s"><div class="txn-meta">${esc(r.category||'其他 Others')} · ${esc(r.date||'')}${r.time?' · '+esc(r.time):''}</div></div></div><div class="aa-txn-side"><div class="aa-txn-r"><div class="aa-txn-a" style="color:var(--green)">+${fmt(l)}</div><div class="aa-txn-w">待收</div></div><div class="aa-txn-tools"><i class="ti ti-trash" onclick="event.stopPropagation();window.delAAReceivable14(${JSON.stringify(r.id)})" style="color:var(--red);font-size:19px;padding:4px"></i></div></div></div>`;});
+        }else{
+          h+=`<div class="aa-acts" style="margin:0 0 10px"><button class="btn del" onclick="event.stopPropagation();clearAAHistory16(${JSON.stringify(p.id)})"><i class="ti ti-trash"></i>清空已结清记录</button></div>`;
+          if(!hist.length)h+=`<div style="padding:18px 0;text-align:center;font-size:13px;color:var(--text3)">还没有历史记录</div>`;
+          hist.slice(0,50).forEach(x=>{ if(x.type==='receipt'){const r=x.r;h+=`<div class="aa-txn"><div class="aa-txn-ic" style="color:var(--green)"><i class="ti ti-cash"></i></div><div class="aa-txn-m"><div class="aa-txn-n">收到还款 ${fmt(round(r.amount))}</div><div class="aa-txn-s"><div class="txn-meta">${esc(r.cardName||'未指定入账')} · ${esc(r.date||'')}${r.time?' · '+esc(r.time):''}</div></div></div><div class="aa-txn-tools"><i class="ti ti-trash" onclick="event.stopPropagation();delAAHistory16('receipt',${JSON.stringify(r.settlementId)},${JSON.stringify(p.id)})" style="color:var(--red);font-size:18px;padding:5px"></i></div></div>`;} else {const t=x.t,aa=x.aa;h+=`<div class="aa-txn"><div class="aa-txn-ic"><i class="ti ${t.catIcon||'ti-receipt'}"></i></div><div class="aa-txn-m"><div class="aa-txn-n">${esc(t.desc||'AA 消费')}</div><div class="aa-txn-s"><div class="txn-meta">${esc(t.catLabel||'其他 Others')} · 总 ${fmt(round(t.amt))} · AA ${fmt(aa.owed)}${aa.due<=0?' · 已结清':''}</div><div class="txn-meta txn-date">${esc(t.date||'')}${t.time?' · '+esc(t.time):''}</div></div></div><div class="aa-txn-tools"><i class="ti ti-trash" onclick="event.stopPropagation();delAAHistory16('txn',${JSON.stringify(t.id)},${JSON.stringify(p.id)})" style="color:var(--red);font-size:18px;padding:5px"></i></div></div>`;} });
+          if(hist.length>50)h+=`<div style="padding:12px;text-align:center;color:var(--text3);font-size:12px">只显示前 50 笔，避免卡顿。</div>`;
+        }
+        h+=`<div class="aa-acts"><button class="btn pay" onclick="openModal('addAATxn',{activePersonId:${JSON.stringify(p.id)},selPaidBy:'me',selSplit:2})"><i class="ti ti-plus"></i>加记录</button><button class="btn del" onclick="window.delAAPerson14(${JSON.stringify(p.id)})"><i class="ti ti-trash"></i></button></div></div>`;
+      }
+      h+=`</div>`;
+    });
+    h+=`<button class="add-btn" onclick="openModal('addAAPerson')"><i class="ti ti-user-plus"></i>添加分账对象</button>`;
+    return h;
+  };
+  window.delAAHistory16=function(type,key,pid){
+    if(type==='receipt')return window.delAAReceipt16(key);
+    const t=arr(D.txns).find(x=>same(x.id,key)); if(!t)return;
+    confirmSheet('删除这条 AA 记录？','会删除对应消费记录，并同步取消 AA。',()=>{window.delTxn(t.id);},{danger:true,okText:'删除'});
+  };
+  window.clearAAHistory16=function(pid){
+    const p=collectPeople16().find(x=>same(x.id,pid)); if(!p)return;
+    const hist=historyRows16(p);
+    const receipts=hist.filter(x=>x.type==='receipt').map(x=>x.r.settlementId);
+    const settledTx=hist.filter(x=>x.type==='txn'&&x.aa&&x.aa.due<=0).map(x=>x.t.id);
+    confirmSheet('清空已结清记录？',`会删除 ${receipts.length} 笔收款记录和 ${settledTx.length} 笔已结清 AA 消费；未结清 AA 会保留。`,()=>{receipts.forEach(k=>delAAReceiptCore16(k));settledTx.forEach(id=>{try{window.delTxn(id);}catch(e){}});save();render();toast('已清空已结清记录');},{danger:true,okText:'清空'});
+  };
+  function delAAReceiptCore16(key){
+    ensure16(); key=String(key||''); if(!key)return;
+    if(!D.aaHiddenSettlementIds)D.aaHiddenSettlementIds={};D.aaHiddenSettlementIds[key]=true;
+    const old=allReceipts16().find(r=>same(r.settlementId,key));
+    if(old&&old.cardId){const c=cardById(old.cardId); if(c&&(c.type==='saving'||c.type==='ew'))c.balance=round((Number(c.balance)||0)-round(old.amount));}
+    arr(D.aaSettlementReceipts).forEach(r=>{if(same(receiptKey(r),key)){r.hidden=true;r.deletedAt=nowISO();}});
+    arr(D.incomes).forEach(i=>{if(isAAIncome(i)&&same(receiptKey(i),key)){i.hidden=true;i.deletedAt=nowISO();}});
+    if(!D.tgSettlementApplied||typeof D.tgSettlementApplied!=='object')D.tgSettlementApplied={};
+    D.tgSettlementApplied[key]={...(D.tgSettlementApplied[key]||{}),hidden:true,deletedAt:nowISO()};
+    if(typeof supaReady==='function'&&supaReady()){setTimeout(()=>{try{supa.from('aa_settlements').update({status:'archived',updated_at:new Date().toISOString(),note:'Archived from RinggitMe app'}).eq('id',key);}catch(e){}},50);}
+  }
+  window.delAAReceipt16=function(key){confirmSheet('删除这笔收到还款？','会把入账金额扣回，并从 AA 记录同步隐藏。',()=>{delAAReceiptCore16(key);save();render();toast('已删除还款记录');},{danger:true,okText:'删除'});};
+  window.delAAReceipt14=window.delAAReceipt16;
+  async function syncSettlementReceipts16(show){
+    if(!(typeof supaReady==='function'&&supaReady()))return;
+    try{
+      ensure16();
+      const {data:sets,error}=await supa.from('aa_settlements').select('id,partner_id,amount,status,receive_card_id,receive_card_name,receive_card_type,applied_to_ledger,created_at,updated_at').eq('owner_user_id',SESSION.user.id).eq('status','confirmed').order('created_at',{ascending:true}).limit(300);
+      if(error)throw error;
+      const partnerIds=[...new Set(arr(sets).map(s=>s.partner_id).filter(Boolean))]; let pmap={};
+      if(partnerIds.length){const {data:ps}=await supa.from('aa_partners').select('id,display_name').in('id',partnerIds);arr(ps).forEach(p=>pmap[String(p.id)]=p.display_name||'女朋友');}
+      let changed=false;
+      arr(sets).forEach(s=>{
+        const key=String(s.id); if(isHiddenSettle(key))return;
+        const amount=round(s.amount), partnerName=pmap[String(s.partner_id)]||'女朋友';
+        const d=new Date(s.updated_at||s.created_at||Date.now()), iso=d.toISOString().slice(0,10), hm=d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',hour12:false});
+        let rec=arr(D.aaSettlementReceipts).find(x=>same(receiptKey(x),key)); if(!rec){rec={settlementId:key,createdAt:s.created_at||nowISO(),edits:[]};D.aaSettlementReceipts.unshift(rec);changed=true;}
+        Object.assign(rec,{hidden:false,amount,partnerId:s.partner_id,partnerName,cardId:String(s.receive_card_id||''),cardName:s.receive_card_name||'',cardType:s.receive_card_type||'',isoDate:rec.isoDate||iso,date:rec.date||dateLbl(iso),time:rec.time||hm,source:'telegram_bot'});
+        let inc=arr(D.incomes).find(i=>isAAIncome(i)&&same(receiptKey(i),key)); if(!inc){inc={id:nid(),source:'telegram_aa_settlement',sourceType:'aa_settlement',settlementId:key,aaSettlementId:key,catId:'aa_repay',files:[],edits:[]};D.incomes.unshift(inc);changed=true;}
+        Object.assign(inc,{hidden:false,amt:amount,desc:`${partnerName} AA 还款`,partnerName,partnerId:s.partner_id,receiveCardId:String(s.receive_card_id||''),receiveCardName:s.receive_card_name||'',receiveCardType:s.receive_card_type||'',isoDate:inc.isoDate||iso,date:inc.date||dateLbl(iso),time:inc.time||hm});
+      });
+      // Remove any locally hidden settlement that older sync code may have re-added.
+      Object.keys(D.aaHiddenSettlementIds||{}).forEach(k=>{arr(D.aaSettlementReceipts).forEach(r=>{if(same(receiptKey(r),k))r.hidden=true;});arr(D.incomes).forEach(i=>{if(isAAIncome(i)&&same(receiptKey(i),k))i.hidden=true;});});
+      if(changed){save(); if(show)toast('✓ 已同步 AA 收款记录'); render();}
+    }catch(e){console.log('syncSettlementReceipts16',e); if(show)toast('AA 收款同步失败');}
+  }
+  const prevSync16=window.rmSyncTelegramAA;
+  window.rmSyncTelegramAA=async function(show){ if(prevSync16) await prevSync16(show); await syncSettlementReceipts16(false); };
+  window.syncSettlementReceipts16=syncSettlementReceipts16;
+  window.setRecordMonth16=function(delta){U.recordMonthOffset16=(U.recordMonthOffset16||0)+delta; if(U.recordMonthOffset16>0)U.recordMonthOffset16=0; render();};
+  function ymTarget16(){const d=new Date();d.setDate(1);d.setMonth(d.getMonth()+(U.recordMonthOffset16||0));return d;}
+  function receiptSection16(ym){const rows=allReceipts16().filter(r=>String(r.isoDate||'').slice(0,7)===ym);if(!rows.length)return'';const total=rows.reduce((a,r)=>a+round(r.amount),0);let h=`<div class="sec">收到还款 <span class="sec-a">AA Repayments · ${fmt(total)}</span></div><div class="card">`;rows.slice().sort((a,b)=>String(b.isoDate+' '+b.time).localeCompare(String(a.isoDate+' '+a.time))).forEach(r=>{h+=`<div class="swipe"><div class="txn-swipe-del" onclick="delAAReceipt16('${esc(r.settlementId)}')"><i class="ti ti-trash"></i></div><div class="swipe-fg txn"><div class="txn-ic" style="background:var(--green-bg);color:var(--green)"><i class="ti ti-users"></i></div><div class="txn-m"><div class="txn-n">${esc(r.partnerName||'女朋友')} 还款</div><div class="txn-s"><div class="txn-meta">AA 收款 · ${esc(r.cardName||'未指定入账')}</div><div class="txn-meta txn-date">${esc(r.date||'')}${r.time?' · '+esc(r.time):''}</div></div></div><div class="txn-x"><div class="txn-a g">+${fmt(round(r.amount))}</div><div class="txn-tools"><i class="ti ti-history" onclick="event.stopPropagation();openAAReceiptAudit14('${esc(r.settlementId)}')"></i><i class="ti ti-edit" onclick="event.stopPropagation();openAAReceiptEdit14('${esc(r.settlementId)}')"></i></div></div></div></div>`;});return h+'</div>';}
+  const oldRenderRecord16=window.renderRecord||renderRecord;
+  window.renderRecord=renderRecord=function(){
+    if(typeof syncSettlementReceipts16==='function'&&(!U._lastReceiptSync16||Date.now()-U._lastReceiptSync16>30000)){U._lastReceiptSync16=Date.now();setTimeout(()=>syncSettlementReceipts16(false),300);}
+    const tgt=ymTarget16(), ym=tgt.toISOString().slice(0,7); const inM=d=>String(d||'').slice(0,7)===ym;
+    const mInc=arr(D.incomes).filter(i=>inM(i.isoDate)&&!i.hidden).reduce((a,i)=>a+round(i.amt),0), mExp=arr(D.txns).filter(t=>inM(t.isoDate)).reduce((a,t)=>a+round(t.amt),0), bal=round(mInc-mExp);
+    let h=`<div class="month-nav"><button class="mn-btn" onclick="setRecordMonth16(-1)"><i class="ti ti-chevron-left"></i></button><div class="mn-lbl">${tgt.toLocaleDateString('zh-CN',{year:'numeric',month:'long'})}${(U.recordMonthOffset16||0)===0?' · 本月':''}</div><button class="mn-btn" ${(U.recordMonthOffset16||0)>=0?'disabled style="opacity:.3"':''} onclick="setRecordMonth16(1)"><i class="ti ti-chevron-right"></i></button></div>`;
+    h+=`<div class="card" style="padding:16px"><div style="font-size:12px;color:var(--text3);font-weight:600;margin-bottom:7px">收支 · ${tgt.getMonth()+1}月</div><div style="display:flex;align-items:baseline;gap:8px;margin-bottom:13px"><span style="font-family:var(--font-display);font-size:28px;font-weight:700;color:${bal>=0?'var(--green)':'var(--red)'}">${bal>=0?'+':'−'}${fmt(Math.abs(bal))}</span><span style="font-size:12px;color:var(--text3)">本月结余</span></div><div style="display:flex;gap:10px"><div style="flex:1;background:var(--green-bg);border-radius:12px;padding:10px 12px"><div style="font-size:11px;color:var(--text3)">收入 / 收款</div><div style="font-size:16px;font-weight:700;color:var(--green)">${fmt(mInc)}</div></div><div style="flex:1;background:color-mix(in srgb,var(--red) 9%,var(--bg2));border-radius:12px;padding:10px 12px"><div style="font-size:11px;color:var(--text3)">支出</div><div style="font-size:16px;font-weight:700;color:var(--red)">${fmt(mExp)}</div></div></div></div>`;
+    h+=`<div class="record-actions-title">Quick Actions</div><div style="display:flex;gap:10px;margin-bottom:16px"><button class="btn" style="flex:1;flex-direction:column;gap:6px;justify-content:center;padding:15px;font-size:14px;background:var(--orange);color:#fff;border-color:transparent" onclick="openModal('spend')"><i class="ti ti-shopping-bag" style="font-size:21px"></i>记一笔支出</button><button class="btn" style="flex:1;flex-direction:column;gap:6px;justify-content:center;padding:15px;font-size:14px;background:var(--green);color:#fff;border-color:transparent" onclick="openModal('addincome')"><i class="ti ti-trending-up" style="font-size:21px"></i>记一笔收入</button></div>`;
+    h+=receiptSection16(ym); if(typeof telegramAttachmentSection14==='function')h+=telegramAttachmentSection14();
+    const normal=arr(D.incomes).filter(i=>!isAAIncome(i)&&!i.hidden&&inM(i.isoDate));
+    const by={}; normal.forEach(i=>{const k=i.isoDate||todayISO();(by[k]=by[k]||[]).push(i);});
+    Object.keys(by).sort((a,b)=>b.localeCompare(a)).forEach(date=>{const rows=by[date],sum=rows.reduce((a,i)=>a+round(i.amt),0);const d=new Date(date),lbl=d.toLocaleDateString('en-MY',{weekday:'short',month:'short',day:'numeric'});h+=`<div class="dgroup"><div class="dh"><span class="dh-l">${lbl}</span><span class="dh-r" style="color:var(--green)">+ ${fmt(sum)}</span></div><div class="card">`;rows.forEach(inc=>{const cat=arr(D.incomeCats).find(c=>same(c.id,inc.catId));h+=`<div class="txn"><div class="txn-ic" style="background:var(--green-bg);color:var(--green)"><i class="ti ti-trending-up"></i></div><div class="txn-m"><div class="txn-n">${esc(inc.desc||uiLabel(cat?cat.label:'收入'))}</div><div class="txn-s"><div class="txn-meta">${esc(uiLabel(cat?cat.label:'收入'))}</div><div class="txn-meta txn-date">${esc(inc.date||'')}${inc.time?' · '+esc(inc.time):''}</div></div></div><div class="txn-x"><div class="txn-a g">+${fmt(inc.amt)}</div></div></div>`;});h+=`</div></div>`;});
+    return h;
+  };
+  try{if(!document.getElementById('rm-phase16-css')){const st=document.createElement('style');st.id='rm-phase16-css';st.textContent='.aa-txn-tools,.txn-tools{display:flex;gap:8px;align-items:center}.aa-body .aa-acts .btn.del{color:var(--red)}';document.head.appendChild(st);}}catch(e){}
+})();
+</script>
+
 </body>
 </html>
