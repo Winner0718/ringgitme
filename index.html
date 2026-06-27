@@ -544,6 +544,20 @@ input,textarea,select{-webkit-user-select:text;user-select:text}
 <body>
 <div class="app" id="app"></div>
 <script>
+// Phase 9.2 early boot guard: show runtime errors instead of blank screen.
+(function(){
+  function showBootError(err){
+    try{
+      var app=document.getElementById('app');
+      var msg=(err && (err.stack||err.message)) ? (err.stack||err.message) : String(err||'Unknown error');
+      if(app){
+        app.innerHTML='<div style="min-height:100%;padding:calc(env(safe-area-inset-top,0px) + 28px) 18px 28px;background:#f5f5f7;color:#111;font-family:-apple-system,BlinkMacSystemFont,sans-serif;overflow:auto"><div style="max-width:420px;margin:0 auto"><div style="font-size:22px;font-weight:800;margin-bottom:8px">RinggitMe 启动保护</div><div style="font-size:13px;line-height:1.55;background:#fff;border:1px solid #ddd;border-radius:16px;padding:14px;margin-bottom:12px">App 启动时有一段代码报错，所以我先挡住白屏。数据没有丢。把下面错误截图给我。</div><pre style="white-space:pre-wrap;font-size:11px;line-height:1.4;background:#111;color:#fff;border-radius:12px;padding:12px;max-height:260px;overflow:auto">'+msg.replace(/[<>&]/g,function(m){return {"<":"&lt;",">":"&gt;","&":"&amp;"}[m]})+'</pre><button onclick="location.reload()" style="width:100%;margin-top:12px;border:0;border-radius:14px;padding:14px;font-size:15px;font-weight:750;background:#0a8a54;color:#fff">重新载入</button></div></div>';
+      }
+    }catch(e){}
+  }
+  window.addEventListener('error',function(e){showBootError(e.error||e.message);},true);
+  window.addEventListener('unhandledrejection',function(e){showBootError(e.reason);},true);
+})();
 // ══════════════════════════════════════════════════════
 // SECURITY — WebAuthn (optional) + PIN
 // ══════════════════════════════════════════════════════
@@ -2381,7 +2395,7 @@ function renderAA(){
     try{await supa.from('quick_entries').update({status:'rejected',raw:{source:'telegram_bot',app_deleted:true,deleted_at:new Date().toISOString()}}).eq('id',qid);await supa.from('aa_ledger_items').update({status:'cancelled',updated_at:new Date().toISOString()}).or(`source_id.eq.${qid},quick_entry_id.eq.${qid}`);await window.rmSyncTelegramAA(false);}catch(e){console.log('syncDeletedTelegramTxn9',e);}
   }
   const prevDelTxn=window.delTxn||delTxn;
-  window.delTxn=delTxn=function(id){const tx=(D.txns||[]).find(t=>same(t.id,id));const wasTg=tx&&txCloudId(tx);const res=prevDelTxn(id);if(wasTg)setTimeout(()=>syncDeletedTelegramTxn9(tx),350);return res;};
+  window.delTxn=function(id){const tx=(D.txns||[]).find(t=>same(t.id,id));const wasTg=tx&&txCloudId(tx);const res=prevDelTxn(id);if(wasTg)setTimeout(()=>syncDeletedTelegramTxn9(tx),350);return res;};
 
   function sourceGroupLabel(r){if(r.sourceType==='telegram_aa')return'来源：Telegram AA';if(r.sourceType==='loan')return'来源：固定支出';if(r.sourceType==='sub')return'来源：订阅';if(r.sourceType==='txn')return'来源：消费记录';if(r.sourceType==='installment')return'来源：信用卡分期';return'来源：AA分账';}
   const sourceGroupOrder={'来源：Telegram AA':0,'来源：固定支出':1,'来源：订阅':2,'来源：消费记录':3,'来源：信用卡分期':4,'来源：AA分账':5};
