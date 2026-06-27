@@ -1652,7 +1652,7 @@ function render(){
   if(LOCK.state!=='unlocked'){renderLock();return;}
   const TABS=[{id:'home',i:'ti-home',l:'首页'},{id:'cards',i:'ti-credit-card',l:'卡片'},{id:'record',i:'ti-circle-plus',l:'记账'},{id:'history',i:'ti-calendar',l:'记录'},{id:'fixed',i:'ti-repeat',l:'固定'},{id:'aa',i:'ti-users',l:'AA'}];
   const TITLES={home:'RinggitMe',cards:'卡片管理',record:'收入 & 收款',history:'消费记录',fixed:'固定支出',aa:'AA 分账'};
-  const SUBS={home:'马来西亚理财 · 数据存本机 · V90',cards:'信用卡 · 储蓄 · 电子钱包 eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
+  const SUBS={home:'马来西亚理财 · 数据存本机 · V91',cards:'信用卡 · 储蓄 · 电子钱包 eWallet',record:'收入追踪 · 快速记账',history:'按日期查看消费',fixed:'订阅 · 贷款 · 租金',aa:'分账追踪 · 随时结算'};
   // preserve scroll on same-tab re-render (no more jumping to top on every tap); fade only on tab switch
   const tabChanged=U.tab!==_lastRenderedTab;
   const prevContent=document.querySelector('.content');
@@ -4223,6 +4223,76 @@ function telegramFiles15(raw){
   try{const st=document.createElement('style');st.id='phase18-2-css';st.textContent=`.mb{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;background:rgba(15,18,24,.38)!important}.md{max-height:84dvh!important;overflow:auto!important;-webkit-overflow-scrolling:touch!important;transform:translateZ(0);will-change:auto!important}.md input,.md textarea,.md select{font-size:16px!important}.aa-light18{margin:16px 0;padding:16px;border-radius:18px;background:var(--bg2);border:1px solid var(--border);color:var(--text3);font-size:13px;text-align:center}.aa-p,.aa-history-card18 .aa-txn{content-visibility:auto;contain-intrinsic-size:80px}.aa-history-card18 .aa-txn{contain:layout paint style}.aa-main-tabs18{margin:10px 0 12px;display:flex;gap:8px}.aa-main-tabs18 .pill{flex:1;justify-content:center}.phase18-persons{margin:0 0 12px}.phase18-persons .day-chip{min-width:92px}.aa-history-card18{padding:4px 0}.aa-history-card18 .aa-txn{border-bottom:1px solid var(--border)}.aa-history-card18 .aa-txn:last-child{border-bottom:0}`;document.head.appendChild(st);}catch(_){ }
 })();
 
+
+
+// PHASE 18.3 — AA ADD PERSON ZERO-RENDER PERFORMANCE FIX
+// Reason: iPhone Safari struggles with bottom-sheet modal + keyboard on AA page.
+// This replaces only "Add AA Person" with an isolated lightweight full-screen form.
+(()=>{
+  const cssId='phase18-3-aa-person-css';
+  function arr(x){return Array.isArray(x)?x:[]}
+  function safe(s){return String(s==null?'':s)}
+  function colors(){try{return Array.isArray(COLORS)&&COLORS.length?COLORS:['#0a84ff','#0a8a54','#d97706','#dc2626','#7c3aed','#0891b2','#db2777','#475569','#b7791f','#4f46e5']}catch(_){return ['#0a84ff','#0a8a54','#d97706','#dc2626','#7c3aed','#0891b2','#db2777','#475569','#b7791f','#4f46e5']}}
+  function esc(s){return safe(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+  function ensureCss(){
+    if(document.getElementById(cssId))return;
+    const st=document.createElement('style');st.id=cssId;
+    st.textContent=`
+      .aa-add-lite{position:fixed;inset:0;z-index:99999;background:var(--bg,#f8f8f8);color:var(--text,#111);overflow:auto;-webkit-overflow-scrolling:touch;padding:calc(env(safe-area-inset-top) + 18px) 22px calc(env(safe-area-inset-bottom) + 24px);box-sizing:border-box;contain:layout paint style;}
+      .aa-add-lite *{box-sizing:border-box}.aa-add-lite-card{max-width:560px;margin:0 auto;padding-top:8px}.aa-add-lite-top{display:flex;align-items:center;gap:12px;margin-bottom:22px}.aa-add-lite-ic{width:48px;height:48px;border-radius:16px;background:rgba(10,132,255,.12);display:grid;place-items:center;color:#0a84ff;font-size:22px}.aa-add-lite-title{font-size:24px;font-weight:900;letter-spacing:-.02em}.aa-add-lite-sub{font-size:13px;color:var(--text3,#777);margin-top:3px;line-height:1.45}.aa-add-lite label{display:block;font-size:13px;font-weight:800;margin:18px 0 8px;color:var(--text2,#555)}.aa-add-lite input{width:100%;height:58px;border-radius:16px;border:1px solid var(--border,#ddd);background:var(--card,#fff);padding:0 16px;font-size:16px!important;color:var(--text,#111);outline:none}.aa-add-lite input:focus{border-color:var(--accent,#b7791f);box-shadow:0 0 0 4px rgba(183,121,31,.12)}.aa-add-lite-colors{display:flex;flex-wrap:wrap;gap:12px;margin:10px 0 14px}.aa-add-lite-color{width:38px;height:38px;border-radius:50%;border:3px solid transparent;background:var(--c);box-shadow:inset 0 0 0 4px var(--bg,#f8f8f8);}.aa-add-lite-color.on{border-color:var(--c);transform:scale(1.05)}.aa-add-lite-note{margin-top:18px;padding:14px;border-radius:16px;background:rgba(10,138,84,.08);color:var(--text2,#555);font-size:13px;line-height:1.5}.aa-add-lite-actions{position:sticky;bottom:0;background:linear-gradient(to top,var(--bg,#f8f8f8) 70%,transparent);display:grid;grid-template-columns:1fr 1fr;gap:12px;padding-top:24px;margin-top:28px}.aa-add-lite-btn{height:56px;border:0;border-radius:16px;font-size:16px;font-weight:900}.aa-add-lite-cancel{background:var(--bg2,#f1f1f1);color:var(--text2,#555);border:1px solid var(--border,#ddd)}.aa-add-lite-save{background:var(--accent,#b7791f);color:white}.aa-add-lite-save:active,.aa-add-lite-cancel:active{transform:scale(.99)}
+    `;
+    document.head.appendChild(st);
+  }
+  function dedupePeople(){
+    try{
+      if(!Array.isArray(D.aaPeople))D.aaPeople=[];
+      const seen=new Set();
+      D.aaPeople=D.aaPeople.filter(p=>{
+        const k=safe(p&&p.name).trim().toLowerCase();
+        if(!k)return false;
+        if(seen.has(k))return false;
+        seen.add(k);return true;
+      });
+    }catch(_){ }
+  }
+  function close(){const el=document.getElementById('aa-add-lite');if(el)el.remove();try{document.body.classList.remove('aa-lite-open')}catch(_){}}
+  function savePerson(){
+    const name=safe(document.getElementById('aa-add-lite-name')?.value).trim();
+    const color=safe(document.getElementById('aa-add-lite-color')?.value)||colors()[0];
+    if(!name){try{toast('请输入名字')}catch(_){alert('请输入名字')}return;}
+    try{
+      if(!Array.isArray(D.aaPeople))D.aaPeople=[];
+      const exists=D.aaPeople.some(p=>safe(p.name).trim().toLowerCase()===name.toLowerCase());
+      if(exists){try{toast('这个分账对象已经存在')}catch(_){alert('这个分账对象已经存在')}close();try{render()}catch(_){};return;}
+      const id=(typeof nid==='function')?nid():Date.now();
+      D.aaPeople.push({id,name,color,txns:[]});
+      dedupePeople();
+      if(typeof save==='function')save();
+      close();
+      try{U.aaMainTab18='current';U.expandedId=id;}catch(_){ }
+      if(typeof render==='function')render();
+      try{toast('✓ 已添加分账对象')}catch(_){ }
+    }catch(err){console.error(err);try{toast('保存失败，请再试一次')}catch(_){alert('保存失败，请再试一次')}}
+  }
+  function open(){
+    ensureCss();close();
+    try{if(document.activeElement)document.activeElement.blur()}catch(_){ }
+    const cs=colors();
+    const el=document.createElement('div');el.id='aa-add-lite';el.className='aa-add-lite';
+    el.innerHTML=`<div class="aa-add-lite-card"><div class="aa-add-lite-top"><div class="aa-add-lite-ic"><i class="ti ti-user-plus"></i></div><div><div class="aa-add-lite-title">添加分账对象</div><div class="aa-add-lite-sub">这个是本机 / 账号内 AA 对象，Telegram Partner 绑定还是在设置页面。</div></div></div><label>名字</label><input id="aa-add-lite-name" autocomplete="off" autocorrect="off" placeholder="女朋友 / 姐姐 / 朋友 / 家人"/><label>颜色</label><input id="aa-add-lite-color" type="hidden" value="${esc(cs[0])}"/><div class="aa-add-lite-colors">${cs.map((c,i)=>`<button type="button" class="aa-add-lite-color ${i===0?'on':''}" style="--c:${esc(c)}" data-c="${esc(c)}" aria-label="color"></button>`).join('')}</div><div class="aa-add-lite-note"><i class="ti ti-info-circle"></i> 这是独立轻量页面，不会渲染 AA 历史，所以 iPhone 键盘会顺很多。</div><div class="aa-add-lite-actions"><button type="button" class="aa-add-lite-btn aa-add-lite-cancel">取消</button><button type="button" class="aa-add-lite-btn aa-add-lite-save">保存</button></div></div>`;
+    document.body.appendChild(el);
+    try{document.body.classList.add('aa-lite-open')}catch(_){ }
+    el.querySelectorAll('.aa-add-lite-color').forEach(btn=>btn.addEventListener('click',()=>{el.querySelectorAll('.aa-add-lite-color').forEach(b=>b.classList.remove('on'));btn.classList.add('on');el.querySelector('#aa-add-lite-color').value=btn.dataset.c||cs[0];},{passive:true}));
+    el.querySelector('.aa-add-lite-cancel').addEventListener('click',close,{passive:true});
+    el.querySelector('.aa-add-lite-save').addEventListener('click',savePerson,{passive:true});
+    el.querySelector('#aa-add-lite-name').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();savePerson();}});
+    setTimeout(()=>{try{el.querySelector('#aa-add-lite-name').focus({preventScroll:true})}catch(_){try{el.querySelector('#aa-add-lite-name').focus()}catch(__){}}},220);
+  }
+  window.openAAAddPerson18_2=open;
+  window.openAAAddPerson18_3=open;
+  window.closeAAAddPerson18_3=close;
+  try{dedupePeople();}catch(_){ }
+})();
 </script>
 
 </body>
