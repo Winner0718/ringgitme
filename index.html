@@ -2739,7 +2739,7 @@ function renderAA(){
 
 
 // ══════════════════════════════════════════════════════
-// PHASE 9.6 — AA PERSON + MODAL STABILITY POLISH
+// PHASE 9.7 — AA PERSON + MODAL STABILITY POLISH
 // Fixes:
 // - Empty/new account: Add split person modal was blank/stuck.
 // - saveAAPerson used an undefined variable `color` in older code.
@@ -2783,6 +2783,8 @@ function renderAA(){
       return `<div class="mb${anim}" onclick="if(event.target===this)closeModal()"><div class="md${anim}"><div class="md-handle"></div><div class="md-title"><div class="md-ic" style="background:#f59e0b22;color:#f59e0b"><i class="ti ti-alert-triangle"></i></div>找不到 AA 对象</div><div class="ib w"><i class="ti ti-info-circle"></i>请先添加分账对象，或刷新后再试。</div><div class="ma"><button class="ok" onclick="closeModal()">知道了</button></div></div></div>`;
     }
     const ex=U.activeEditTxnId?safeArr(p.txns).find(t=>same(t.id,U.activeEditTxnId)):null;
+    const modalKey=String(U.activePersonId||'')+'|'+String(U.activeEditTxnId||'new');
+    if(U._phase96Key!==modalKey){U._phase96Key=modalKey;U._phase96Presel=false;}
     if(ex&&!U._phase96Presel){
       setTimeout(()=>{U.selCatId=ex.catId||null;U.selPayId=(ex.payId===undefined?null:ex.payId);U.selPaidBy=ex.paidBy||'me';U.selSplit=parseInt(ex.split)||2;U._phase96Presel=true;try{render();}catch(_e){}},0);
     }
@@ -2793,11 +2795,11 @@ function renderAA(){
     const split=parseInt(U.selSplit)||2;
     return `<div class="mb${anim}" onclick="if(event.target===this)closeModal()"><div class="md${anim}"><div class="md-handle"></div><div class="md-title"><div class="aa-av" style="width:36px;height:36px;border-radius:11px;background:${esc(col)}22;color:${esc(col)};font-size:13px">${esc(String(p.name||'AA').slice(0,2).toUpperCase())}</div>${ex?'编辑':'记一笔'} — ${nm}</div><div class="field"><label>描述</label><input id="aa-desc" placeholder="e.g. Lunch / Movie / Grab" value="${esc(ex?ex.desc:'')}"/></div><div class="field"><label>总金额 (RM)</label><input id="aa-total" type="number" inputmode="decimal" placeholder="0.00" class="big" value="${esc(ex?ex.total:'')}"/></div><div class="field"><label>谁付？</label><div class="pill-row"><div class="pill ${paidBy==='me'?'on':''}" onclick="sPaidBy('me')">我付</div><div class="pill ${paidBy==='them'?'on':''}" onclick="sPaidBy('them')">${who} 付</div></div></div><div class="field"><label>怎么分？</label><div class="pill-row"><div class="pill ${split===2?'on':''}" onclick="sSplit(2)">AA ÷2</div><div class="pill ${split===3?'on':''}" onclick="sSplit(3)">÷3</div><div class="pill ${split===4?'on':''}" onclick="sSplit(4)">÷4</div></div></div><div class="field"><label>消费类别 <span style="color:var(--text3);font-weight:400">可选</span></label>${typeof catPicker==='function'?catPicker():''}</div>${paidBy==='me'?`<div class="field"><label>用哪张卡付？</label>${typeof payOpts==='function'?payOpts(false):''}</div>`:''}<div class="ma"><button onclick="closeModal()">取消</button><button class="ok" onclick="saveAATxn()">${ex?'保存修改':'记录'}</button></div></div></div>`;
   }
-  const prevOpen96=window.openModal||openModal;
-  window.openModal=openModal=function(m,ex={}){
-    if(m==='addAAPerson'){U._phase96Presel=false;}
-    if(m==='addAATxn'){U._phase96Presel=false;}
-    return prevOpen96(m,ex||{});
+  // Do not reassign the original `openModal` const. Safari treats that as a fatal startup error.
+  // The original openModal still works; buildModal below safely overrides the modal content.
+  window.openModalSafe96=function(m,ex={}){
+    if(m==='addAAPerson'||m==='addAATxn'){U._phase96Presel=false;U._phase96Key='';}
+    return (window.openModal||openModal)(m,ex||{});
   };
   const prevBuild96=window.buildModal||buildModal;
   window.buildModal=buildModal=function(){
