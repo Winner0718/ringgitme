@@ -2282,6 +2282,130 @@ function renderAA(){
   const _baseDelTxn=window.delTxn||delTxn;window.delTxn=function(id){const tx=(D.txns||[]).find(t=>same(t.id,id));const wasTg=tx&&txCloudId(tx);const res=_baseDelTxn(id);if(wasTg)setTimeout(()=>syncDeletedTelegramTxn(tx),650);return res;};
 })();
 
+// ══════════════════════════════════════════════════════
+// TELEGRAM AA PHASE 9 PERFECT SYNC
+// - AA row-level swipe delete
+// - Deleting an imported Telegram expense cancels its cloud AA item
+// - Telegram AA summaries with time / status / settlement destination
+// - Confirmed repayment can sync into Saving / eWallet balance exactly once
+// ══════════════════════════════════════════════════════
+(function(){
+  const PENDING=['unpaid','partially_settled','pending_receiver_confirm','pending_payer_confirm'];
+  const same=(a,b)=>String(a)===String(b);
+  const n=s=>String(s||'');
+  const hmFromTS=ts=>{try{const d=new Date(ts);const my=new Date(d.getTime()+8*60*60*1000);return my.toISOString().slice(11,16);}catch(e){return'';}};
+  const statusZh=s=>({unpaid:'未结清',partially_settled:'部分已还',pending_receiver_confirm:'待我确认收款',pending_payer_confirm:'待对方确认付款',settled:'已结清',confirmed:'已确认',rejected:'已拒绝',cancelled:'已取消',disputed:'有问题'})[s]||String(s||'');
+  function ensureAA9(){
+    if(!D.tgPartnerMap)D.tgPartnerMap={};
+    if(!D.tgAAReceivableMap)D.tgAAReceivableMap={};
+    if(!D.tgSettlementApplied||typeof D.tgSettlementApplied!=='object')D.tgSettlementApplied={};
+    if(!D.tgAAPendingSettlements||typeof D.tgAAPendingSettlements!=='object')D.tgAAPendingSettlements={};
+    if(!Array.isArray(D.aaPeople))D.aaPeople=[];
+    if(!Array.isArray(D.aaReceivables))D.aaReceivables=[];
+  }
+  function localPersonForPartner(p){ensureAA9();const key=n(p.id);let lid=D.tgPartnerMap[key];let person=lid?D.aaPeople.find(x=>same(x.id,lid)):null;if(!person){lid=nid();D.tgPartnerMap[key]=lid;person={id:lid,name:p.display_name||'AA Partner',color:'#0a8a54',txns:[],telegramPartnerId:key};D.aaPeople.push(person);}else{person.name=p.display_name||person.name;person.telegramPartnerId=key;}return person;}
+  function recIdForItem(itemId){ensureAA9();const key=n(itemId);if(!D.tgAAReceivableMap[key])D.tgAAReceivableMap[key]=nid();return D.tgAAReceivableMap[key];}
+  function txCloudId(tx){return tx&&(tx.telegramQuickEntryId||tx.quickEntryId||tx.shortcutEntryId);}
+  function leftOf(r){return Math.max(0,money(r.owedAmount)-money(r.settledAmount));}
+  async function fetchTelegramAA9(){
+    if(!(typeof supaReady==='function'&&supaReady()))return null;
+    const {data:partners,error:e1}=await supa.from('aa_partners').select('id,display_name,status,partner_telegram_username,partner_telegram_first_name').eq('owner_user_id',SESSION.user.id).order('created_at',{ascending:true});
+    if(e1)throw e1;
+    const {data:items,error:e2}=await supa.from('aa_ledger_items').select('id,partner_id,source_type,source_id,quick_entry_id,item_date,item_time,description,category,payment_name,total_amount,receivable_amount,settled_amount,status,direction,raw,created_at,updated_at').eq('owner_user_id',SESSION.user.id).order('item_date',{ascending:false}).limit(250);
+    if(e2)throw e2;
+    const {data:settlements,error:e3}=await supa.from('aa_settlements').select('id,partner_id,amount,status,initiated_by_role,receive_card_id,receive_card_name,receive_card_type,applied_to_ledger,created_at,updated_at').eq('owner_user_id',SESSION.user.id).order('created_at',{ascending:false}).limit(100);
+    if(e3)throw e3;
+    return {partners:partners||[],items:items||[],settlements:settlements||[]};
+  }
+  function applyConfirmedSettlementLocally(s){
+    ensureAA9();
+    if(!s||s.status!=='confirmed'||!s.receive_card_id)return;
+    const key=n(s.id);if(D.tgSettlementApplied[key])return;
+    const card=(D.cards||[]).find(c=>same(c.id,s.receive_card_id)&&(c.type==='saving'||c.type==='ew'));
+    if(!card)return;
+    card.balance=round2(money(card.balance)+money(s.amount));
+    D.tgSettlementApplied[key]={amount:money(s.amount),cardId:n(card.id),cardName:card.name||'',at:new Date().toISOString(),source:'app_sync'};
+  }
+  window.rmSyncTelegramAA=async function(show){
+    if(!(typeof supaReady==='function'&&supaReady())){if(show)toast('先登录云同步');return;}
+    try{
+      const data=await fetchTelegramAA9(); if(!data)return;
+      ensureAA9();
+      const partnerMap={};
+      (data.partners||[]).forEach(p=>{if(p.status==='connected'||p.status==='pending')partnerMap[n(p.id)]=localPersonForPartner(p);});
+      (data.settlements||[]).forEach(applyConfirmedSettlementLocally);
+      const pendingSettles={};
+      (data.settlements||[]).filter(s=>['pending_receiver_confirm','pending_payer_confirm'].includes(s.status)).forEach(s=>{(pendingSettles[n(s.partner_id)]||(pendingSettles[n(s.partner_id)]=[])).push(s);});
+      D.tgAAPendingSettlements=pendingSettles;
+      D.aaReceivables=D.aaReceivables.filter(r=>r.sourceType!=='telegram_aa');
+      (data.items||[]).forEach(it=>{
+        if(!PENDING.includes(it.status))return;
+        const person=partnerMap[n(it.partner_id)];if(!person)return;
+        const l=Math.max(0,money(it.receivable_amount)-money(it.settled_amount));if(!l)return;
+        const raw=it.raw||{};
+        D.aaReceivables.unshift({
+          id:recIdForItem(it.id),sourceType:'telegram_aa',sourceId:it.id,telegramAAItemId:it.id,quickEntryId:it.quick_entry_id||it.source_id,
+          personId:person.id,personName:person.name,desc:it.description||'Telegram AA',owedAmount:money(it.receivable_amount),settledAmount:money(it.settled_amount),status:it.status,
+          date:it.item_date||'',time:it.item_time||raw.ledger_time||raw?.aa?.ledger_time||hmFromTS(it.created_at),category:it.category||'',paymentName:it.payment_name||'',totalAmount:money(it.total_amount),raw
+        });
+      });
+      save(); if(show)toast('✓ Telegram AA 已同步');
+    }catch(e){console.log('rmSyncTelegramAA phase9',e);if(show)toast('Telegram AA 同步失败');}
+  };
+  window.aaSourceInfo=function(r){
+    if(r&&r.sourceType==='telegram_aa')return{title:r.desc||'Telegram AA',meta:`Telegram AA · ${r.date||''}${r.time?' '+r.time:''}${r.category?' · '+uiLabel(r.category):''}${r.paymentName?' · '+r.paymentName:''}${r.status?' · '+statusZh(r.status):''}${money(r.settledAmount)>0?' · 已确认 '+fmtR(r.settledAmount):''}`,icon:'ti-brand-telegram',edit:''};
+    const tx=r&&r.sourceType==='txn'?(D.txns||[]).find(t=>same(t.id,r.sourceId)):null;
+    if(tx)return{title:tx.desc,meta:`消费记录 · ${tx.date||''}${tx.time?' '+tx.time:''}${tx.catLabel?' · '+uiLabel(tx.catLabel):''}${tx.payName?' · '+tx.payName:''}`,icon:tx.catIcon||'ti-receipt',edit:'txn'};
+    return {title:r&&r.desc||'AA 分账',meta:r&&r.date||'',icon:'ti-users',edit:''};
+  };
+  function cancelCloudAAForRec(r){
+    if(!(typeof supaReady==='function'&&supaReady())||!r)return Promise.resolve();
+    if(r.sourceType==='telegram_aa'&&r.telegramAAItemId){return supa.from('aa_ledger_items').update({status:'cancelled',updated_at:new Date().toISOString()}).eq('id',r.telegramAAItemId).then(()=>window.rmSyncTelegramAA(false));}
+    if(r.quickEntryId){return supa.from('aa_ledger_items').update({status:'cancelled',updated_at:new Date().toISOString()}).eq('source_id',r.quickEntryId).then(()=>window.rmSyncTelegramAA(false));}
+    return Promise.resolve();
+  }
+  window.delAAReceivable=function(id){
+    ensureAA9();const r=(D.aaReceivables||[]).find(x=>same(x.id,id));if(!r)return;
+    confirmSheet('删除这笔 AA 明细？','只会删除/取消 AA 应收，不会删除原本的消费记录。',()=>{
+      D.aaReceivables=(D.aaReceivables||[]).filter(x=>!same(x.id,id));
+      if(r.sourceType==='txn'){const tx=(D.txns||[]).find(t=>same(t.id,r.sourceId));if(tx)tx.aaSplit=null;}
+      save();render();toast('已删除 AA 明细');
+      cancelCloudAAForRec(r).catch(e=>console.log('cancelCloudAAForRec',e));
+    },{danger:true,okText:'删除'});
+  };
+  async function syncDeletedTelegramTxn9(tx){
+    if(!(typeof supaReady==='function'&&supaReady())||!txCloudId(tx))return;
+    const qid=txCloudId(tx);
+    D.aaReceivables=(D.aaReceivables||[]).filter(r=>!same(r.quickEntryId,qid));
+    save();
+    try{await supa.from('quick_entries').update({status:'rejected',raw:{source:'telegram_bot',app_deleted:true,deleted_at:new Date().toISOString()}}).eq('id',qid);await supa.from('aa_ledger_items').update({status:'cancelled',updated_at:new Date().toISOString()}).or(`source_id.eq.${qid},quick_entry_id.eq.${qid}`);await window.rmSyncTelegramAA(false);}catch(e){console.log('syncDeletedTelegramTxn9',e);}
+  }
+  const prevDelTxn=window.delTxn||delTxn;
+  window.delTxn=delTxn=function(id){const tx=(D.txns||[]).find(t=>same(t.id,id));const wasTg=tx&&txCloudId(tx);const res=prevDelTxn(id);if(wasTg)setTimeout(()=>syncDeletedTelegramTxn9(tx),350);return res;};
+
+  function sourceGroupLabel(r){if(r.sourceType==='telegram_aa')return'来源：Telegram AA';if(r.sourceType==='loan')return'来源：固定支出';if(r.sourceType==='sub')return'来源：订阅';if(r.sourceType==='txn')return'来源：消费记录';if(r.sourceType==='installment')return'来源：信用卡分期';return'来源：AA分账';}
+  const sourceGroupOrder={'来源：Telegram AA':0,'来源：固定支出':1,'来源：订阅':2,'来源：消费记录':3,'来源：信用卡分期':4,'来源：AA分账':5};
+  function swipeRow(inner,delCall){return `<div class="swipe"><button class="txn-swipe-del" onclick="event.stopPropagation();${delCall}"><i class="ti ti-trash"></i></button><div class="swipe-fg">${inner}</div></div>`;}
+  function renderRecRow9(r){const info=aaSourceInfo(r),left=leftOf(r);const inner=`<div class="aa-txn"><div class="aa-txn-ic"><i class="ti ${info.icon||'ti-users'}"></i></div><div class="aa-txn-m"><div class="aa-txn-n">${info.title||r.desc||'AA 分账'}</div><div class="aa-txn-s"><div class="txn-meta">${info.meta||''}</div></div></div><div class="aa-txn-side"><div class="aa-txn-r"><div class="aa-txn-a" style="color:var(--green)">+${fmt(left)}</div><div class="aa-txn-w">待收</div></div><div class="aa-txn-tools">${info.edit?`<i class="ti ti-edit" onclick="editAAReceivableSource(${r.id})" style="color:var(--accent);font-size:19px;padding:4px"></i>`:''}<i class="ti ti-check" onclick="settleAAReceivable(${r.id})" style="color:var(--green);font-size:20px;padding:4px"></i><i class="ti ti-trash" onclick="delAAReceivable(${r.id})" style="color:var(--text3);font-size:19px;padding:4px"></i></div></div></div>`;return swipeRow(inner,`delAAReceivable(${r.id})`);}
+  function renderManualRow9(p,t){const myShare=t.total/t.split,owedAmt=myShare*(t.split-1),iAmOwed=t.paidBy==='me';const inner=`<div class="aa-txn"><div class="aa-txn-ic"><i class="ti ${t.catIcon||'ti-receipt'}"></i></div><div class="aa-txn-m"><div class="aa-txn-n">${t.desc}</div><div class="aa-txn-s"><div class="txn-meta">${uiLabel(t.catLabel||'其他')}</div>${t.payName?`<div class="txn-meta txn-pay">${t.payName}</div>`:''}<div class="txn-meta txn-date">${t.date}${t.time?' '+t.time:''} · 共${fmtR(t.total)} ÷${t.split}</div></div></div><div class="aa-txn-side"><div class="aa-txn-r"><div class="aa-txn-a" style="color:${iAmOwed?'var(--green)':'var(--red)'}">${iAmOwed?'+':'−'}${fmtR(owedAmt)}</div><div class="aa-txn-w">${iAmOwed?'待收':'我欠'}</div></div><div class="aa-txn-tools"><i class="ti ti-edit" onclick="openModal('addAATxn',{activePersonId:${p.id},activeEditTxnId:${t.id}})" style="color:var(--accent);font-size:19px;padding:4px"></i><i class="ti ti-trash" onclick="delAATxn(${p.id},${t.id})" style="color:var(--text3);font-size:19px;padding:4px"></i></div></div></div>`;return swipeRow(inner,`delAATxn(${p.id},${t.id})`);}
+  function pendingSettlementRows(partnerId){ensureAA9();return D.tgAAPendingSettlements[n(partnerId)]||[];}
+  function renderPendingSettlements(partnerId){const rows=pendingSettlementRows(partnerId);if(!rows.length)return'';let h=`<div class="po-lbl" style="margin:13px 0 6px">待双方确认的还款</div>`;rows.forEach(s=>{h+=`<div class="aa-txn"><div class="aa-txn-ic"><i class="ti ti-hourglass"></i></div><div class="aa-txn-m"><div class="aa-txn-n">${fmtR(s.amount)} · ${statusZh(s.status)}</div><div class="aa-txn-s">${hmFromTS(s.created_at)} · ${s.initiated_by_role==='partner'?'Partner 标记已还':'Owner 标记已收到'}</div></div></div>`;});return h;}
+  renderAA=window.renderAA=function(){
+    ensureAA9();
+    const recs=getAAReceivables().filter(r=>money(r.owedAmount)>money(r.settledAmount));
+    const people=[...(D.aaPeople||[])];
+    recs.forEach(r=>{if(r.personId&&!people.some(p=>same(p.id,r.personId)))people.push({id:r.personId,name:r.personName||'AA对象',color:'#0a8a54',txns:[],telegramPartnerId:r.partnerId||''});});
+    if(!people.length&&!recs.length)return`<div class="empty" style="margin-top:40px"><div class="empty-ic"><i class="ti ti-users"></i></div><div class="et">还没有分账记录</div><div class="es">添加朋友或女朋友<br>开始记录 AA 消费</div></div><button class="add-btn" onclick="openModal('addAAPerson')"><i class="ti ti-user-plus"></i>添加分账对象</button>`;
+    const personRecs=id=>recs.filter(r=>same(r.personId,id));
+    const recTotal=id=>personRecs(id).reduce((a,r)=>a+leftOf(r),0);
+    let tThey=0,tMe=0;people.forEach(p=>{const b=aaBal(p||{txns:[]});tThey+=b.they+recTotal(p.id);tMe+=b.me;});
+    let h=`<div class="sg"><div class="sc" style="--scc:var(--green)"><div class="sl">AA待收</div><div class="sv g">${fmt(tThey)}</div></div><div class="sc" style="--scc:var(--red)"><div class="sl">我欠别人</div><div class="sv r">${fmt(tMe)}</div></div></div>`;
+    people.forEach(p=>{const b=aaBal(p||{txns:[]}),prs=personRecs(p.id),recAmt=recTotal(p.id),net=b.net+recAmt,unsettled=(p.txns||[]).filter(t=>!t.settled),settled=(p.txns||[]).filter(t=>t.settled),isOpen=U.expandedId===p.id,count=unsettled.length+prs.length;h+=`<div class="aa-p" style="--tint:${p.color||'var(--accent)'}"><div class="aa-h" onclick="toggle(${p.id})"><div class="aa-av" style="background:${(p.color||'#0a8a54')}22;color:${p.color||'var(--accent)'}">${(p.name||'AA').slice(0,2).toUpperCase()}</div><div class="aa-info"><div class="aa-name">${p.name||'AA对象'}</div><div class="aa-sub">${count} 笔未结算</div></div><div class="aa-bal"><div class="aa-num" style="color:${net>0?'var(--green)':net<0?'var(--red)':'var(--text3)'}">${net===0?'—':(net>0?'+':'−')+fmtR(Math.abs(net))}</div><div class="aa-lbl">${net>0?'待收':net<0?'我欠':'已结清'}</div></div><i class="ti ti-chevron-down chevron ${isOpen?'rot':''}"></i></div>`;if(isOpen){h+=`<div class="aa-body">`;if(!count&&!settled.length)h+=`<div style="padding:18px 0;text-align:center;font-size:13px;color:var(--text3)">还没有 AA 记录</div>`;if(prs.length){const groups={};prs.forEach(r=>{const k=sourceGroupLabel(r);(groups[k]||(groups[k]=[])).push(r);});Object.keys(groups).sort((a,b)=>(sourceGroupOrder[a]||99)-(sourceGroupOrder[b]||99)).forEach(k=>{h+=`<div class="po-lbl" style="margin:13px 0 6px">${k}</div>`;groups[k].forEach(r=>h+=renderRecRow9(r));});}h+=renderPendingSettlements(p.telegramPartnerId);if(unsettled.length){h+=`<div class="po-lbl" style="margin:13px 0 6px">来源：手动AA记录</div>`;unsettled.forEach(t=>h+=renderManualRow9(p,t));}if(settled.length){h+=`<div class="po-lbl" style="margin:13px 0 6px">已结算 (${settled.length})</div>`;settled.slice(-2).forEach(t=>{h+=`<div class="aa-txn" style="opacity:.45"><div class="aa-txn-ic"><i class="ti ti-check"></i></div><div class="aa-txn-m"><div class="aa-txn-n" style="text-decoration:line-through">${t.desc}</div><div class="aa-txn-s">${t.date}${t.time?' '+t.time:''}</div></div><div class="aa-txn-r"><div class="aa-txn-a" style="color:var(--text3)">${fmtR(t.total/t.split)}</div></div></div>`;});}h+=`<div class="aa-acts"><button class="btn pay" onclick="openModal('addAATxn',{activePersonId:${p.id},selPaidBy:'me',selSplit:2})"><i class="ti ti-plus"></i>加记录</button>${b.net!==0?`<button class="btn topup" onclick="settleAA(${p.id})"><i class="ti ti-check"></i>结算手动AA</button>`:''}<button class="btn del" onclick="delAAPerson(${p.id})"><i class="ti ti-trash"></i></button></div></div>`;}h+=`</div>`;});
+    h+=`<button class="add-btn" onclick="openModal('addAAPerson')"><i class="ti ti-user-plus"></i>添加分账对象</button>`;return h;
+  };
+})();
+
+
 initSecurity();
 initSupa();
 </script>
