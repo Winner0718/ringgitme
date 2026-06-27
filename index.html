@@ -560,7 +560,6 @@ input,textarea,select{-webkit-user-select:text;user-select:text}
       if(!msg)return;
       if(window.__RM_BOOT_READY || Date.now()-bootAt>7000){
         console.error('RinggitMe runtime error blocked',err);
-        try{ if(typeof toast==='function')toast('刚刚操作有小错误，已挡住。刷新后再试'); }catch(_e){}
         return;
       }
       var app=document.getElementById('app');
@@ -2737,6 +2736,83 @@ function renderAA(){
   const baseRender95=window.render||render;
   window.render=render=function(){try{ensureLedger95();return baseRender95();}catch(e){console.error('render95 prevented',e);try{toast('画面有小错误，已自动挡住');}catch(_e){} return '';}};
 })();
+
+
+// ══════════════════════════════════════════════════════
+// PHASE 9.6 — AA PERSON + MODAL STABILITY POLISH
+// Fixes:
+// - Empty/new account: Add split person modal was blank/stuck.
+// - saveAAPerson used an undefined variable `color` in older code.
+// - AA add/edit modal now uses a final safe renderer for string/number ids.
+// - Post-boot mobile promise noise no longer blocks the user with scary toast.
+// ══════════════════════════════════════════════════════
+(function(){
+  const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const same=(a,b)=>String(a)===String(b);
+  const arg=v=>JSON.stringify(v);
+  const safeArr=v=>Array.isArray(v)?v.filter(x=>x&&typeof x==='object'):[];
+  const fallbackColor=()=> (U.selColor || (Array.isArray(COLORS)&&COLORS[0]) || '#22c55e');
+  function cleanLedger96(){
+    if(!Array.isArray(D.aaPeople))D.aaPeople=[];
+    D.aaPeople.forEach(p=>{ if(!Array.isArray(p.txns))p.txns=[]; if(!p.color)p.color='#22c55e'; if(!p.name)p.name='AA对象'; });
+    if(!Array.isArray(D.cards))D.cards=[];
+    if(!Array.isArray(D.spendCats)||!D.spendCats.length)D.spendCats=JSON.parse(JSON.stringify(DEF_SPEND||[]));
+  }
+  window.saveAAPerson=function(){
+    cleanLedger96();
+    const name=(v('aa-name')||'').trim();
+    if(!name){toast('请输入名字');return;}
+    const id=(typeof nid==='function')?nid():Date.now();
+    D.aaPeople.push({id,name,color:fallbackColor(),txns:[],createdAt:new Date().toISOString()});
+    save();
+    closeModal();
+    U.expandedId=id;
+    render();
+    toast('✓ 已添加分账对象');
+  };
+  function personModal96(){
+    const anim=U._modalAnim?' anim':'';U._modalAnim=false;
+    const c=fallbackColor();
+    return `<div class="mb${anim}" onclick="if(event.target===this)closeModal()"><div class="md${anim}"><div class="md-handle"></div><div class="md-title"><div class="md-ic" style="background:${esc(c)}22;color:${esc(c)}"><i class="ti ti-user-plus"></i></div>添加分账对象</div><div class="field"><label>名字</label><input id="aa-name" placeholder="女朋友 / 朋友 / 家人" autocomplete="off" autofocus/></div><div class="field"><label>颜色</label>${typeof colorPicker==='function'?colorPicker():''}</div><div class="ib b"><i class="ti ti-info-circle"></i>这个只是本机 / 账号内的 AA 对象；Telegram Partner 绑定还是在设置里的 Telegram 页面。</div><div class="ma"><button onclick="closeModal()">取消</button><button class="ok g" onclick="saveAAPerson()">保存</button></div></div></div>`;
+  }
+  function safeAATxnModal96(){
+    cleanLedger96();
+    const p=safeArr(D.aaPeople).find(x=>same(x.id,U.activePersonId));
+    const anim=U._modalAnim?' anim':'';U._modalAnim=false;
+    if(!p){
+      return `<div class="mb${anim}" onclick="if(event.target===this)closeModal()"><div class="md${anim}"><div class="md-handle"></div><div class="md-title"><div class="md-ic" style="background:#f59e0b22;color:#f59e0b"><i class="ti ti-alert-triangle"></i></div>找不到 AA 对象</div><div class="ib w"><i class="ti ti-info-circle"></i>请先添加分账对象，或刷新后再试。</div><div class="ma"><button class="ok" onclick="closeModal()">知道了</button></div></div></div>`;
+    }
+    const ex=U.activeEditTxnId?safeArr(p.txns).find(t=>same(t.id,U.activeEditTxnId)):null;
+    if(ex&&!U._phase96Presel){
+      setTimeout(()=>{U.selCatId=ex.catId||null;U.selPayId=(ex.payId===undefined?null:ex.payId);U.selPaidBy=ex.paidBy||'me';U.selSplit=parseInt(ex.split)||2;U._phase96Presel=true;try{render();}catch(_e){}},0);
+    }
+    const col=p.color||'#22c55e';
+    const nm=esc(p.name||'AA对象');
+    const who=esc(String(p.name||'TA').split(' ')[0]||'对方');
+    const paidBy=U.selPaidBy||'me';
+    const split=parseInt(U.selSplit)||2;
+    return `<div class="mb${anim}" onclick="if(event.target===this)closeModal()"><div class="md${anim}"><div class="md-handle"></div><div class="md-title"><div class="aa-av" style="width:36px;height:36px;border-radius:11px;background:${esc(col)}22;color:${esc(col)};font-size:13px">${esc(String(p.name||'AA').slice(0,2).toUpperCase())}</div>${ex?'编辑':'记一笔'} — ${nm}</div><div class="field"><label>描述</label><input id="aa-desc" placeholder="e.g. Lunch / Movie / Grab" value="${esc(ex?ex.desc:'')}"/></div><div class="field"><label>总金额 (RM)</label><input id="aa-total" type="number" inputmode="decimal" placeholder="0.00" class="big" value="${esc(ex?ex.total:'')}"/></div><div class="field"><label>谁付？</label><div class="pill-row"><div class="pill ${paidBy==='me'?'on':''}" onclick="sPaidBy('me')">我付</div><div class="pill ${paidBy==='them'?'on':''}" onclick="sPaidBy('them')">${who} 付</div></div></div><div class="field"><label>怎么分？</label><div class="pill-row"><div class="pill ${split===2?'on':''}" onclick="sSplit(2)">AA ÷2</div><div class="pill ${split===3?'on':''}" onclick="sSplit(3)">÷3</div><div class="pill ${split===4?'on':''}" onclick="sSplit(4)">÷4</div></div></div><div class="field"><label>消费类别 <span style="color:var(--text3);font-weight:400">可选</span></label>${typeof catPicker==='function'?catPicker():''}</div>${paidBy==='me'?`<div class="field"><label>用哪张卡付？</label>${typeof payOpts==='function'?payOpts(false):''}</div>`:''}<div class="ma"><button onclick="closeModal()">取消</button><button class="ok" onclick="saveAATxn()">${ex?'保存修改':'记录'}</button></div></div></div>`;
+  }
+  const prevOpen96=window.openModal||openModal;
+  window.openModal=openModal=function(m,ex={}){
+    if(m==='addAAPerson'){U._phase96Presel=false;}
+    if(m==='addAATxn'){U._phase96Presel=false;}
+    return prevOpen96(m,ex||{});
+  };
+  const prevBuild96=window.buildModal||buildModal;
+  window.buildModal=buildModal=function(){
+    try{
+      if(U.modal==='addAAPerson')return personModal96();
+      if(U.modal==='addAATxn')return safeAATxnModal96();
+      return prevBuild96();
+    }catch(e){
+      console.error('phase96 modal fallback',e);
+      const anim=U._modalAnim?' anim':'';U._modalAnim=false;
+      return `<div class="mb${anim}" onclick="if(event.target===this)closeModal()"><div class="md${anim}"><div class="md-handle"></div><div class="md-title"><div class="md-ic" style="background:#ef444422;color:#ef4444"><i class="ti ti-alert-triangle"></i></div>这个弹窗刚刚卡住了</div><div class="ib w"><i class="ti ti-info-circle"></i>我已经挡住错误，关闭后可以继续用。若重复出现，截图给我。</div><pre style="white-space:pre-wrap;font-size:11px;background:var(--card2);border-radius:12px;padding:10px;max-height:120px;overflow:auto;color:var(--text2)">${esc(e&&e.message?e.message:e)}</pre><div class="ma"><button class="ok" onclick="closeModal()">关闭</button></div></div></div>`;
+    }
+  };
+})();
+
 
 initSecurity();
 initSupa();
