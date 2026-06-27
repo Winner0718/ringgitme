@@ -2472,6 +2472,203 @@ function renderAA(){
   };
 })();
 
+
+// ══════════════════════════════════════════════════════
+// PHASE 9.3 — AA PAGE EDIT / ID SAFETY / MANUAL BALANCE SYNC HOTFIX
+// Fixes:
+// - AA add-record crash when person id is not a plain number
+// - AA imported/Telegram rows can be edited via their linked expense record
+// - Manual AA edit/delete now reverses/reapplies card/eWallet/saving balance correctly
+// - Row UI keeps swipe-delete only; removes the extra small trash icon
+// ══════════════════════════════════════════════════════
+(function(){
+  const same=(a,b)=>String(a)===String(b);
+  const arg=v=>JSON.stringify(v);
+  const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const safeName=p=>esc((p&&p.name)||'AA对象');
+  const safeColor=p=>((p&&p.color)||'#0a8a54');
+  const leftOf93=r=>Math.max(0,money(r&&r.owedAmount)-money(r&&r.settledAmount));
+  const findAAPerson93=id=>(D.aaPeople||[]).find(p=>same(p.id,id));
+  const findManualTxn93=(pid,tid)=>{const p=findAAPerson93(pid);return {p,t:p&&(p.txns||[]).find(t=>same(t.id,tid))};};
+  const txCloudId93=tx=>tx&&(tx.telegramQuickEntryId||tx.quickEntryId||tx.shortcutEntryId);
+  const txByQuick93=qid=>(D.txns||[]).find(t=>same(txCloudId93(t),qid));
+  const txById93=id=>(D.txns||[]).find(t=>same(t.id,id));
+  const cardById93=id=>(D.cards||[]).find(c=>same(c.id,id));
+  const hmFromTS93=ts=>{try{const d=new Date(ts);const my=new Date(d.getTime()+8*60*60*1000);return my.toISOString().slice(11,16);}catch(e){return'';}};
+  const statusZh93=s=>({unpaid:'未结清',partially_settled:'部分已还',pending_receiver_confirm:'待我确认收款',pending_payer_confirm:'待对方确认付款',settled:'已结清',confirmed:'已确认',rejected:'已拒绝',cancelled:'已取消',disputed:'有问题'})[s]||String(s||'');
+  function refreshCard93(c){
+    if(!c)return;
+    if(c.type==='cc'){
+      c.owed=round2(Math.max(0,money(c.owed)));
+      c.currentOutstanding=c.owed;
+      if(typeof getCardAvailableLimit==='function')c.availableLimit=getCardAvailableLimit(c);
+    }
+  }
+  function reverseManualAATxn93(t){
+    if(!t||t.paidBy!=='me'||!t.payId)return true;
+    const c=cardById93(t.payId); if(!c)return true;
+    const amt=round2(money(t.total)); if(!amt)return true;
+    if(c.type==='cc'){c.owed=round2(Math.max(0,money(c.owed)-amt));refreshCard93(c);return true;}
+    if(c.type==='ew'||c.type==='saving'){c.balance=round2(money(c.balance)+amt);return true;}
+    return true;
+  }
+  function applyManualAATxn93(t){
+    if(!t||t.paidBy!=='me'||!t.payId)return true;
+    const c=cardById93(t.payId); if(!c)return true;
+    const amt=round2(money(t.total)); if(!amt)return true;
+    if(c.type==='cc'){c.owed=round2(money(c.owed)+amt);refreshCard93(c);if(typeof ensureCardCycle==='function')ensureCardCycle(c,t.isoDate||todayISO());return true;}
+    if(c.type==='ew'||c.type==='saving'){
+      if(money(c.balance)<amt){toast((c.type==='ew'?'eWallet':'储蓄账户')+' 余额不足');return false;}
+      c.balance=round2(money(c.balance)-amt);return true;
+    }
+    return true;
+  }
+  function manualAATxnFromForm93(old){
+    const p=findAAPerson93(U.activePersonId);
+    const desc=v('aa-desc'); const total=pf('aa-total');
+    if(!p){toast('找不到 AA 对象，请刷新后再试');return null;}
+    if(!desc||!total){toast('请填写描述和金额');return null;}
+    const cat=U.selCatId?(D.spendCats||[]).find(c=>same(c.id,U.selCatId)):null;
+    const payCard=U.selPayId?cardById93(U.selPayId):null;
+    return {
+      ...(old||{}),
+      id:old?old.id:nid(),
+      desc,total:round2(total),paidBy:U.selPaidBy||'me',split:parseInt(U.selSplit||2)||2,
+      catId:U.selCatId||null,catLabel:cat?cat.label:'其他',catIcon:cat?cat.icon:'ti-receipt',
+      payId:U.selPayId||null,payName:payCard?payCard.name:null,
+      date:old&&old.date?old.date:today(),isoDate:old&&old.isoDate?old.isoDate:todayISO(),time:old&&old.time?old.time:nowHM(),
+      settled:!!(old&&old.settled)
+    };
+  }
+  window.saveAATxn=saveAATxn=function(){
+    const p=findAAPerson93(U.activePersonId); if(!p){toast('找不到 AA 对象，请刷新后再试');return;}
+    const editId=U.activeEditTxnId;
+    const idx=editId?(p.txns||[]).findIndex(t=>same(t.id,editId)):-1;
+    const old=idx>=0?{...p.txns[idx]}:null;
+    const next=manualAATxnFromForm93(old); if(!next)return;
+    if(old)reverseManualAATxn93(old);
+    if(!applyManualAATxn93(next)){if(old)applyManualAATxn93(old);return;}
+    if(idx>=0)p.txns[idx]=next;else{if(!Array.isArray(p.txns))p.txns=[];p.txns.push(next);}
+    if(window.rmRefreshDerived)window.rmRefreshDerived();
+    save();toast(old?'✓ AA 已更新，金额已同步':'✓ AA 已记录');closeModal();render();
+  };
+  window.delAATxn=delAATxn=function(pid,tid){
+    const p=findAAPerson93(pid); if(!p)return;
+    const idx=(p.txns||[]).findIndex(t=>same(t.id,tid)); if(idx<0)return;
+    const old={...p.txns[idx]};
+    reverseManualAATxn93(old);
+    p.txns.splice(idx,1);
+    if(window.rmRefreshDerived)window.rmRefreshDerived();
+    save();render();toast('已删除 AA 明细');
+  };
+  async function syncEditedTelegramTxn93(tx){
+    if(!(typeof supaReady==='function'&&supaReady())||!txCloudId93(tx))return;
+    const qid=txCloudId93(tx);
+    try{
+      await supa.from('quick_entries').update({amount:money(tx.amt),note:tx.desc||'',payment:tx.payName||'',category:tx.catLabel||'',occurred_date:tx.isoDate||todayISO(),occurred_time:tx.time||'',raw:{source:'telegram_bot',app_edited:true,edited_at:new Date().toISOString()}}).eq('id',qid);
+      const rec=(D.aaReceivables||[]).find(r=>r.sourceType==='telegram_aa'&&same(r.quickEntryId,qid));
+      if(rec&&rec.telegramAAItemId){
+        const ratio=rec.totalAmount?money(rec.owedAmount)/money(rec.totalAmount):0.5;
+        const newReceivable=round2(money(tx.amt)*ratio);
+        await supa.from('aa_ledger_items').update({description:tx.desc||'',category:tx.catLabel||'',payment_name:tx.payName||'',item_date:tx.isoDate||todayISO(),item_time:tx.time||'',total_amount:money(tx.amt),receivable_amount:newReceivable,updated_at:new Date().toISOString(),raw:{...(rec.raw||{}),app_edited:true,ledger_time:tx.time||rec.time||''}}).eq('id',rec.telegramAAItemId);
+      }
+      if(window.rmSyncTelegramAA)await window.rmSyncTelegramAA(false);
+    }catch(e){console.log('syncEditedTelegramTxn93',e);}
+  }
+  const prevSaveSpend93=window.saveSpend||saveSpend;
+  window.saveSpend=saveSpend=function(){
+    const editId=U.editId;
+    const old=editId?(D.txns||[]).find(t=>same(t.id,editId)):null;
+    const wasTg=old&&txCloudId93(old);
+    const res=prevSaveSpend93();
+    setTimeout(()=>{if(wasTg){const tx=(D.txns||[]).find(t=>same(t.id,editId));if(tx)syncEditedTelegramTxn93(tx);}},700);
+    return res;
+  };
+  window.editAAReceivableSource=editAAReceivableSource=function(id){
+    const r=(D.aaReceivables||[]).find(x=>same(x.id,id)); if(!r)return;
+    if(r.sourceType==='telegram_aa'){
+      const tx=txByQuick93(r.quickEntryId);
+      if(tx){openModal('spend',{editId:tx.id});return;}
+      toast('先去「自动记账」拉取云端消费记录，再编辑这笔 AA');return;
+    }
+    if(r.sourceType==='txn'){const tx=txById93(r.sourceId);if(tx){openModal('spend',{editId:tx.id});return;}}
+    if(r.sourceType==='sub'){openModal('addsub',{editSubId:r.sourceId});return;}
+    if(r.sourceType==='loan'){openModal('addloan',{editLoanId:r.sourceId});return;}
+    if(r.sourceType==='installment'){const inst=(typeof getInstallments==='function'?getInstallments():[]).find(x=>same(x.id,r.sourceId));if(inst){openModal('addInst',{editId:inst.cardId,activeEditTxnId:inst.id});return;}}
+    toast('这笔来源记录已不存在');
+  };
+  const baseBuildModal93=window.buildModal||buildModal;
+  window.buildModal=buildModal=function(){
+    if(U.modal!=='addAATxn')return baseBuildModal93();
+    const p=findAAPerson93(U.activePersonId);
+    if(!p){const anim=U._modalAnim?' anim':'';U._modalAnim=false;return `<div class="mb${anim}" onclick="if(event.target===this)closeModal()"><div class="md${anim}"><div class="md-handle"></div><div class="md-title"><div class="md-ic" style="background:#f59e0b22;color:#f59e0b"><i class="ti ti-alert-triangle"></i></div>找不到 AA 对象</div><div class="ib w"><i class="ti ti-info-circle"></i>这通常是旧数据 ID 格式造成的。请关闭弹窗、刷新 AA 页面再试。</div><div class="ma"><button class="ok" onclick="closeModal()">知道了</button></div></div></div>`;}
+    const ex=U.activeEditTxnId?(p.txns||[]).find(t=>same(t.id,U.activeEditTxnId)):null;
+    if(ex&&!U._presel){setTimeout(()=>{U.selCatId=ex.catId||null;U.selPayId=ex.payId||null;U.selPaidBy=ex.paidBy||'me';U.selSplit=ex.split||2;U._presel=true;render();},0);}
+    const col=safeColor(p), nm=safeName(p), first=esc(String(p.name||'TA').split(' ')[0]);
+    const b=`<div class="md-title"><div class="aa-av" style="width:36px;height:36px;border-radius:11px;background:${col}22;color:${col};font-size:13px">${esc(String(p.name||'AA').slice(0,2).toUpperCase())}</div>${ex?'编辑':'记一笔'} — ${nm}</div><div class="field"><label>描述</label><input id="aa-desc" placeholder="e.g. Lunch @ SS15, GSC 戏票" value="${esc(ex?ex.desc:'')}"/></div><div class="field"><label>总金额 (RM)</label><input id="aa-total" type="number" inputmode="decimal" placeholder="0.00" class="big" value="${ex?esc(ex.total):''}"/></div><div class="field"><label>谁付？</label><div class="pill-row"><div class="pill ${U.selPaidBy==='me'?'on':''}" onclick="sPaidBy('me')">我付</div><div class="pill ${U.selPaidBy==='them'?'on':''}" onclick="sPaidBy('them')">${first} 付</div></div></div><div class="field"><label>怎么分？</label><div class="pill-row"><div class="pill ${Number(U.selSplit)===2?'on':''}" onclick="sSplit(2)">AA ÷2</div><div class="pill ${Number(U.selSplit)===3?'on':''}" onclick="sSplit(3)">÷3</div><div class="pill ${Number(U.selSplit)===4?'on':''}" onclick="sSplit(4)">÷4</div></div></div><div class="field"><label>消费类别 <span style="color:var(--text3);font-weight:400">可选</span></label>${catPicker()}</div>${U.selPaidBy==='me'?`<div class="field"><label>用哪张卡付？</label>${payOpts(false)}</div>`:''}<div class="ma"><button onclick="closeModal()">取消</button><button class="ok" onclick="saveAATxn()">${ex?'保存修改':'记录'}</button></div>`;
+    const anim=U._modalAnim?' anim':'';U._modalAnim=false;
+    return `<div class="mb${anim}" onclick="if(event.target===this)closeModal()"><div class="md${anim}"><div class="md-handle"></div>${b}</div></div>`;
+  };
+  function sourceGroupLabel93(r){if(r.sourceType==='telegram_aa')return'来源：Telegram AA';if(r.sourceType==='loan')return'来源：固定支出';if(r.sourceType==='sub')return'来源：订阅';if(r.sourceType==='txn')return'来源：消费记录';if(r.sourceType==='installment')return'来源：信用卡分期';return'来源：AA分账';}
+  const sourceGroupOrder93={'来源：Telegram AA':0,'来源：固定支出':1,'来源：订阅':2,'来源：消费记录':3,'来源：信用卡分期':4,'来源：AA分账':5};
+  function swipeRow93(inner,delCall){return `<div class="swipe"><button class="txn-swipe-del" onclick="event.stopPropagation();${delCall}"><i class="ti ti-trash"></i></button><div class="swipe-fg">${inner}</div></div>`;}
+  function aaInfo93(r){
+    if(r&&r.sourceType==='telegram_aa'){
+      const tx=txByQuick93(r.quickEntryId);
+      return {title:(tx&&tx.desc)||r.desc||'Telegram AA',meta:`Telegram AA · ${(tx&&tx.isoDate)||r.date||''}${((tx&&tx.time)||r.time)?' '+((tx&&tx.time)||r.time):''}${((tx&&tx.catLabel)||r.category)?' · '+uiLabel((tx&&tx.catLabel)||r.category):''}${((tx&&tx.payName)||r.paymentName)?' · '+((tx&&tx.payName)||r.paymentName):''}${r.status?' · '+statusZh93(r.status):''}${money(r.settledAmount)>0?' · 已确认 '+fmtR(r.settledAmount):''}`,icon:'ti-brand-telegram',editable:!!tx};
+    }
+    if(r&&r.sourceType==='txn'){
+      const tx=txById93(r.sourceId);
+      return {title:(tx&&tx.desc)||r.desc||'消费分账',meta:`消费记录 · ${(tx&&tx.date)||r.date||''}${tx&&tx.time?' '+tx.time:''}${tx&&tx.catLabel?' · '+uiLabel(tx.catLabel):''}${tx&&tx.payName?' · '+tx.payName:''}`,icon:(tx&&tx.catIcon)||'ti-receipt',editable:!!tx};
+    }
+    const base=(typeof aaSourceInfo==='function')?aaSourceInfo(r):null;
+    return {title:(base&&base.title)||r.desc||'AA 分账',meta:(base&&base.meta)||r.date||'',icon:(base&&base.icon)||'ti-users',editable:!!(base&&base.edit)};
+  }
+  function renderRecRow93(r){
+    const info=aaInfo93(r),left=leftOf93(r);
+    const id=arg(r.id);
+    const inner=`<div class="aa-txn"><div class="aa-txn-ic"><i class="ti ${info.icon||'ti-users'}"></i></div><div class="aa-txn-m"><div class="aa-txn-n">${esc(info.title||r.desc||'AA 分账')}</div><div class="aa-txn-s"><div class="txn-meta">${esc(info.meta||'')}</div></div></div><div class="aa-txn-side"><div class="aa-txn-r"><div class="aa-txn-a" style="color:var(--green)">+${fmt(left)}</div><div class="aa-txn-w">待收</div></div><div class="aa-txn-tools">${info.editable?`<i class="ti ti-edit" onclick="editAAReceivableSource(${id})" style="color:var(--accent);font-size:19px;padding:4px"></i>`:''}<i class="ti ti-check" onclick="settleAAReceivable(${id})" style="color:var(--green);font-size:20px;padding:4px"></i></div></div></div>`;
+    return swipeRow93(inner,`delAAReceivable(${id})`);
+  }
+  function renderManualRow93(p,t){
+    const myShare=money(t.total)/(parseInt(t.split)||2),owedAmt=myShare*((parseInt(t.split)||2)-1),iAmOwed=t.paidBy==='me';
+    const pid=arg(p.id),tid=arg(t.id);
+    const inner=`<div class="aa-txn"><div class="aa-txn-ic"><i class="ti ${t.catIcon||'ti-receipt'}"></i></div><div class="aa-txn-m"><div class="aa-txn-n">${esc(t.desc)}</div><div class="aa-txn-s"><div class="txn-meta">${esc(uiLabel(t.catLabel||'其他'))}</div>${t.payName?`<div class="txn-meta txn-pay">${esc(t.payName)}</div>`:''}<div class="txn-meta txn-date">${esc(t.date||'')}${t.time?' '+esc(t.time):''} · 共${fmtR(t.total)} ÷${parseInt(t.split)||2}</div></div></div><div class="aa-txn-side"><div class="aa-txn-r"><div class="aa-txn-a" style="color:${iAmOwed?'var(--green)':'var(--red)'}">${iAmOwed?'+':'−'}${fmtR(owedAmt)}</div><div class="aa-txn-w">${iAmOwed?'待收':'我欠'}</div></div><div class="aa-txn-tools"><i class="ti ti-edit" onclick="openModal('addAATxn',{activePersonId:${pid},activeEditTxnId:${tid}})" style="color:var(--accent);font-size:19px;padding:4px"></i></div></div></div>`;
+    return swipeRow93(inner,`delAATxn(${pid},${tid})`);
+  }
+  function pendingSettlementRows93(partnerId){return (D.tgAAPendingSettlements&&D.tgAAPendingSettlements[String(partnerId||'')])||[];}
+  function renderPendingSettlements93(partnerId){const rows=pendingSettlementRows93(partnerId);if(!rows.length)return'';let h=`<div class="po-lbl" style="margin:13px 0 6px">待双方确认的还款</div>`;rows.forEach(s=>{h+=`<div class="aa-txn"><div class="aa-txn-ic"><i class="ti ti-hourglass"></i></div><div class="aa-txn-m"><div class="aa-txn-n">${fmtR(s.amount)} · ${esc(statusZh93(s.status))}</div><div class="aa-txn-s">${hmFromTS93(s.created_at)} · ${s.initiated_by_role==='partner'?'Partner 标记已还':'Owner 标记已收到'}</div></div></div>`;});return h;}
+  window.renderAA=renderAA=function(){
+    if(window.rmSanitizeLedger)window.rmSanitizeLedger();
+    const recs=getAAReceivables().filter(r=>money(r.owedAmount)>money(r.settledAmount));
+    const people=[...(D.aaPeople||[])];
+    recs.forEach(r=>{if(r.personId&&!people.some(p=>same(p.id,r.personId)))people.push({id:r.personId,name:r.personName||'AA对象',color:'#0a8a54',txns:[],telegramPartnerId:r.partnerId||''});});
+    if(!people.length&&!recs.length)return`<div class="empty" style="margin-top:40px"><div class="empty-ic"><i class="ti ti-users"></i></div><div class="et">还没有分账记录</div><div class="es">添加朋友或女朋友<br>开始记录 AA 消费</div></div><button class="add-btn" onclick="openModal('addAAPerson')"><i class="ti ti-user-plus"></i>添加分账对象</button>`;
+    const personRecs=id=>recs.filter(r=>same(r.personId,id));
+    const recTotal=id=>personRecs(id).reduce((a,r)=>a+leftOf93(r),0);
+    let tThey=0,tMe=0;people.forEach(p=>{const b=aaBal(p||{txns:[]});tThey+=b.they+recTotal(p.id);tMe+=b.me;});
+    let h=`<div class="sg"><div class="sc" style="--scc:var(--green)"><div class="sl">AA待收</div><div class="sv g">${fmt(tThey)}</div></div><div class="sc" style="--scc:var(--red)"><div class="sl">我欠别人</div><div class="sv r">${fmt(tMe)}</div></div></div>`;
+    people.forEach(p=>{
+      if(!Array.isArray(p.txns))p.txns=[];
+      const b=aaBal(p||{txns:[]}),prs=personRecs(p.id),recAmt=recTotal(p.id),net=b.net+recAmt,unsettled=p.txns.filter(t=>!t.settled),settled=p.txns.filter(t=>t.settled),isOpen=same(U.expandedId,p.id),count=unsettled.length+prs.length;
+      const pid=arg(p.id), col=safeColor(p), nm=safeName(p);
+      h+=`<div class="aa-p" style="--tint:${col}"><div class="aa-h" onclick="toggle(${pid})"><div class="aa-av" style="background:${col}22;color:${col}">${esc(String(p.name||'AA').slice(0,2).toUpperCase())}</div><div class="aa-info"><div class="aa-name">${nm}</div><div class="aa-sub">${count} 笔未结算</div></div><div class="aa-bal"><div class="aa-num" style="color:${net>0?'var(--green)':net<0?'var(--red)':'var(--text3)'}">${net===0?'—':(net>0?'+':'−')+fmtR(Math.abs(net))}</div><div class="aa-lbl">${net>0?'待收':net<0?'我欠':'已结清'}</div></div><i class="ti ti-chevron-down chevron ${isOpen?'rot':''}"></i></div>`;
+      if(isOpen){
+        h+=`<div class="aa-body">`;
+        if(!count&&!settled.length)h+=`<div style="padding:18px 0;text-align:center;font-size:13px;color:var(--text3)">还没有 AA 记录</div>`;
+        if(prs.length){const groups={};prs.forEach(r=>{const k=sourceGroupLabel93(r);(groups[k]||(groups[k]=[])).push(r);});Object.keys(groups).sort((a,b)=>(sourceGroupOrder93[a]||99)-(sourceGroupOrder93[b]||99)).forEach(k=>{h+=`<div class="po-lbl" style="margin:13px 0 6px">${k}</div>`;groups[k].forEach(r=>h+=renderRecRow93(r));});}
+        h+=renderPendingSettlements93(p.telegramPartnerId);
+        if(unsettled.length){h+=`<div class="po-lbl" style="margin:13px 0 6px">来源：手动AA记录</div>`;unsettled.forEach(t=>h+=renderManualRow93(p,t));}
+        if(settled.length){h+=`<div class="po-lbl" style="margin:13px 0 6px">已结算 (${settled.length})</div>`;settled.slice(-2).forEach(t=>{h+=`<div class="aa-txn" style="opacity:.45"><div class="aa-txn-ic"><i class="ti ti-check"></i></div><div class="aa-txn-m"><div class="aa-txn-n" style="text-decoration:line-through">${esc(t.desc)}</div><div class="aa-txn-s">${esc(t.date||'')}${t.time?' '+esc(t.time):''}</div></div><div class="aa-txn-r"><div class="aa-txn-a" style="color:var(--text3)">${fmtR(money(t.total)/(parseInt(t.split)||2))}</div></div></div>`;});}
+        h+=`<div class="aa-acts"><button class="btn pay" onclick="openModal('addAATxn',{activePersonId:${pid},selPaidBy:'me',selSplit:2})"><i class="ti ti-plus"></i>加记录</button>${b.net!==0?`<button class="btn topup" onclick="settleAA(${pid})"><i class="ti ti-check"></i>结算手动AA</button>`:''}<button class="btn del" onclick="delAAPerson(${pid})"><i class="ti ti-trash"></i></button></div></div>`;
+      }
+      h+=`</div>`;
+    });
+    h+=`<button class="add-btn" onclick="openModal('addAAPerson')"><i class="ti ti-user-plus"></i>添加分账对象</button>`;
+    return h;
+  };
+})();
+
 initSecurity();
 initSupa();
 </script>
