@@ -2406,6 +2406,58 @@ function renderAA(){
 })();
 
 
+
+// ══════════════════════════════════════════════════════
+// PHASE 9.1 — LOGIN BLACK SCREEN SAFETY HOTFIX
+// Cause being guarded: after cloud login, older/cloud ledger data can miss arrays/objects
+// or a render-time exception can leave the PWA as a black blank screen.
+// This guard sanitizes cloud data before render and shows a recovery screen instead of blank.
+// ══════════════════════════════════════════════════════
+(function(){
+  function cloneDefault(v){try{return JSON.parse(JSON.stringify(v));}catch(e){return v;}}
+  window.rmSanitizeLedger=function(){
+    try{
+      if(!D||typeof D!=='object')D=fresh();
+      const f=fresh();
+      const arrays=['cards','subs','loans','txns','incomes','aaPeople','aaReceivables','favs','goals','resists','taxItems','customTaxCats','recurIncomes','ccInstallments'];
+      arrays.forEach(k=>{if(!Array.isArray(D[k]))D[k]=cloneDefault(f[k]||[]);});
+      if(!Array.isArray(D.incomeCats)||!D.incomeCats.length)D.incomeCats=cloneDefault(DEF_INCOME);
+      if(!Array.isArray(D.spendCats)||!D.spendCats.length)D.spendCats=cloneDefault(DEF_SPEND);
+      if(!D.netSnaps||typeof D.netSnaps!=='object')D.netSnaps={};
+      if(!D.tgPartnerMap||typeof D.tgPartnerMap!=='object')D.tgPartnerMap={};
+      if(!D.tgAAReceivableMap||typeof D.tgAAReceivableMap!=='object')D.tgAAReceivableMap={};
+      if(!D.tgSettlementApplied||typeof D.tgSettlementApplied!=='object')D.tgSettlementApplied={};
+      if(!D.tgAAPendingSettlements||typeof D.tgAAPendingSettlements!=='object')D.tgAAPendingSettlements={};
+      if(!D.nextId||isNaN(parseInt(D.nextId)))D.nextId=1;
+      ['incomeMode','theme'].forEach(k=>{if(D[k]==null)D[k]=f[k];});
+      if(!['home','cards','record','history','fixed','aa'].includes(U.tab))U.tab='home';
+    }catch(e){console.error('rmSanitizeLedger failed',e);}
+  };
+  const _rmBaseRender=window.render||render;
+  window.render=render=function(){
+    try{
+      window.rmSanitizeLedger&&window.rmSanitizeLedger();
+      return _rmBaseRender();
+    }catch(e){
+      console.error('RinggitMe render crash prevented',e);
+      try{
+        const app=document.getElementById('app');
+        if(app){app.innerHTML=`<div style="min-height:100%;background:var(--bg,#fff);color:var(--text,#111);padding:calc(env(safe-area-inset-top,0px) + 28px) 18px 28px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;overflow:auto"><div style="max-width:420px;margin:0 auto"><div style="font-size:22px;font-weight:800;margin-bottom:8px">RinggitMe 启动保护</div><div style="font-size:13px;line-height:1.55;color:var(--text2,#555);background:var(--bg2,#fff);border:1px solid var(--border,#ddd);border-radius:16px;padding:14px;margin-bottom:12px">刚刚登录云同步后有一段旧资料造成画面渲染失败。数据没有丢。请先点下面按钮重整；如果还是失败，先用网页版打开并联系我看错误。</div><pre style="white-space:pre-wrap;font-size:11px;line-height:1.4;background:#111;color:#fff;border-radius:12px;padding:12px;max-height:180px;overflow:auto">${(e&&e.stack?e.stack:String(e)).replace(/[<>&]/g,m=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[m]))}</pre><button onclick="location.reload()" style="width:100%;margin-top:12px;border:0;border-radius:14px;padding:14px;font-size:15px;font-weight:750;background:var(--accent,#0a8a54);color:#fff">重新载入</button><button onclick="try{localStorage.setItem('rm_onboarded','1');localStorage.removeItem('rm_pin_hash');localStorage.removeItem('rm_webauthn_cred');location.reload()}catch(e){}" style="width:100%;margin-top:10px;border:1px solid var(--border,#ddd);border-radius:14px;padding:13px;font-size:14px;font-weight:700;background:var(--bg2,#fff);color:var(--text,#111)">临时跳过锁屏再开</button></div></div>`;}
+      }catch(_e){}
+    }
+  };
+  const _rmBaseAdopt=window.adoptCloudOrPush||adoptCloudOrPush;
+  window.adoptCloudOrPush=adoptCloudOrPush=async function(){
+    try{
+      await _rmBaseAdopt();
+      window.rmSanitizeLedger&&window.rmSanitizeLedger();
+    }catch(e){
+      console.error('adoptCloudOrPush crash prevented',e);
+      try{window.rmSanitizeLedger&&window.rmSanitizeLedger();persistLocal();localStorage.setItem('rm_owner',(SESSION&&SESSION.user&&SESSION.user.id)||localStorage.getItem('rm_owner')||'');render();toast('已修复云端资料格式，请再试一次');}catch(e2){console.error(e2);}
+    }
+  };
+})();
+
 initSecurity();
 initSupa();
 </script>
