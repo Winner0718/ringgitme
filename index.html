@@ -2896,6 +2896,47 @@ function renderAA(){
 
 initSecurity();
 initSupa();
+
+
+
+// ══════════════════════════════════════════════════════
+// PHASE 10 — AA EDIT HISTORY + CLOUD SYNC POLISH
+// - When an imported Telegram expense is edited in RinggitMe, keep an edit history.
+// - The edit history is synced into quick_entries.raw and aa_ledger_items.raw so Telegram summaries can explain why amounts changed.
+// - AA page metadata also shows latest edit note for imported Telegram AA rows.
+// ══════════════════════════════════════════════════════
+(function(){
+  const same=(a,b)=>String(a)===String(b);
+  const m=n=>Math.round((Number(n)||0)*100)/100;
+  const cloudId=tx=>tx&&(tx.telegramQuickEntryId||tx.quickEntryId||tx.shortcutEntryId);
+  const nowHM10=()=>{try{return new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Kuala_Lumpur'});}catch(e){return ''}};
+  function editEntry(oldTx,newTx){return {at:new Date().toISOString(),time:nowHM10(),source:'ringgitme_app',old_amount:m(oldTx&&oldTx.amt),new_amount:m(newTx&&newTx.amt),old_desc:(oldTx&&oldTx.desc)||'',new_desc:(newTx&&newTx.desc)||'',old_category:(oldTx&&oldTx.catLabel)||'',new_category:(newTx&&newTx.catLabel)||'',old_payment:(oldTx&&oldTx.payName)||'',new_payment:(newTx&&newTx.payName)||''};}
+  function changed(e){return e.old_amount!==e.new_amount||e.old_desc!==e.new_desc||e.old_category!==e.new_category||e.old_payment!==e.new_payment;}
+  async function syncEdit10(oldTx,newTx){
+    if(!(typeof supaReady==='function'&&supaReady())||!newTx||!cloudId(newTx))return;
+    const qid=cloudId(newTx), entry=editEntry(oldTx,newTx);
+    if(!changed(entry))return;
+    try{
+      newTx.editHistory=Array.isArray(newTx.editHistory)?newTx.editHistory:[];newTx.editHistory.push(entry);newTx.editedAt=entry.at;
+      const rec=(D.aaReceivables||[]).find(r=>r.sourceType==='telegram_aa'&&same(r.quickEntryId,qid));
+      const oldHist=Array.isArray(rec&&rec.raw&&rec.raw.edit_history)?rec.raw.edit_history:[];
+      const hist=[...oldHist,entry].slice(-10);
+      const raw={source:'telegram_bot',app_edited:true,edited_at:entry.at,edit_history:hist,ledger_time:newTx.time||''};
+      await supa.from('quick_entries').update({amount:m(newTx.amt),note:newTx.desc||'',payment:newTx.payName||'',category:newTx.catLabel||'',occurred_date:newTx.isoDate||todayISO(),occurred_time:newTx.time||'',raw}).eq('id',qid);
+      if(rec&&rec.telegramAAItemId){
+        const ratio=rec.totalAmount?m(rec.owedAmount)/m(rec.totalAmount):0.5;
+        const newReceivable=Math.round(m(newTx.amt)*ratio*100)/100;
+        await supa.from('aa_ledger_items').update({description:newTx.desc||'',category:newTx.catLabel||'',payment_name:newTx.payName||'',item_date:newTx.isoDate||todayISO(),item_time:newTx.time||'',total_amount:m(newTx.amt),receivable_amount:newReceivable,updated_at:new Date().toISOString(),raw:{...(rec.raw||{}),app_edited:true,edited_at:entry.at,edit_history:hist,ledger_time:newTx.time||rec.time||''}}).eq('id',rec.telegramAAItemId);
+      }
+      if(window.rmSyncTelegramAA)await window.rmSyncTelegramAA(false);save();
+    }catch(e){console.log('syncEdit10',e);}
+  }
+  const prevSaveSpend10=window.saveSpend||saveSpend;
+  window.saveSpend=saveSpend=function(){const editId=U.editId;const oldTx=editId?(D.txns||[]).find(t=>same(t.id,editId)):null;const oldCopy=oldTx?JSON.parse(JSON.stringify(oldTx)):null;const res=prevSaveSpend10();setTimeout(()=>{try{const tx=editId?(D.txns||[]).find(t=>same(t.id,editId)):null;if(oldCopy&&tx&&cloudId(tx))syncEdit10(oldCopy,tx);}catch(e){console.log('phase10 saveSpend hook',e);}},800);return res;};
+  const prevInfo10=window.aaSourceInfo;
+  window.aaSourceInfo=function(r){const info=prevInfo10?prevInfo10(r):{title:r&&r.desc||'AA 分账',meta:r&&r.date||'',icon:'ti-users',edit:''};try{const hist=Array.isArray(r&&r.raw&&r.raw.edit_history)?r.raw.edit_history:[];const last=hist[hist.length-1];if(last){const parts=[];if(m(last.old_amount)!==m(last.new_amount))parts.push(`金额 ${fmtR(last.old_amount)}→${fmtR(last.new_amount)}`);if(last.old_desc!==last.new_desc)parts.push('内容已改');if(last.old_category!==last.new_category)parts.push('类别已改');if(last.old_payment!==last.new_payment)parts.push('付款已改');info.meta=(info.meta||'')+` · ✏️ ${last.time||''}${parts.length?' '+parts.join(' · '):' 已编辑'}`;}else if(r&&r.raw&&r.raw.app_edited){info.meta=(info.meta||'')+' · ✏️ 已编辑';}}catch(e){}return info;};
+})();
+
 </script>
 </body>
 </html>
