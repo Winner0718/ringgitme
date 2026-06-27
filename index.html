@@ -2827,6 +2827,73 @@ function renderAA(){
 })();
 
 
+
+// ══════════════════════════════════════════════════════
+// PHASE 9.9 — QUICK LEDGER CATEGORY CLICK FIX
+// Fixes:
+// - iPhone/PWA quick spending modal category buttons could look unclickable.
+// - Category selection no longer depends only on inline `sCat(...)` handler.
+// - Adds capture-level click/touch fallback + safe button type.
+// ══════════════════════════════════════════════════════
+(function(){
+  const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const same=(a,b)=>String(a)===String(b);
+  const arg=v=>JSON.stringify(v);
+  function safeCats(){
+    try{ if(!Array.isArray(D.spendCats)||!D.spendCats.length)D.spendCats=JSON.parse(JSON.stringify(DEF_SPEND||[])); }
+    catch(_e){ if(!Array.isArray(D.spendCats))D.spendCats=[]; }
+    return (D.spendCats||[]).filter(c=>c&&c.label);
+  }
+  function setCatVisual(id){
+    try{document.querySelectorAll('[data-rm-cat-id]').forEach(btn=>btn.classList.toggle('on', same(btn.getAttribute('data-rm-cat-id'),id)));}catch(_e){}
+  }
+  window.rmSelectSpendCat=function(ev,id){
+    try{ if(ev){ev.preventDefault&&ev.preventDefault();ev.stopPropagation&&ev.stopPropagation();} }catch(_e){}
+    U.selCatId=id;
+    setCatVisual(id);
+    try{ render(); }catch(e){ console.error('category render skipped',e); try{toast('✓ 已选择类别');}catch(_e){} }
+    return false;
+  };
+  window.rmDeleteSpendCat=function(ev,id){
+    try{ if(ev){ev.preventDefault&&ev.preventDefault();ev.stopPropagation&&ev.stopPropagation();} }catch(_e){}
+    try{ delSpendCat(id); }catch(e){ console.error('delete spend cat failed',e); }
+    return false;
+  };
+  // Expose a safe global for any old inline handler still using sCat(...).
+  window.sCat=function(id){ return window.rmSelectSpendCat(null,id); };
+  window.catPicker=catPicker=function(){
+    const cats=safeCats();
+    const groups=[...new Set(cats.map(c=>c.group||'杂 Others'))];
+    let h='';
+    groups.forEach(g=>{
+      const gc=(typeof catCol==='function'?catCol(g):'#64748b');
+      h+=`<div class="po-lbl">${esc(g)}</div><div class="cat-grid">`;
+      cats.filter(c=>(c.group||'杂 Others')===g).forEach(c=>{
+        const id=String(c.id);
+        const on=same(U.selCatId,id)||same(U.selCatId,c.id);
+        h+=`<button type="button" class="cat-btn ${on?'on':''}" data-rm-cat-id="${esc(id)}" style="--cc:${esc(gc)}" onclick="return rmSelectSpendCat(event,${arg(c.id)})"><i class="ti ${esc(c.icon||'ti-receipt')}"></i><span>${esc((typeof uiLabel==='function'?uiLabel(c.label):c.label)||'其他')}</span>${c.custom?`<span class="cat-del" data-rm-cat-delete="${esc(id)}" onclick="return rmDeleteSpendCat(event,${arg(c.id)})"><i class="ti ti-x"></i></span>`:''}</button>`;
+      });
+      h+=`</div>`;
+    });
+    h+=`<div class="cat-grid" style="margin-top:8px"><button type="button" class="cat-btn add-c" onclick="openModal('addSpendCat');return false;"><i class="ti ti-plus"></i><span>自定义添加</span></button></div>`;
+    return h;
+  };
+  if(!window.__RM_CAT_CLICK_FIX_99){
+    window.__RM_CAT_CLICK_FIX_99=true;
+    const handler=function(e){
+      try{
+        const del=e.target&&e.target.closest&&e.target.closest('[data-rm-cat-delete]');
+        if(del){ return window.rmDeleteSpendCat(e,del.getAttribute('data-rm-cat-delete')); }
+        const btn=e.target&&e.target.closest&&e.target.closest('[data-rm-cat-id]');
+        if(btn){ return window.rmSelectSpendCat(e,btn.getAttribute('data-rm-cat-id')); }
+      }catch(err){ console.error('category click fallback failed',err); }
+    };
+    document.addEventListener('click',handler,true);
+    document.addEventListener('touchend',handler,{capture:true,passive:false});
+  }
+})();
+
+
 initSecurity();
 initSupa();
 </script>
