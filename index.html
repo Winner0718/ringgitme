@@ -138,6 +138,167 @@ function telegramFiles15(raw){
   try{if(!document.getElementById('rm-phase15-css')){const st=document.createElement('style');st.id='rm-phase15-css';st.textContent='.aa-body .pill-row{display:flex;gap:8px}.aa-body .pill{flex:1;justify-content:center}.txn-tools i{padding:3px;cursor:pointer}';document.head.appendChild(st);}}catch(e){}
 })();
 
+// PHASE 18.6M - Fixed expense monthly AA instancing.
+// App-only. No Worker / SQL / webhook changes. Installment AA remains on the old behavior.
+(()=>{
+  if(!window.D)return;
+  const A=Array.isArray;
+  const arr=x=>A(x)?x:[];
+  const sid=x=>String(x==null?'':x);
+  const same=(a,b)=>sid(a)===sid(b);
+  const N=x=>Number(x)||0;
+  const r2=x=>Math.round(N(x)*100)/100;
+  const esc=x=>sid(x).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const todayIso=()=>{try{return typeof todayISO==='function'?todayISO():new Date().toISOString().slice(0,10)}catch(_){return new Date().toISOString().slice(0,10)}};
+  const shortDate=iso=>{try{return new Date(iso+'T00:00:00').toLocaleDateString('en-MY',{month:'short',day:'numeric'})}catch(_){return iso||todayIso()}};
+  const F=x=>{try{return typeof fmt==='function'?fmt(N(x)):(typeof fmtR==='function'?fmtR(N(x)):'RM '+r2(x).toFixed(2))}catch(_){return 'RM '+r2(x).toFixed(2)}};
+  const hm=()=>{try{return typeof nowHM==='function'?nowHM():(()=>{const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')})()}catch(_){const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}};
+  function aaArr(){if(!A(D.aaReceivables))D.aaReceivables=[];return D.aaReceivables;}
+  function personName(id){try{if(typeof aaPersonName==='function'){const n=aaPersonName(id);if(n)return n;}}catch(_){}const p=arr(D.aaPeople).find(x=>same(x.id,id));return p?p.name:'';}
+  function newId(){try{return typeof nid==='function'?nid():Date.now()}catch(_){return Date.now()}}
+  function fixedPeriodMonth(){return todayIso().slice(0,7);}
+  function lastDay(ym){const y=N(ym.slice(0,4)),m=N(ym.slice(5,7));return new Date(y,m,0).getDate();}
+  function fixedDueIsoForMonth(type,item,ym){const day=type==='sub'?N(item&&item.day):N((item&&item.dueDay)||(item&&item.day));return ym+'-'+String(Math.max(1,Math.min(lastDay(ym),day||1))).padStart(2,'0');}
+  function fixedAAKey(fixedId,ym){return sid(fixedId)+'@'+sid(ym);}
+  function fixedSourceIdOf(r){return r&&(r.fixedSourceId||((r.periodMonth&&r.sourceId)?sid(r.sourceId).replace(new RegExp('@'+r.periodMonth.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'$'),''):r.sourceId));}
+  function findFixedAARec(type,fixedId,ym){return aaArr().find(r=>r&&same(r.sourceType,type)&&same(r.periodMonth,ym)&&same(r.fixedSourceId,fixedId))||aaArr().find(r=>r&&same(r.sourceType,type)&&same(r.sourceId,fixedAAKey(fixedId,ym)))||null;}
+  function fixedSplitOwed(total,split){try{return r2(calcAAOwed(total,split))}catch(_){if(!split||!split.enabled)return 0;if(split.method==='custom'||split.method==='amount')return r2(split.amount||split.owedAmount);if(split.method==='percent')return r2(N(total)*N(split.percent)/100);return r2(N(total)/Math.max(2,N(split.peopleCount||split.split||2)));}}
+  function upsertFixedAAForMonth(type,fixedId,total,split,desc,ym,dueIso){
+    ym=ym||fixedPeriodMonth();dueIso=dueIso||fixedDueIsoForMonth(type,{day:1,dueDay:1},ym);
+    const old=findFixedAARec(type,fixedId,ym);
+    if(!split||!split.enabled||!split.personId){if(old){old.hidden=true;old.status=old.status||'unpaid';old.periodMonth=ym;old.fixedSourceId=fixedId;old.sourceId=fixedAAKey(fixedId,ym);}return null;}
+    const owed=r2(fixedSplitOwed(total,split));if(!(owed>0)){if(old)old.hidden=true;return old||null;}
+    const settled=old?Math.min(N(old.settledAmount),owed):0;
+    const obj={sourceType:type,sourceId:fixedAAKey(fixedId,ym),fixedSourceId:fixedId,periodMonth:ym,personId:split.personId,personName:personName(split.personId)||split.personName||'',desc:desc||'',totalAmount:r2(total),owedAmount:owed,settledAmount:r2(settled),status:settled>=owed?'paid':'unpaid',hidden:false,date:dueIso,isoDate:dueIso};
+    if(old){Object.assign(old,obj);return old;}
+    const rec={id:newId(),...obj,settlements:[],editHistory:[]};
+    aaArr().unshift(rec);
+    return rec;
+  }
+  function migrateFixedAAInstancingV1(){
+    if(D.fixedAAInstancingV1)return false;
+    let changed=false;
+    aaArr().forEach(r=>{
+      if(!r||!['sub','loan'].includes(sid(r.sourceType))||r.periodMonth)return;
+      const ym=/^\d{4}-\d{2}-\d{2}/.test(sid(r.date||r.isoDate))?sid(r.date||r.isoDate).slice(0,7):fixedPeriodMonth();
+      const fixedId=r.fixedSourceId||r.sourceId;
+      r.periodMonth=ym;
+      r.fixedSourceId=fixedId;
+      r.sourceId=fixedAAKey(fixedId,ym);
+      if(r.isoDate&&!r.date)r.date=r.isoDate;
+      if(r.date&&!r.isoDate)r.isoDate=r.date;
+      changed=true;
+    });
+    D.fixedAAInstancingV1=true;
+    return true||changed;
+  }
+  function syncFixedAAReceivable18_6M(type,obj,ym){
+    if(!obj)return null;
+    ym=ym||fixedPeriodMonth();
+    const total=type==='sub'?N(obj.amt):N(obj.monthly);
+    return upsertFixedAAForMonth(type,obj.id,total,obj.aaSplit,obj.name||'Fixed AA',ym,fixedDueIsoForMonth(type,obj,ym));
+  }
+  window.fixedPeriodMonth=fixedPeriodMonth;
+  window.fixedDueIsoForMonth=fixedDueIsoForMonth;
+  window.fixedAAKey=fixedAAKey;
+  window.findFixedAARec=findFixedAARec;
+  window.upsertFixedAAForMonth=upsertFixedAAForMonth;
+  window.syncFixedAAReceivable=function(type,obj){return ['sub','loan'].includes(sid(type))?syncFixedAAReceivable18_6M(type,obj,fixedPeriodMonth()):null;};
+  try{syncFixedAAReceivable=window.syncFixedAAReceivable}catch(_){}
+  const prevUpsert=window.upsertAAReceivable||(typeof upsertAAReceivable==='function'?upsertAAReceivable:null);
+  window.upsertAAReceivable=function(sourceType,sourceId,total,split,desc){
+    if(['sub','loan'].includes(sid(sourceType))){
+      const list=sourceType==='sub'?arr(D.subs):arr(D.loans);
+      const obj=list.find(x=>same(x.id,sourceId))||{id:sourceId,day:1,dueDay:1};
+      return syncFixedAAReceivable18_6M(sourceType,obj,fixedPeriodMonth());
+    }
+    return prevUpsert?prevUpsert.apply(this,arguments):null;
+  };
+  try{upsertAAReceivable=window.upsertAAReceivable}catch(_){}
+  const prevRemove=window.removeAAReceivable||(typeof removeAAReceivable==='function'?removeAAReceivable:null);
+  window.removeAAReceivable=function(sourceType,sourceId){
+    if(['sub','loan'].includes(sid(sourceType))){const r=findFixedAARec(sourceType,sourceId,fixedPeriodMonth());if(r)r.hidden=true;return;}
+    return prevRemove?prevRemove.apply(this,arguments):undefined;
+  };
+  try{removeAAReceivable=window.removeAAReceivable}catch(_){}
+  window.syncAllFixedAAReceivables=function(){
+    const ym=fixedPeriodMonth();
+    arr(D.subs).forEach(s=>syncFixedAAReceivable18_6M('sub',s,ym));
+    arr(D.loans).forEach(l=>syncFixedAAReceivable18_6M('loan',l,ym));
+    try{arr(typeof getInstallments==='function'?getInstallments():D.ccInstallments).forEach(p=>{if(p&&p.aaSplit&&p.aaSplit.enabled&&prevUpsert)prevUpsert('installment',p.id,p.monthlyPayment,p.aaSplit,p.itemName);});}catch(_){}
+  };
+  try{syncAllFixedAAReceivables=window.syncAllFixedAAReceivables}catch(_){}
+  function payCard(id){try{return typeof findCardById==='function'?findCardById(id):arr(D.cards).find(c=>same(c.id,id))}catch(_){return arr(D.cards).find(c=>same(c.id,id))}}
+  function markFixedTxn(tx,kind,o,ym){tx.fixedKind=kind;tx.fixedId=o.id;tx.fixedSourceId=o.id;tx.periodMonth=ym;tx.fixedPaymentMonth=ym;tx.sourceType=kind==='sub'?'fixed_sub':'fixed_loan';tx.sourceId=o.id;tx.raw={...(tx.raw||{}),fixedKind:kind,fixedId:o.id,fixedSourceId:o.id,periodMonth:ym,fixedPaymentMonth:ym};return tx;}
+  function postFixed18_6M(kind,id){
+    const list=kind==='sub'?arr(D.subs):arr(D.loans),o=list.find(x=>same(x.id,id));if(!o)return;
+    const ym=fixedPeriodMonth(),amount=kind==='sub'?N(o.amt):N(o.monthly),pc=payCard(o.payId||o.paymentSourceId||''),already=o.lastPaid===ym;
+    const go=()=>{
+      const tx=markFixedTxn({id:newId(),amt:amount,desc:o.name,catLabel:kind==='sub'?'订阅 Subscription':'贷款 / 租金',catIcon:kind==='sub'?'ti-repeat':'ti-home',payId:pc?pc.id:null,payName:pc?pc.name:null,postingMode:pc?'normal':'recordOnly',date:(typeof today==='function'?today():shortDate(todayIso())),isoDate:todayIso(),time:hm(),aaSplit:o.aaSplit||null,files:[]},kind,o,ym);
+      if(pc&&typeof applyTransactionBalanceEffect==='function'&&!applyTransactionBalanceEffect(tx))return;
+      D.txns.unshift(tx);
+      if(kind==='loan'&&N(o.remaining)>0)o.remaining=Math.max(0,r2(N(o.remaining)-amount));
+      o.lastPaid=ym;o.lastPaidAt=new Date().toISOString();o.lastTxnId=tx.id;o.paidMonths=o.paidMonths||{};o.paidMonths[ym]=tx.id;
+      upsertFixedAAForMonth(kind,o.id,amount,o.aaSplit,o.name||'',ym,fixedDueIsoForMonth(kind,o,ym));
+      save();try{render()}catch(_){}
+      try{toast(pc?'✓ 已记录固定支出并扣 '+pc.name:'✓ 已记录固定支出')}catch(_){}
+      try{playSound&&playSound('out')}catch(_){}
+    };
+    if(already&&typeof confirmSheet==='function')confirmSheet('这个月已经记过了',`要再记一笔 ${o.name} ${F(amount)} 吗？`,go,{okText:'再记一笔'});
+    else if(typeof confirmSheet==='function')confirmSheet('确认本月已支付？',`${o.name} · ${F(amount)}\n${pc?'付款方式：'+pc.name:'未设置付款方式：只会记录，不扣余额'}`,go,{okText:'确认已付'});
+    else go();
+  }
+  window.postFixedPay18_6I=postFixed18_6M;
+  window.postSub=id=>postFixed18_6M('sub',id);
+  window.postLoan=id=>postFixed18_6M('loan',id);
+  try{postSub=window.postSub;postLoan=window.postLoan}catch(_){}
+  function viewedYm(){const d=new Date();d.setDate(1);d.setMonth(d.getMonth()+N(U.fixedMonthOffset18_6I||U.fixedMonthOffset18_6G3||U.fixedMonthOffset17||0));return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
+  function ownAmount(o,total){const owed=fixedSplitOwed(total,o&&o.aaSplit);return Math.max(0,r2(N(total)-owed));}
+  function paymentText(o){const c=payCard(o&&(o.payId||o.paymentSourceId));return c?`付款：${c.name}`:'付款：未指定（只记录，不扣余额）';}
+  function dueText(kind,o,ym,paid){const day=kind==='sub'?N(o.day):N(o.dueDay||o.day),iso=fixedDueIsoForMonth(kind,o,ym),diff=Math.round((new Date(iso+'T00:00:00')-new Date(todayIso()+'T00:00:00'))/86400000);if(paid)return '本月已还 · 到期日 '+iso.slice(5);if(diff===0)return '今天到期';if(diff>0)return '还剩 '+diff+' 天 · 到期日 '+iso.slice(5);return '已过 '+Math.abs(diff)+' 天 · 到期日 '+iso.slice(5);}
+  function aaStatus(kind,o,total,ym){const owed=fixedSplitOwed(total,o&&o.aaSplit);if(!(owed>0))return '';const r=findFixedAARec(kind,o&&o.id,ym);if(!r)return ym===fixedPeriodMonth()?'AA待收 '+F(owed)+' · '+(personName(o.aaSplit&&o.aaSplit.personId)||'对方')+' · 未收':'';if(r.hidden)return '本月 AA 已取消';const paid=Math.max(0,r2(N(r.settledAmount))),due=Math.max(0,r2(N(r.owedAmount)-N(r.settledAmount)));if(paid>=N(r.owedAmount)||due<=0)return 'AA已还款 '+F(r.owedAmount)+' · 已结清';if(paid>0)return 'AA部分已还 '+F(paid)+' · 剩 '+F(due);return 'AA待收 '+F(r.owedAmount)+' · '+(r.personName||personName(r.personId)||'对方')+' · 未收';}
+  function itemIconHtml(kind,o){try{return typeof itemIcon==='function'?itemIcon(o,46,13):`<div class="aa-txn-ic"><i class="ti ${kind==='sub'?'ti-repeat':'ti-home'}"></i></div>`}catch(_){return `<div class="aa-txn-ic"><i class="ti ${kind==='sub'?'ti-repeat':'ti-home'}"></i></div>`}}
+  function duration(kind,o){try{return typeof durationLabel==='function'?durationLabel(kind,o):''}catch(_){return ''}}
+  function fixedItem(kind,o,ym){
+    const total=kind==='sub'?N(o.amt):N(o.monthly),mine=ownAmount(o,total),owed=fixedSplitOwed(total,o&&o.aaSplit),paid=o.lastPaid===ym,status=aaStatus(kind,o,total,ym),typeBadge=kind==='sub'?'订阅':sid(o.type||'贷款').split(' ')[0];
+    const edit=kind==='sub'?`openModal('addsub',{editSubId:${JSON.stringify(o.id)}})`: `openModal('addloan',{editLoanId:${JSON.stringify(o.id)}})`;
+    const del=kind==='sub'?`delSub(${JSON.stringify(o.id)})`:`delLoan(${JSON.stringify(o.id)})`;
+    const hist=arr(o&&o.editHistory).length?`<button class="btn" onclick="openFixedAudit18_6G3&&openFixedAudit18_6G3('${kind}',${JSON.stringify(o.id)})"><i class="ti ti-history"></i>编辑记录</button>`:'';
+    const dur=duration(kind,o);
+    return `<div class="fixed-clean-card18g3 fixed-clean-card18i"><div class="fixed-head18g3"><div class="fixed-icon18g3">${itemIconHtml(kind,o)}</div><div class="fixed-title18g3"><div class="fixed-name18g3">${esc(o.name||'固定支出')}</div><div class="fixed-sub18g3">${esc(dueText(kind,o,ym,paid))}<br>${dur?esc(dur)+' · ':''}${esc(paymentText(o))}</div></div><span class="badge ${kind==='sub'?'bsub':'bloan'}">${esc(typeBadge)}</span></div><div class="fixed-boxes18g3"><div class="db"><div class="dl">本月要付</div><div class="dv r">${F(total)}</div></div><div class="db"><div class="dl">我的负担</div><div class="dv w">${F(mine)}</div></div></div>${owed>0&&status?`<div class="fixed-aa-status18g3"><i class="ti ti-users"></i>${esc(status)}</div>`:''}<div class="fixed-acts18g3"><button class="btn ${paid?'':'spd'}" onclick="postFixedPay18_6I('${kind}',${JSON.stringify(o.id)})"><i class="ti ti-${paid?'check':'receipt'}"></i>${paid?'本月已还':'本月待支付'}</button><button class="btn" onclick="${edit}"><i class="ti ti-pencil"></i>编辑</button>${hist}<button class="btn del" onclick="${del}"><i class="ti ti-trash"></i>删除</button></div></div>`;
+  }
+  window.renderFixed=function(){
+    try{window.syncAllFixedAAReceivables&&window.syncAllFixedAAReceivables()}catch(_){}
+    const ym=viewedYm(),off=N(U.fixedMonthOffset18_6I||U.fixedMonthOffset18_6G3||U.fixedMonthOffset17||0),tab=U.fixedTab18_6I||U.fixedTab18_6G3||U.fixedTab17||'loans';let cc=[];try{cc=arr(getCreditCardMonthlyObligations())}catch(_){}
+    const full=r2(arr(D.subs).reduce((a,s)=>a+N(s.amt),0)+arr(D.loans).reduce((a,l)=>a+N(l.monthly),0)+cc.reduce((a,o)=>a+N(o.amount),0));
+    const mine=r2(arr(D.subs).reduce((a,s)=>a+ownAmount(s,s.amt),0)+arr(D.loans).reduce((a,l)=>a+ownAmount(l,l.monthly),0)+cc.reduce((a,o)=>a+ownAmount(o,o.amount),0));
+    const fixedRows=aaArr().filter(r=>['sub','loan'].includes(sid(r.sourceType))&&!r.hidden&&same(r.periodMonth,ym));
+    const liveDue=fixedRows.reduce((a,r)=>a+Math.max(0,r2(N(r.owedAmount)-N(r.settledAmount))),0),livePaid=fixedRows.reduce((a,r)=>a+Math.max(0,r2(N(r.settledAmount))),0);
+    let h=`<div class="sec">固定支出 Fixed</div><div class="sg fixed-top18i"><div class="sc" style="--scc:var(--red)"><div class="sl">本月要付 Cash Out</div><div class="sv r">${F(full)}</div></div><div class="sc" style="--scc:var(--orange)"><div class="sl">我的真实负担 My Cost</div><div class="sv w">${F(mine)}</div></div><div class="sc" style="--scc:var(--green)"><div class="sl">AA 待收</div><div class="sv g">${F(liveDue)}</div></div><div class="sc" style="--scc:var(--blue)"><div class="sl">AA 已还款</div><div class="sv b">${F(livePaid)}</div></div></div><div class="ib g fixed-helper18g3"><i class="ti ti-info-circle"></i>到期日前准备钱；点「本月待支付」会按付款方式扣钱并记到消费记录。AA 款到 AA 页确认收到。</div>`;
+    h+=`<div class="month-nav"><button class="mn-btn" onclick="setFixedMonth18_6I(-1)"><i class="ti ti-chevron-left"></i></button><div class="mn-lbl">${ym.slice(0,4)}年${N(ym.slice(5,7))}月${off===0?' · 本月':''}</div><button class="mn-btn" ${off>=0?'disabled style="opacity:.3"':''} onclick="setFixedMonth18_6I(1)"><i class="ti ti-chevron-right"></i></button></div>`;
+    const sums={subs:arr(D.subs).reduce((a,s)=>a+N(s.amt),0),loans:arr(D.loans).reduce((a,l)=>a+N(l.monthly),0),cards:cc.reduce((a,o)=>a+N(o.amount),0)};
+    h+=`<div class="fixed-tabs"><button class="tab-card ${tab==='subs'?'on':''}" onclick="setFixedTab18_6I('subs')"><b>订阅</b><span>Subscriptions</span><em>${arr(D.subs).length} 项 · ${F(sums.subs)}</em></button><button class="tab-card ${tab==='loans'?'on':''}" onclick="setFixedTab18_6I('loans')"><b>贷款 / 租金</b><span>Loans & Rent</span><em>${arr(D.loans).length} 项 · ${F(sums.loans)}</em></button><button class="tab-card ${tab==='cards'?'on':''}" onclick="setFixedTab18_6I('cards')"><b>信用卡月供</b><span>Card Payments</span><em>${F(sums.cards)}</em></button></div>`;
+    if(tab==='subs'){h+=`<div class="sec">订阅 <span class="sec-a" onclick="openModal('addsub')"><i class="ti ti-plus" style="font-size:13px"></i>添加</span></div>`;if(!arr(D.subs).length)h+=`<div class="empty"><div class="empty-ic"><i class="ti ti-repeat"></i></div><div class="et">还没有订阅</div></div>`;arr(D.subs).forEach(s=>h+=fixedItem('sub',s,ym));}
+    else if(tab==='loans'){h+=`<div class="sec">贷款 / 租金 <span class="sec-a" onclick="openModal('addloan')"><i class="ti ti-plus" style="font-size:13px"></i>添加</span></div>`;if(!arr(D.loans).length)h+=`<div class="empty"><div class="empty-ic"><i class="ti ti-home"></i></div><div class="et">还没有贷款 / 租金</div></div>`;arr(D.loans).forEach(l=>h+=fixedItem('loan',l,ym));}
+    else{h+=`<div class="sec">信用卡月供</div>`;if(!cc.length)h+=`<div class="empty"><div class="empty-ic"><i class="ti ti-credit-card-pay"></i></div><div class="et">本月没有信用卡月供</div></div>`;cc.forEach(o=>{h+=`<div class="fixed-clean-card18g3"><div class="fixed-head18g3"><div class="aa-txn-ic"><i class="ti ${o.type==='installment'?'ti-calendar-dollar':'ti-credit-card-pay'}"></i></div><div class="fixed-title18g3"><div class="fixed-name18g3">${esc(o.name||'信用卡月供')}</div><div class="fixed-sub18g3">${esc(o.cardName||'')}${o.remainingMonths?` · 剩 ${o.remainingMonths}/${o.tenureMonths} 期`:''}</div></div><span class="badge bcc">卡</span></div><div class="fixed-boxes18g3"><div class="db"><div class="dl">本月要付</div><div class="dv r">${F(o.amount)}</div></div><div class="db"><div class="dl">我的负担</div><div class="dv w">${F(ownAmount(o,o.amount))}</div></div></div></div>`;});}
+    return h;
+  };
+  try{renderFixed=window.renderFixed}catch(_){}
+  const prevReceive=window.saveAAReceive18_6;
+  if(prevReceive){
+    window.saveAAReceive18_6=function(){
+      const root=document.getElementById('aa-receive18e'),rid=root&&root.getAttribute('data-rid');
+      const before=rid?aaArr().find(r=>same(r.id,rid)):null;
+      const ret=prevReceive.apply(this,arguments);
+      try{const rec=arr(D.aaSettlementReceipts)[0];if(before&&rec&&same(rec.receivableId,before.id)){rec.periodMonth=before.periodMonth||'';rec.fixedSourceId=before.fixedSourceId||'';rec.sourceType=before.sourceType;rec.sourceId=before.sourceId;const s=arr(before.settlements).find(x=>same(x.settlementId,rec.settlementId));if(s){s.periodMonth=before.periodMonth||'';s.fixedSourceId=before.fixedSourceId||'';}}}catch(_){}
+      return ret;
+    };
+  }
+  const migrated=migrateFixedAAInstancingV1();
+  try{window.syncAllFixedAAReceivables()}catch(_){}
+  if(migrated){try{save()}catch(_){}}
+})();
+
 </script>
 <link rel="icon" type="image/svg+xml" href="icon.svg"/>
 <link rel="apple-touch-icon" href="icon.svg"/>
@@ -5938,6 +6099,66 @@ function telegramFiles15(raw){
   };
   try{renderAA=window.renderAA}catch(_){ }
   try{if(!document.getElementById('phase18-6k-css')){const st=document.createElement('style');st.id='phase18-6k-css';st.textContent=`.filter-center18k{display:flex;gap:8px;overflow-x:auto;padding:2px 1px 8px;margin:0 -1px 6px;scrollbar-width:none}.filter-center18k::-webkit-scrollbar{display:none}.filter-btn18k{flex:0 0 auto;border:1px solid var(--border);background:var(--bg2);color:var(--text2);border-radius:999px;padding:9px 11px;font-size:12px;font-weight:800;display:flex;align-items:center;gap:6px;box-shadow:var(--shadow)}.filter-btn18k.on{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 9%,var(--bg2))}.filter-btn18k i{font-size:15px}.filter-summary18k{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 2px 11px;color:var(--text3);font-size:12px}.filter-summary18k b{font-family:var(--font-display);font-size:15px;color:var(--text)}.filter-summary18k button{border:0;background:transparent;color:var(--accent);font-size:12px;font-weight:800;display:flex;align-items:center;gap:3px}.active-chips18k{display:flex;gap:6px;flex-wrap:wrap;margin:-3px 2px 12px}.active-chips18k span{font-size:11px;font-weight:800;color:var(--green);background:var(--green-bg);border-radius:99px;padding:5px 8px}.filter-sheet18k{display:grid;gap:8px;margin-top:-4px}.filter-sheet-opt18k{width:100%;display:grid;grid-template-columns:36px minmax(0,1fr) 20px;align-items:center;gap:10px;border:1px solid var(--border);background:var(--bg2);border-radius:15px;padding:10px 12px;text-align:left;color:var(--text);cursor:pointer}.filter-sheet-opt18k.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 9%,var(--bg2))}.fso-ic18k{width:36px;height:36px;border-radius:12px;background:var(--bg3);display:flex;align-items:center;justify-content:center;color:var(--accent)}.filter-sheet-opt18k b{display:block;font-size:13px;font-weight:850}.filter-sheet-opt18k span{display:block;font-size:11px;color:var(--text3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.fso-check18k{display:none;color:var(--accent)}.filter-sheet-opt18k.on .fso-check18k{display:block}.filter-sheet-sub18k{font-size:11px;color:var(--text3);font-weight:850;text-transform:uppercase;letter-spacing:.06em;margin:8px 2px 0}.phase18k-days .day-chip.on,.aa-person-strip18k .day-chip.on{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 9%,var(--bg2))}.aa-slim-note18k{display:flex;align-items:flex-start;gap:9px;margin:2px 0 12px;padding:11px 12px;border-radius:15px;background:var(--green-bg);color:var(--text2);font-size:12.2px;line-height:1.45}.aa-slim-note18k i{color:var(--green);font-size:17px;margin-top:1px}.aa-person-strip18k .day-chip{min-width:70px}.aa-view-history18k{margin-bottom:10px}.aa-slim-card18k .aa-sub{line-height:1.35}.aa-slim-card18k .aa-acts .btn{min-height:36px}.txn-tools{display:flex;align-items:center;gap:9px;justify-content:flex-end;margin-top:4px}.txn-tools i{font-size:18px;color:var(--accent);padding:3px;cursor:pointer}`;document.head.appendChild(st);}}catch(_){ }
+})();
+
+// PHASE 18.6M final runtime hook - monthly fixed AA rows for subscriptions and loans.
+(()=>{
+  const A=Array.isArray,arr=x=>A(x)?x:[],sid=x=>String(x==null?'':x),same=(a,b)=>sid(a)===sid(b),N=x=>Number(x)||0,r2=x=>Math.round(N(x)*100)/100;
+  const esc=x=>sid(x).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const todayIso=()=>{try{return typeof todayISO==='function'?todayISO():new Date().toISOString().slice(0,10)}catch(_){return new Date().toISOString().slice(0,10)}};
+  const F=x=>{try{return typeof fmt==='function'?fmt(N(x)):(typeof fmtR==='function'?fmtR(N(x)):'RM '+r2(x).toFixed(2))}catch(_){return 'RM '+r2(x).toFixed(2)}};
+  const hm=()=>{try{return typeof nowHM==='function'?nowHM():(()=>{const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')})()}catch(_){const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}};
+  const aa=()=>{if(!A(D.aaReceivables))D.aaReceivables=[];return D.aaReceivables};
+  const pidName=id=>{try{const n=typeof aaPersonName==='function'?aaPersonName(id):'';if(n)return n}catch(_){}const p=arr(D.aaPeople).find(x=>same(x.id,id));return p?p.name:''};
+  const nidSafe=()=>{try{return typeof nid==='function'?nid():Date.now()}catch(_){return Date.now()}};
+  function fixedPeriodMonth(){return todayIso().slice(0,7)}
+  function fixedAAKey(fixedId,ym){return sid(fixedId)+'@'+sid(ym)}
+  function maxDay(ym){return new Date(N(ym.slice(0,4)),N(ym.slice(5,7)),0).getDate()}
+  function fixedDueIsoForMonth(type,item,ym){const d=type==='sub'?N(item&&item.day):N((item&&item.dueDay)||(item&&item.day));return ym+'-'+String(Math.max(1,Math.min(maxDay(ym),d||1))).padStart(2,'0')}
+  function findFixedAARec(type,fixedId,ym){return aa().find(r=>r&&same(r.sourceType,type)&&same(r.periodMonth,ym)&&same(r.fixedSourceId,fixedId))||aa().find(r=>r&&same(r.sourceType,type)&&same(r.sourceId,fixedAAKey(fixedId,ym)))||null}
+  function calcOwed(total,split){try{return r2(calcAAOwed(total,split))}catch(_){if(!split||!split.enabled)return 0;if(split.method==='custom'||split.method==='amount')return r2(split.amount||split.owedAmount);if(split.method==='percent')return r2(N(total)*N(split.percent)/100);return r2(N(total)/Math.max(2,N(split.peopleCount||split.split||2)))}}
+  function upsertFixedAAForMonth(type,fixedId,total,split,desc,ym,dueIso){
+    ym=ym||fixedPeriodMonth();dueIso=dueIso||fixedDueIsoForMonth(type,{day:1,dueDay:1},ym);
+    const old=findFixedAARec(type,fixedId,ym);
+    if(!split||!split.enabled||!split.personId){if(old){old.hidden=true;old.periodMonth=ym;old.fixedSourceId=fixedId;old.sourceId=fixedAAKey(fixedId,ym)}return old||null}
+    const owed=r2(calcOwed(total,split));if(!(owed>0)){if(old)old.hidden=true;return old||null}
+    const settled=old?Math.min(N(old.settledAmount),owed):0;
+    const obj={sourceType:type,sourceId:fixedAAKey(fixedId,ym),fixedSourceId:fixedId,periodMonth:ym,totalAmount:r2(total),owedAmount:owed,settledAmount:r2(settled),status:settled>=owed?'paid':'unpaid',hidden:false,personId:split.personId,personName:pidName(split.personId)||split.personName||'',desc:desc||'',date:dueIso,isoDate:dueIso};
+    if(old){Object.assign(old,obj);return old}
+    const rec={id:nidSafe(),...obj,settlements:[],editHistory:[]};aa().unshift(rec);return rec;
+  }
+  function migrateFixedAAInstancingV1(){
+    if(D.fixedAAInstancingV1)return false;let changed=false;
+    aa().forEach(r=>{if(!r||!['sub','loan'].includes(sid(r.sourceType))||r.periodMonth)return;const ym=/^\d{4}-\d{2}-\d{2}/.test(sid(r.date||r.isoDate))?sid(r.date||r.isoDate).slice(0,7):fixedPeriodMonth();const fixedId=r.fixedSourceId||r.sourceId;r.periodMonth=ym;r.fixedSourceId=fixedId;r.sourceId=fixedAAKey(fixedId,ym);if(r.date&&!r.isoDate)r.isoDate=r.date;if(r.isoDate&&!r.date)r.date=r.isoDate;changed=true});
+    D.fixedAAInstancingV1=true;return true||changed;
+  }
+  function dedupeFixedAAInstancingV1(){const seen={};aa().forEach(r=>{if(!r||!['sub','loan'].includes(sid(r.sourceType))||!r.periodMonth)return;const fixedId=r.fixedSourceId||sid(r.sourceId).replace('@'+r.periodMonth,'');r.fixedSourceId=fixedId;r.sourceId=fixedAAKey(fixedId,r.periodMonth);const k=sid(r.sourceType)+'|'+sid(fixedId)+'|'+sid(r.periodMonth),old=seen[k];if(!old){seen[k]=r;return;}const keep=N(r.settledAmount)>N(old.settledAmount)?r:old,hide=keep===r?old:r;keep.settledAmount=Math.max(N(keep.settledAmount),N(hide.settledAmount));keep.owedAmount=Math.max(N(keep.owedAmount),N(hide.owedAmount));keep.status=N(keep.settledAmount)>=N(keep.owedAmount)?'paid':(N(keep.settledAmount)>0?'partially_settled':'unpaid');hide.hidden=true;hide.duplicateOf=keep.id;seen[k]=keep})}
+  function syncOne(type,o,ym){if(!o)return null;const total=type==='sub'?N(o.amt):N(o.monthly);return upsertFixedAAForMonth(type,o.id,total,o.aaSplit,o.name||'',ym||fixedPeriodMonth(),fixedDueIsoForMonth(type,o,ym||fixedPeriodMonth()))}
+  window.fixedPeriodMonth=fixedPeriodMonth;window.fixedDueIsoForMonth=fixedDueIsoForMonth;window.fixedAAKey=fixedAAKey;window.findFixedAARec=findFixedAARec;window.upsertFixedAAForMonth=upsertFixedAAForMonth;
+  const oldUpsert=window.upsertAAReceivable||(typeof upsertAAReceivable==='function'?upsertAAReceivable:null);
+  window.upsertAAReceivable=function(type,id,total,split,desc){if(['sub','loan'].includes(sid(type))){const o=(type==='sub'?arr(D.subs):arr(D.loans)).find(x=>same(x.id,id))||{id,day:1,dueDay:1,aaSplit:split,name:desc};return syncOne(type,o,fixedPeriodMonth())}return oldUpsert?oldUpsert.apply(this,arguments):null};
+  try{upsertAAReceivable=window.upsertAAReceivable}catch(_){}
+  const oldRemove=window.removeAAReceivable||(typeof removeAAReceivable==='function'?removeAAReceivable:null);
+  window.removeAAReceivable=function(type,id){if(['sub','loan'].includes(sid(type))){const r=findFixedAARec(type,id,fixedPeriodMonth());if(r)r.hidden=true;return}return oldRemove?oldRemove.apply(this,arguments):undefined};
+  try{removeAAReceivable=window.removeAAReceivable}catch(_){}
+  window.syncFixedAAReceivable=(type,o)=>['sub','loan'].includes(sid(type))?syncOne(type,o,fixedPeriodMonth()):null;try{syncFixedAAReceivable=window.syncFixedAAReceivable}catch(_){}
+  window.syncAllFixedAAReceivables=function(){const ym=fixedPeriodMonth();arr(D.subs).forEach(s=>syncOne('sub',s,ym));arr(D.loans).forEach(l=>syncOne('loan',l,ym));try{arr(typeof getInstallments==='function'?getInstallments():D.ccInstallments).forEach(p=>{if(p&&p.aaSplit&&p.aaSplit.enabled&&oldUpsert)oldUpsert('installment',p.id,p.monthlyPayment,p.aaSplit,p.itemName)})}catch(_){}};
+  try{syncAllFixedAAReceivables=window.syncAllFixedAAReceivables}catch(_){}
+  const card=id=>{try{return typeof findCardById==='function'?findCardById(id):arr(D.cards).find(c=>same(c.id,id))}catch(_){return arr(D.cards).find(c=>same(c.id,id))}};
+  function post(kind,id){const o=(kind==='sub'?arr(D.subs):arr(D.loans)).find(x=>same(x.id,id));if(!o)return;const ym=fixedPeriodMonth(),amt=kind==='sub'?N(o.amt):N(o.monthly),pc=card(o.payId||o.paymentSourceId||''),already=o.lastPaid===ym;const go=()=>{const tx={id:nidSafe(),amt,desc:o.name,catLabel:kind==='sub'?'订阅 Subscription':'贷款 / 租金',catIcon:kind==='sub'?'ti-repeat':'ti-home',payId:pc?pc.id:null,payName:pc?pc.name:null,postingMode:pc?'normal':'recordOnly',date:(typeof today==='function'?today():todayIso()),isoDate:todayIso(),time:hm(),aaSplit:o.aaSplit||null,files:[],fixedKind:kind,fixedId:o.id,fixedSourceId:o.id,periodMonth:ym,fixedPaymentMonth:ym,sourceType:kind==='sub'?'fixed_sub':'fixed_loan',sourceId:o.id};tx.raw={...(tx.raw||{}),fixedKind:kind,fixedId:o.id,fixedSourceId:o.id,periodMonth:ym,fixedPaymentMonth:ym};if(pc&&typeof applyTransactionBalanceEffect==='function'&&!applyTransactionBalanceEffect(tx))return;D.txns.unshift(tx);if(kind==='loan'&&N(o.remaining)>0)o.remaining=Math.max(0,r2(N(o.remaining)-amt));o.lastPaid=ym;o.lastPaidAt=new Date().toISOString();o.lastTxnId=tx.id;o.paidMonths=o.paidMonths||{};o.paidMonths[ym]=tx.id;upsertFixedAAForMonth(kind,o.id,amt,o.aaSplit,o.name||'',ym,fixedDueIsoForMonth(kind,o,ym));save();try{render()}catch(_){};try{toast(pc?'✓ 已记录固定支出并扣 '+pc.name:'✓ 已记录固定支出')}catch(_){};try{playSound&&playSound('out')}catch(_){}};if(already&&typeof confirmSheet==='function')confirmSheet('这个月已经记过了',`要再记一笔 ${o.name} ${F(amt)} 吗？`,go,{okText:'再记一笔'});else if(typeof confirmSheet==='function')confirmSheet('确认本月已支付？',`${o.name} · ${F(amt)}\n${pc?'付款方式：'+pc.name:'未设置付款方式：只会记录，不扣余额'}`,go,{okText:'确认已付'});else go()}
+  window.postFixedPay18_6I=post;window.postSub=id=>post('sub',id);window.postLoan=id=>post('loan',id);try{postSub=window.postSub;postLoan=window.postLoan}catch(_){}
+  const viewYm=()=>{const d=new Date();d.setDate(1);d.setMonth(d.getMonth()+N(U.fixedMonthOffset18_6I||U.fixedMonthOffset18_6G3||U.fixedMonthOffset17||0));return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')};
+  const own=(o,total)=>Math.max(0,r2(N(total)-calcOwed(total,o&&o.aaSplit)));
+  const payText=o=>{const c=card(o&&(o.payId||o.paymentSourceId));return c?'付款：'+c.name:'付款：未指定（只记录，不扣余额）'};
+  const dueText=(kind,o,ym,paid)=>{const iso=fixedDueIsoForMonth(kind,o,ym),diff=Math.round((new Date(iso+'T00:00:00')-new Date(todayIso()+'T00:00:00'))/86400000);if(paid)return '本月已还 · 到期日 '+iso.slice(5);if(diff===0)return '今天到期';return (diff>0?'还剩 '+diff+' 天':'已过 '+Math.abs(diff)+' 天')+' · 到期日 '+iso.slice(5)};
+  function status(kind,o,total,ym){const owed=calcOwed(total,o&&o.aaSplit);if(!(owed>0))return '';const r=findFixedAARec(kind,o&&o.id,ym);if(!r)return ym===fixedPeriodMonth()?`AA待收 ${F(owed)} · ${pidName(o.aaSplit&&o.aaSplit.personId)||'对方'} · 未收`:'';if(r.hidden)return '本月 AA 已取消';const paid=r2(r.settledAmount),due=Math.max(0,r2(N(r.owedAmount)-N(r.settledAmount)));if(paid>=N(r.owedAmount)||due<=0)return `AA已还款 ${F(r.owedAmount)} · 已结清`;if(paid>0)return `AA部分已还 ${F(paid)} · 剩 ${F(due)}`;return `AA待收 ${F(r.owedAmount)} · ${r.personName||pidName(r.personId)||'对方'} · 未收`}
+  const icon=(kind,o)=>{try{return typeof itemIcon==='function'?itemIcon(o,46,13):`<div class="aa-txn-ic"><i class="ti ${kind==='sub'?'ti-repeat':'ti-home'}"></i></div>`}catch(_){return `<div class="aa-txn-ic"><i class="ti ${kind==='sub'?'ti-repeat':'ti-home'}"></i></div>`}};
+  const dur=(kind,o)=>{try{return typeof durationLabel==='function'?durationLabel(kind,o):''}catch(_){return ''}};
+  function row(kind,o,ym){const total=kind==='sub'?N(o.amt):N(o.monthly),mine=own(o,total),owed=calcOwed(total,o&&o.aaSplit),paid=o.lastPaid===ym,st=status(kind,o,total,ym),badge=kind==='sub'?'订阅':sid(o.type||'贷款').split(' ')[0],edit=kind==='sub'?`openModal('addsub',{editSubId:${JSON.stringify(o.id)}})`: `openModal('addloan',{editLoanId:${JSON.stringify(o.id)}})`,del=kind==='sub'?`delSub(${JSON.stringify(o.id)})`:`delLoan(${JSON.stringify(o.id)})`,hist=arr(o&&o.editHistory).length?`<button class="btn" onclick="openFixedAudit18_6G3&&openFixedAudit18_6G3('${kind}',${JSON.stringify(o.id)})"><i class="ti ti-history"></i>编辑记录</button>`:'',du=dur(kind,o);return `<div class="fixed-clean-card18g3 fixed-clean-card18i"><div class="fixed-head18g3"><div class="fixed-icon18g3">${icon(kind,o)}</div><div class="fixed-title18g3"><div class="fixed-name18g3">${esc(o.name||'固定支出')}</div><div class="fixed-sub18g3">${esc(dueText(kind,o,ym,paid))}<br>${du?esc(du)+' · ':''}${esc(payText(o))}</div></div><span class="badge ${kind==='sub'?'bsub':'bloan'}">${esc(badge)}</span></div><div class="fixed-boxes18g3"><div class="db"><div class="dl">本月要付</div><div class="dv r">${F(total)}</div></div><div class="db"><div class="dl">我的负担</div><div class="dv w">${F(mine)}</div></div></div>${owed>0&&st?`<div class="fixed-aa-status18g3"><i class="ti ti-users"></i>${esc(st)}</div>`:''}<div class="fixed-acts18g3"><button class="btn ${paid?'':'spd'}" onclick="postFixedPay18_6I('${kind}',${JSON.stringify(o.id)})"><i class="ti ti-${paid?'check':'receipt'}"></i>${paid?'本月已还':'本月待支付'}</button><button class="btn" onclick="${edit}"><i class="ti ti-pencil"></i>编辑</button>${hist}<button class="btn del" onclick="${del}"><i class="ti ti-trash"></i>删除</button></div></div>`}
+  window.renderFixed=function(){try{window.syncAllFixedAAReceivables()}catch(_){}const ym=viewYm(),off=N(U.fixedMonthOffset18_6I||U.fixedMonthOffset18_6G3||U.fixedMonthOffset17||0),tab=U.fixedTab18_6I||U.fixedTab18_6G3||U.fixedTab17||'loans';let cc=[];try{cc=arr(getCreditCardMonthlyObligations())}catch(_){}const full=r2(arr(D.subs).reduce((a,s)=>a+N(s.amt),0)+arr(D.loans).reduce((a,l)=>a+N(l.monthly),0)+cc.reduce((a,o)=>a+N(o.amount),0)),mine=r2(arr(D.subs).reduce((a,s)=>a+own(s,s.amt),0)+arr(D.loans).reduce((a,l)=>a+own(l,l.monthly),0)+cc.reduce((a,o)=>a+own(o,o.amount),0)),fr=aa().filter(r=>['sub','loan'].includes(sid(r.sourceType))&&!r.hidden&&same(r.periodMonth,ym)),liveDue=fr.reduce((a,r)=>a+Math.max(0,r2(N(r.owedAmount)-N(r.settledAmount))),0),livePaid=fr.reduce((a,r)=>a+Math.max(0,r2(N(r.settledAmount))),0);let h=`<div class="sec">固定支出 Fixed</div><div class="sg fixed-top18i"><div class="sc" style="--scc:var(--red)"><div class="sl">本月要付 Cash Out</div><div class="sv r">${F(full)}</div></div><div class="sc" style="--scc:var(--orange)"><div class="sl">我的真实负担 My Cost</div><div class="sv w">${F(mine)}</div></div><div class="sc" style="--scc:var(--green)"><div class="sl">AA 待收</div><div class="sv g">${F(liveDue)}</div></div><div class="sc" style="--scc:var(--blue)"><div class="sl">AA 已还款</div><div class="sv b">${F(livePaid)}</div></div></div><div class="ib g fixed-helper18g3"><i class="ti ti-info-circle"></i>到期日前准备钱；点「本月待支付」会按付款方式扣钱并记到消费记录。AA 款到 AA 页确认收到。</div>`;h+=`<div class="month-nav"><button class="mn-btn" onclick="setFixedMonth18_6I(-1)"><i class="ti ti-chevron-left"></i></button><div class="mn-lbl">${ym.slice(0,4)}年${N(ym.slice(5,7))}月${off===0?' · 本月':''}</div><button class="mn-btn" ${off>=0?'disabled style="opacity:.3"':''} onclick="setFixedMonth18_6I(1)"><i class="ti ti-chevron-right"></i></button></div>`;const sums={subs:arr(D.subs).reduce((a,s)=>a+N(s.amt),0),loans:arr(D.loans).reduce((a,l)=>a+N(l.monthly),0),cards:cc.reduce((a,o)=>a+N(o.amount),0)};h+=`<div class="fixed-tabs"><button class="tab-card ${tab==='subs'?'on':''}" onclick="setFixedTab18_6I('subs')"><b>订阅</b><span>Subscriptions</span><em>${arr(D.subs).length} 项 · ${F(sums.subs)}</em></button><button class="tab-card ${tab==='loans'?'on':''}" onclick="setFixedTab18_6I('loans')"><b>贷款 / 租金</b><span>Loans & Rent</span><em>${arr(D.loans).length} 项 · ${F(sums.loans)}</em></button><button class="tab-card ${tab==='cards'?'on':''}" onclick="setFixedTab18_6I('cards')"><b>信用卡月供</b><span>Card Payments</span><em>${F(sums.cards)}</em></button></div>`;if(tab==='subs'){h+=`<div class="sec">订阅 <span class="sec-a" onclick="openModal('addsub')"><i class="ti ti-plus" style="font-size:13px"></i>添加</span></div>`;if(!arr(D.subs).length)h+=`<div class="empty"><div class="empty-ic"><i class="ti ti-repeat"></i></div><div class="et">还没有订阅</div></div>`;arr(D.subs).forEach(s=>h+=row('sub',s,ym))}else if(tab==='loans'){h+=`<div class="sec">贷款 / 租金 <span class="sec-a" onclick="openModal('addloan')"><i class="ti ti-plus" style="font-size:13px"></i>添加</span></div>`;if(!arr(D.loans).length)h+=`<div class="empty"><div class="empty-ic"><i class="ti ti-home"></i></div><div class="et">还没有贷款 / 租金</div></div>`;arr(D.loans).forEach(l=>h+=row('loan',l,ym))}else{h+=`<div class="sec">信用卡月供</div>`;if(!cc.length)h+=`<div class="empty"><div class="empty-ic"><i class="ti ti-credit-card-pay"></i></div><div class="et">本月没有信用卡月供</div></div>`;cc.forEach(o=>{h+=`<div class="fixed-clean-card18g3"><div class="fixed-head18g3"><div class="aa-txn-ic"><i class="ti ${o.type==='installment'?'ti-calendar-dollar':'ti-credit-card-pay'}"></i></div><div class="fixed-title18g3"><div class="fixed-name18g3">${esc(o.name||'信用卡月供')}</div><div class="fixed-sub18g3">${esc(o.cardName||'')}${o.remainingMonths?` · 剩 ${o.remainingMonths}/${o.tenureMonths} 期`:''}</div></div><span class="badge bcc">卡</span></div><div class="fixed-boxes18g3"><div class="db"><div class="dl">本月要付</div><div class="dv r">${F(o.amount)}</div></div><div class="db"><div class="dl">我的负担</div><div class="dv w">${F(own(o,o.amount))}</div></div></div></div>`})}return h};
+  try{renderFixed=window.renderFixed}catch(_){}
+  const prevReceive=window.saveAAReceive18_6;if(prevReceive){window.saveAAReceive18_6=function(){const root=document.getElementById('aa-receive18e'),rid=root&&root.getAttribute('data-rid'),before=rid?aa().find(r=>same(r.id,rid)):null,ret=prevReceive.apply(this,arguments);try{const rec=arr(D.aaSettlementReceipts)[0];if(before&&rec&&same(rec.receivableId,before.id)){rec.periodMonth=before.periodMonth||'';rec.fixedSourceId=before.fixedSourceId||'';rec.sourceType=before.sourceType;rec.sourceId=before.sourceId;const s=arr(before.settlements).find(x=>same(x.settlementId,rec.settlementId));if(s){s.periodMonth=before.periodMonth||'';s.fixedSourceId=before.fixedSourceId||''}}}catch(_){}return ret}}
+  const migrated=migrateFixedAAInstancingV1();try{window.syncAllFixedAAReceivables();dedupeFixedAAInstancingV1()}catch(_){}if(migrated){try{save()}catch(_){}}
 })();
 
 </script>
