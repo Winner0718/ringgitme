@@ -6161,6 +6161,95 @@ function telegramFiles15(raw){
   const migrated=migrateFixedAAInstancingV1();try{window.syncAllFixedAAReceivables();dedupeFixedAAInstancingV1()}catch(_){}if(migrated){try{save()}catch(_){}}
 })();
 
+// PHASE 18.6O.1 - App AA full sync wiring to Telegram aa_ledger_items.
+(()=>{
+  const A=Array.isArray,arr=x=>A(x)?x:[],sid=x=>String(x==null?'':x),same=(a,b)=>sid(a)===sid(b),N=x=>Number(x)||0,r2=x=>Math.round(N(x)*100)/100;
+  const todayIso=()=>{try{return typeof todayISO==='function'?todayISO():new Date().toISOString().slice(0,10)}catch(_){return new Date().toISOString().slice(0,10)}};
+  const nowHm=()=>{try{return typeof nowHM==='function'?nowHM():(()=>{const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')})()}catch(_){return ''}};
+  const nowIso=()=>{try{return typeof nowISO==='function'?nowISO():new Date().toISOString()}catch(_){return new Date().toISOString()}};
+  const uuidish=x=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sid(x).trim());
+  const fail=(reason,details={})=>{try{console.warn('[18.6O syncRecCloud]',reason,details)}catch(_){}return {ok:false,reason,...details}};
+  const aa=()=>{if(!A(D.aaReceivables))D.aaReceivables=[];return D.aaReceivables};
+  const recBySource=(type,id)=>aa().find(r=>r&&same(r.sourceType,type)&&same(r.sourceId,id))||null;
+  const recById=id=>aa().find(r=>same(r&&r.id,id))||null;
+  const cloudId=r=>r&&(r.cloudAAItemId||r.telegramAAItemId||r.cloudId||'');
+  const sourceMap={manual_aa:'app_manual_aa',txn:'app_txn',sub:'app_sub',loan:'app_loan'};
+  function personFor(r){return arr(D.aaPeople).find(p=>same(p.id,r&&r.personId)||same(p.name,r&&r.personName))||null}
+  function partnerFor(r){const p=personFor(r);return sid((r&&(r.telegramPartnerId||r.partnerId))||(p&&(p.telegramPartnerId||p.partnerId||p.supabasePartnerId))||'')}
+  function cloudStatus(r){if(!r||r.hidden||r.cancelled||r.deleted)return 'cancelled';const owed=N(r.owedAmount),settled=N(r.settledAmount);if(owed>0&&settled>=owed)return 'settled';if(settled>0)return 'partially_settled';return 'unpaid'}
+  function itemDate(r){const d=sid(r&&(r.isoDate||r.date));return /^\d{4}-\d{2}-\d{2}/.test(d)?d.slice(0,10):todayIso()}
+  function rawFor(r){return {source:'ringgitme_app',phase:'18.6O.1',localId:r.id,sourceType:r.sourceType,sourceId:r.sourceId,cloudAAItemId:r.cloudAAItemId||'',telegramAAItemId:r.telegramAAItemId||'',periodMonth:r.periodMonth||'',fixedSourceId:r.fixedSourceId||'',fixedPaymentMonth:r.fixedPaymentMonth||'',editHistory:arr(r.editHistory),settlements:arr(r.settlements),app:{desc:r.desc||'',personId:r.personId||'',personName:r.personName||'',hidden:!!r.hidden},synced_at:nowIso()}}
+  async function rmCurrentOwnerUserId18_6O1(){
+    const direct=[];
+    try{if(typeof SESSION!=='undefined')direct.push(SESSION&&SESSION.user&&SESSION.user.id)}catch(_){}
+    try{direct.push(window.SESSION&&window.SESSION.user&&window.SESSION.user.id)}catch(_){}
+    try{direct.push(localStorage.getItem('rm_owner'))}catch(_){}
+    for(const x of direct){if(uuidish(x))return sid(x).trim();}
+    try{if(typeof supa!=='undefined'&&supa&&supa.auth&&supa.auth.getSession){const {data}=await supa.auth.getSession();const id=data&&data.session&&data.session.user&&data.session.user.id;if(uuidish(id))return sid(id).trim();}}catch(e){console.warn('[18.6O syncRecCloud] auth_getSession_failed',{message:e&&e.message})}
+    try{if(typeof supa!=='undefined'&&supa&&supa.auth&&supa.auth.getUser){const {data}=await supa.auth.getUser();const id=data&&data.user&&data.user.id;if(uuidish(id))return sid(id).trim();}}catch(e){console.warn('[18.6O syncRecCloud] auth_getUser_failed',{message:e&&e.message})}
+    return '';
+  }
+  window.rmCurrentOwnerUserId18_6O1=rmCurrentOwnerUserId18_6O1;
+  function payloadFor(r,partnerId,ownerUserId){return {owner_user_id:ownerUserId,partner_id:partnerId,source_type:sourceMap[sid(r.sourceType)],source_id:sid(r.sourceId||r.id),item_date:itemDate(r),item_time:r.time||nowHm(),description:r.desc||'RinggitMe AA',category:r.category||r.catLabel||'',payment_name:r.paymentName||r.payName||'',total_amount:r2(r.totalAmount||r.total||0),receivable_amount:r2(r.owedAmount),settled_amount:r2(r.settledAmount),direction:'partner_owes_owner',status:cloudStatus(r),raw:rawFor(r)}}
+  async function syncRecCloud18_6O(r,opt={}){
+    if(!r||!sourceMap[sid(r.sourceType)])return fail('invalid_row',{sourceType:r&&r.sourceType});
+    const ownerUserId=await rmCurrentOwnerUserId18_6O1();
+    if(!ownerUserId)return fail('not_logged_in',{hasSession:typeof SESSION!=='undefined'&&!!(SESSION&&SESSION.user&&SESSION.user.id),hasWindowSession:!!(window.SESSION&&window.SESSION.user&&window.SESSION.user.id)});
+    if(typeof supa==='undefined'||!supa)return fail('supabase_error',{message:'supabase client not ready'});
+    const person=personFor(r),partnerId=partnerFor(r);if(!partnerId)return fail('no_partner_mapping',{personId:r.personId||'',personName:r.personName||(person&&person.name)||''});
+    try{
+      const payload=payloadFor(r,partnerId,ownerUserId);
+      let out=null,id=cloudId(r),action='insert';
+      if(id){const {data,error}=await supa.from('aa_ledger_items').update({...payload,updated_at:nowIso()}).eq('id',id).select('id').maybeSingle();if(error)throw error;out=data;action='update';}
+      else{
+        const {data:existing,error:findErr}=await supa.from('aa_ledger_items').select('id').eq('owner_user_id',payload.owner_user_id).eq('source_type',payload.source_type).eq('source_id',payload.source_id).maybeSingle();
+        if(findErr)throw findErr;
+        if(existing&&existing.id){const {data,error}=await supa.from('aa_ledger_items').update({...payload,updated_at:nowIso()}).eq('id',existing.id).select('id').maybeSingle();if(error)throw error;out=data;action='update';}
+        else{const {data,error}=await supa.from('aa_ledger_items').insert(payload).select('id').maybeSingle();if(error)throw error;out=data;action='insert';}
+      }
+      if(out&&out.id){r.cloudAAItemId=out.id;r.telegramAAItemId=r.telegramAAItemId||out.id;r.syncedToTelegramAt=nowIso();try{save()}catch(_){}return {ok:true,id:out.id,action};}
+      return fail('supabase_error',{message:'No id returned from aa_ledger_items '+action});
+    }catch(e){return fail('supabase_error',{message:e&&e.message?e.message:String(e)});}
+  }
+  window.syncRecCloud=syncRecCloud18_6O;
+  function maybeWarn(res,user){if(user&&res&&res.reason==='no_partner_mapping'){try{toast('AA 已记录；这个对象还没绑定 Telegram，Bot 总览不会同步')}catch(_){}}}
+  function syncBest(r,user){if(!r)return Promise.resolve({ok:false,reason:'missing_rec'});return syncRecCloud18_6O(r,{user}).then(res=>{maybeWarn(res,user);return res})}
+  async function cancelCloudRec(r){if(!r)return {ok:false,reason:'missing_rec'};r.hidden=true;const res=await syncRecCloud18_6O(r);return res}
+  const oldUpsert=window.upsertAAReceivable||(typeof upsertAAReceivable==='function'?upsertAAReceivable:null);
+  if(oldUpsert){window.upsertAAReceivable=function(type,id,total,split,desc){const ret=oldUpsert.apply(this,arguments);try{const r=ret&&ret.sourceType?ret:recBySource(type,(ret&&ret.sourceId)||id);if(['txn','sub','loan','manual_aa'].includes(sid(type))&&r)syncBest(r,false);}catch(e){console.log('18.6O upsert hook',e)}return ret};try{upsertAAReceivable=window.upsertAAReceivable}catch(_){}}
+  const oldRemove=window.removeAAReceivable||(typeof removeAAReceivable==='function'?removeAAReceivable:null);
+  if(oldRemove){window.removeAAReceivable=function(type,id){const r=recBySource(type,id);if(r)cancelCloudRec(r);return oldRemove.apply(this,arguments)};try{removeAAReceivable=window.removeAAReceivable}catch(_){}}
+  const oldSaveSpend=window.saveSpend||(typeof saveSpend==='function'?saveSpend:null);
+  if(oldSaveSpend){window.saveSpend=function(){const editId=U&&U.editId,oldRec=editId!==null&&editId!==undefined&&editId!==''?recBySource('txn',editId):null;const ret=oldSaveSpend.apply(this,arguments);try{const activeId=(editId!==null&&editId!==undefined&&editId!=='')?editId:(arr(D.txns)[0]&&arr(D.txns)[0].id),r=recBySource('txn',activeId);if(r)syncBest(r,true);else if(oldRec)cancelCloudRec(oldRec);}catch(e){console.log('18.6O saveSpend hook',e)}return ret};try{saveSpend=window.saveSpend}catch(_){}}
+  const oldDelTxn=window.delTxn;
+  if(oldDelTxn){window.delTxn=function(id){const r=recBySource('txn',id);if(r)cancelCloudRec(r);return oldDelTxn.apply(this,arguments)}}
+  const oldSettle=window.settleAAReceivable||(typeof settleAAReceivable==='function'?settleAAReceivable:null);
+  if(oldSettle){window.settleAAReceivable=function(id){const ret=oldSettle.apply(this,arguments);try{syncBest(recById(id),true)}catch(e){console.log('18.6O settle hook',e)}return ret};try{settleAAReceivable=window.settleAAReceivable}catch(_){}}
+  const oldReceive=window.saveAAReceive18_6;
+  if(oldReceive){window.saveAAReceive18_6=function(){const root=document.getElementById('aa-receive18e'),rid=root&&root.getAttribute('data-rid');const ret=oldReceive.apply(this,arguments);try{syncBest(recById(rid),true)}catch(e){console.log('18.6O receive hook',e)}return ret}}
+  const oldQuick=window.saveAAQuickAdd18_5C3;
+  if(oldQuick){window.saveAAQuickAdd18_5C3=function(){const before=new Set(aa().map(r=>sid(r.id)));const ret=oldQuick.apply(this,arguments);try{const r=aa().find(x=>!before.has(sid(x.id))&&x.sourceType==='manual_aa');if(r){syncBest(r,true);setTimeout(()=>syncBest(r,false),1100)}}catch(e){console.log('18.6O quickadd hook',e)}return ret}}
+  const oldEdit=window.saveAAEdit18_5E;
+  if(oldEdit){window.saveAAEdit18_5E=function(){const root=document.getElementById('aa-quickedit18e'),rid=root&&root.getAttribute('data-rid');const ret=oldEdit.apply(this,arguments);try{const r=rid&&recById(rid);if(r){syncBest(r,true);setTimeout(()=>syncBest(r,false),1100)}}catch(e){console.log('18.6O aa edit hook',e)}return ret}}
+  const oldDelRec=window.delAAReceivable14;
+  if(oldDelRec){window.delAAReceivable14=function(id){const r=recById(id);if(r)cancelCloudRec(r);return oldDelRec.apply(this,arguments)}}
+  const oldFixedUpsert=window.upsertFixedAAForMonth;
+  if(oldFixedUpsert){window.upsertFixedAAForMonth=function(type,fixedId,total,split,desc,ym,dueIso){const r=oldFixedUpsert.apply(this,arguments);try{if(r&&['sub','loan'].includes(sid(r.sourceType))){if(r.hidden)cancelCloudRec(r);else syncBest(r,false)}}catch(e){console.log('18.6O fixed upsert hook',e)}return r}}
+  function fixedCurrentRec(type,id){try{return window.findFixedAARec?window.findFixedAARec(type,id,(window.fixedPeriodMonth?window.fixedPeriodMonth():todayIso().slice(0,7))):recBySource(type,id)}catch(_){return recBySource(type,id)}}
+  const oldSyncAll=window.syncAllFixedAAReceivables;
+  if(oldSyncAll){window.syncAllFixedAAReceivables=function(){const ret=oldSyncAll.apply(this,arguments);try{arr(D.subs).forEach(s=>syncBest(fixedCurrentRec('sub',s.id),false));arr(D.loans).forEach(l=>syncBest(fixedCurrentRec('loan',l.id),false))}catch(e){console.log('18.6O fixed sync hook',e)}return ret};try{syncAllFixedAAReceivables=window.syncAllFixedAAReceivables}catch(_){}}
+  const oldSaveSub=window.saveSub;
+  if(oldSaveSub){window.saveSub=function(){const id=U&&U.editSubId,before=id?fixedCurrentRec('sub',id):null;const ret=oldSaveSub.apply(this,arguments);try{const obj=id?arr(D.subs).find(s=>same(s.id,id)):arr(D.subs)[arr(D.subs).length-1],r=obj?fixedCurrentRec('sub',obj.id):null;if(r&&!r.hidden)syncBest(r,true);else if(before)cancelCloudRec(before)}catch(e){console.log('18.6O saveSub hook',e)}return ret};try{saveSub=window.saveSub}catch(_){}}
+  const oldSaveLoan=window.saveLoan;
+  if(oldSaveLoan){window.saveLoan=function(){const id=U&&U.editLoanId,before=id?fixedCurrentRec('loan',id):null;const ret=oldSaveLoan.apply(this,arguments);try{const obj=id?arr(D.loans).find(l=>same(l.id,id)):arr(D.loans)[arr(D.loans).length-1],r=obj?fixedCurrentRec('loan',obj.id):null;if(r&&!r.hidden)syncBest(r,true);else if(before)cancelCloudRec(before)}catch(e){console.log('18.6O saveLoan hook',e)}return ret};try{saveLoan=window.saveLoan}catch(_){}}
+  const oldPostFixed=window.postFixedPay18_6I;
+  if(oldPostFixed){window.postFixedPay18_6I=function(type,id){const ret=oldPostFixed.apply(this,arguments);try{syncBest(fixedCurrentRec(type,id),true)}catch(e){console.log('18.6O fixed post hook',e)}return ret}}
+  const oldPostSub=window.postSub,oldPostLoan=window.postLoan;
+  if(oldPostSub){window.postSub=function(id){const ret=oldPostSub.apply(this,arguments);try{syncBest(fixedCurrentRec('sub',id),true)}catch(e){console.log('18.6O postSub hook',e)}return ret};try{postSub=window.postSub}catch(_){}}
+  if(oldPostLoan){window.postLoan=function(id){const ret=oldPostLoan.apply(this,arguments);try{syncBest(fixedCurrentRec('loan',id),true)}catch(e){console.log('18.6O postLoan hook',e)}return ret};try{postLoan=window.postLoan}catch(_){}}
+  try{window.syncAllFixedAAReceivables&&window.syncAllFixedAAReceivables()}catch(_){}
+})();
+
 </script>
 
 </body>
