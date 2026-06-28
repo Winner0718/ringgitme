@@ -5760,11 +5760,11 @@ function telegramFiles15(raw){
     }catch(e){console.log('18.6I app AA cloud sync skipped/failed',e)}
   }
   const prevQuick=window.saveAAQuickAdd18_5C3;
-  if(prevQuick){window.saveAAQuickAdd18_5C3=function(){const oldIds=new Set(arr(D.aaReceivables).map(r=>sid(r.id)));const ret=prevQuick.apply(this,arguments);setTimeout(()=>{try{const r=arr(D.aaReceivables).find(x=>!oldIds.has(sid(x.id))&&x.sourceType==='manual_aa');if(r)syncRecCloud(r);}catch(e){console.log('18.6I sync new AA',e)}},700);return ret;};}
+  if(prevQuick){window.saveAAQuickAdd18_5C3=function(){const oldIds=new Set(arr(D.aaReceivables).map(r=>sid(r.id)));const ret=prevQuick.apply(this,arguments);try{const r=arr(D.aaReceivables).find(x=>!oldIds.has(sid(x.id))&&x.sourceType==='manual_aa');if(r&&window.syncAACloudOnce18_6Q)window.syncAACloudOnce18_6Q(r,{reason:'manual_aa_save',user:true});}catch(e){console.log('18.6I sync new AA',e)}return ret;};}
   const prevAAEdit=window.saveAAEdit18_5E;
-  if(prevAAEdit){window.saveAAEdit18_5E=function(){const id=document.getElementById('aae-id18e')&&document.getElementById('aae-id18e').value;const ret=prevAAEdit.apply(this,arguments);setTimeout(()=>{try{const r=arr(D.aaReceivables).find(x=>same(x.id,id));if(r)syncRecCloud(r);}catch(e){console.log('18.6I sync edit AA',e)}},700);return ret;};}
+  if(prevAAEdit){window.saveAAEdit18_5E=function(){const id=document.getElementById('aae-id18e')&&document.getElementById('aae-id18e').value;const ret=prevAAEdit.apply(this,arguments);try{const r=arr(D.aaReceivables).find(x=>same(x.id,id));if(r&&window.syncAACloudOnce18_6Q)window.syncAACloudOnce18_6Q(r,{reason:'manual_aa_edit',user:true});}catch(e){console.log('18.6I sync edit AA',e)}return ret;};}
   const prevDelRec=window.delAAReceivable14;
-  window.delAAReceivable14=function(id){const r=arr(D.aaReceivables).find(x=>same(x.id,id));const cloudId=r&&(r.cloudAAItemId||r.telegramAAItemId);const ret=prevDelRec?prevDelRec.apply(this,arguments):undefined;if(cloudId&&typeof supaReady==='function'&&supaReady()){setTimeout(async()=>{try{await supa.from('aa_ledger_items').update({status:'cancelled',updated_at:nowISO(),raw:{...(r.raw||{}),app_deleted:true,deleted_at:nowISO()}}).eq('id',cloudId);}catch(e){console.log('18.6I cloud cancel AA',e)}},700);}return ret;};
+  window.delAAReceivable14=function(id){const r=arr(D.aaReceivables).find(x=>same(x.id,id));if(r&&window.syncAACloudOnce18_6Q){r.hidden=true;window.syncAACloudOnce18_6Q(r,{reason:'aa_delete',immediate:true});}return prevDelRec?prevDelRec.apply(this,arguments):undefined;};
 
   try{if(!document.getElementById('phase18-6i-css')){const st=document.createElement('style');st.id='phase18-6i-css';st.textContent=`.fixed-top18i{grid-template-columns:repeat(2,1fr)}.fixed-clean-card18i .fixed-sub18g3{line-height:1.45}.fixed-clean-card18i .real-asset.logo{width:46px!important;height:46px!important;border-radius:13px!important}.fixed-clean-card18i .fixed-aa-status18g3{font-size:12.2px}.fixed-clean-card18i .fixed-acts18g3 .btn{min-height:36px}.fixed-date-guide18h{display:flex;align-items:flex-start;gap:9px;margin:2px 0 15px;padding:12px 13px;border-radius:15px;background:var(--green-bg);color:var(--text2);font-size:12.5px;line-height:1.5}.fixed-date-guide18h i{color:var(--green);font-size:17px;margin-top:1px}.fixed-date-guide18h b{color:var(--green)}@media(max-width:390px){.fixed-top18i{grid-template-columns:1fr 1fr}.fixed-clean-card18i .fixed-boxes18g3{grid-template-columns:1fr 1fr}}`;document.head.appendChild(st);}}catch(_){}
 })();
@@ -6212,32 +6212,72 @@ function telegramFiles15(raw){
     }catch(e){return fail('supabase_error',{message:e&&e.message?e.message:String(e)});}
   }
   window.syncRecCloud=syncRecCloud18_6O;
+  // PHASE 18.6Q - de-duplicate AA cloud sync.
+  const aaCloudInFlight18_6Q=new Map(),aaCloudPending18_6Q=new Map();
+  function aaCloudSyncKey18_6Q(r){
+    if(!r)return '';
+    if(r.cloudAAItemId)return 'cloud:'+sid(r.cloudAAItemId);
+    if(r.sourceType&&r.sourceId)return 'src:'+sid(r.sourceType)+':'+sid(r.sourceId);
+    if(r.id)return 'local:'+sid(r.id);
+    return '';
+  }
+  window.aaCloudSyncKey18_6Q=aaCloudSyncKey18_6Q;
+  window.syncAACloudOnce18_6Q=function(r,opts={}){
+    if(!r)return Promise.resolve({ok:false,reason:'invalid_row'});
+    let key=aaCloudSyncKey18_6Q(r);
+    if(!key)return Promise.resolve({ok:false,reason:'invalid_row'});
+    if(aaCloudInFlight18_6Q.has(key))return aaCloudInFlight18_6Q.get(key);
+    const delay=opts.immediate?0:(Number.isFinite(opts.delay)?Math.max(0,N(opts.delay)):320);
+    const p=new Promise(resolve=>{
+      const timer=setTimeout(async()=>{
+        aaCloudPending18_6Q.delete(key);
+        const freshKey=aaCloudSyncKey18_6Q(r)||key;
+        if(freshKey!==key&&aaCloudInFlight18_6Q.has(freshKey)){aaCloudInFlight18_6Q.delete(key);resolve(await aaCloudInFlight18_6Q.get(freshKey));return;}
+        try{
+          const res=await window.syncRecCloud(r);
+          if(res&&res.ok&&res.id)r.cloudAAItemId=res.id;
+          if(res&&!res.ok)console.warn('[18.6Q AA cloud queue]',res.reason,{key:freshKey,reason:opts.reason||'',sourceType:r.sourceType,sourceId:r.sourceId});
+          resolve(res||{ok:false,reason:'sync_failed'});
+        }catch(e){
+          console.warn('[18.6Q AA cloud queue] exception',{key:freshKey,reason:opts.reason||'',message:e&&e.message});
+          resolve({ok:false,reason:'sync_failed',message:e&&e.message?e.message:String(e)});
+        }finally{
+          aaCloudInFlight18_6Q.delete(key);
+          aaCloudInFlight18_6Q.delete(freshKey);
+        }
+      },delay);
+      aaCloudPending18_6Q.set(key,timer);
+    });
+    aaCloudInFlight18_6Q.set(key,p);
+    return p;
+  };
+  window.debugAACloudSyncQueue18_6Q=()=>({inFlightKeys:[...aaCloudInFlight18_6Q.keys()],pendingKeys:[...aaCloudPending18_6Q.keys()]});
   function maybeWarn(res,user){if(user&&res&&res.reason==='no_partner_mapping'){try{toast('AA 已记录；这个对象还没绑定 Telegram，Bot 总览不会同步')}catch(_){}}}
-  function syncBest(r,user){if(!r)return Promise.resolve({ok:false,reason:'missing_rec'});return syncRecCloud18_6O(r,{user}).then(res=>{maybeWarn(res,user);return res})}
-  async function cancelCloudRec(r){if(!r)return {ok:false,reason:'missing_rec'};r.hidden=true;const res=await syncRecCloud18_6O(r);return res}
+  function syncBest(r,user,opts={}){if(!r)return Promise.resolve({ok:false,reason:'missing_rec'});return window.syncAACloudOnce18_6Q(r,{...opts,user}).then(res=>{maybeWarn(res,user);return res})}
+  async function cancelCloudRec(r){if(!r)return {ok:false,reason:'missing_rec'};r.hidden=true;const res=await window.syncAACloudOnce18_6Q(r,{reason:'cancel',immediate:true});return res}
   const oldUpsert=window.upsertAAReceivable||(typeof upsertAAReceivable==='function'?upsertAAReceivable:null);
-  if(oldUpsert){window.upsertAAReceivable=function(type,id,total,split,desc){const ret=oldUpsert.apply(this,arguments);try{const r=ret&&ret.sourceType?ret:recBySource(type,(ret&&ret.sourceId)||id);if(['txn','sub','loan','manual_aa'].includes(sid(type))&&r)syncBest(r,false);}catch(e){console.log('18.6O upsert hook',e)}return ret};try{upsertAAReceivable=window.upsertAAReceivable}catch(_){}}
+  if(oldUpsert){window.upsertAAReceivable=function(type,id,total,split,desc){const ret=oldUpsert.apply(this,arguments);try{const r=ret&&ret.sourceType?ret:recBySource(type,(ret&&ret.sourceId)||id);if(['txn','sub','loan','manual_aa'].includes(sid(type))&&r)syncBest(r,false,{reason:'upsert'});}catch(e){console.log('18.6O upsert hook',e)}return ret};try{upsertAAReceivable=window.upsertAAReceivable}catch(_){}}
   const oldRemove=window.removeAAReceivable||(typeof removeAAReceivable==='function'?removeAAReceivable:null);
   if(oldRemove){window.removeAAReceivable=function(type,id){const r=recBySource(type,id);if(r)cancelCloudRec(r);return oldRemove.apply(this,arguments)};try{removeAAReceivable=window.removeAAReceivable}catch(_){}}
   const oldSaveSpend=window.saveSpend||(typeof saveSpend==='function'?saveSpend:null);
-  if(oldSaveSpend){window.saveSpend=function(){const editId=U&&U.editId,oldRec=editId!==null&&editId!==undefined&&editId!==''?recBySource('txn',editId):null;const ret=oldSaveSpend.apply(this,arguments);try{const activeId=(editId!==null&&editId!==undefined&&editId!=='')?editId:(arr(D.txns)[0]&&arr(D.txns)[0].id),r=recBySource('txn',activeId);if(r)syncBest(r,true);else if(oldRec)cancelCloudRec(oldRec);}catch(e){console.log('18.6O saveSpend hook',e)}return ret};try{saveSpend=window.saveSpend}catch(_){}}
+  if(oldSaveSpend){window.saveSpend=function(){const editId=U&&U.editId,oldRec=editId!==null&&editId!==undefined&&editId!==''?recBySource('txn',editId):null;const ret=oldSaveSpend.apply(this,arguments);try{const activeId=(editId!==null&&editId!==undefined&&editId!=='')?editId:(arr(D.txns)[0]&&arr(D.txns)[0].id),r=recBySource('txn',activeId);if(r)syncBest(r,true,{reason:'spend_save'});else if(oldRec)cancelCloudRec(oldRec);}catch(e){console.log('18.6O saveSpend hook',e)}return ret};try{saveSpend=window.saveSpend}catch(_){}}
   const oldDelTxn=window.delTxn;
   if(oldDelTxn){window.delTxn=function(id){const r=recBySource('txn',id);if(r)cancelCloudRec(r);return oldDelTxn.apply(this,arguments)}}
   const oldSettle=window.settleAAReceivable||(typeof settleAAReceivable==='function'?settleAAReceivable:null);
-  if(oldSettle){window.settleAAReceivable=function(id){const ret=oldSettle.apply(this,arguments);try{syncBest(recById(id),true)}catch(e){console.log('18.6O settle hook',e)}return ret};try{settleAAReceivable=window.settleAAReceivable}catch(_){}}
+  if(oldSettle){window.settleAAReceivable=function(id){const ret=oldSettle.apply(this,arguments);try{syncBest(recById(id),true,{reason:'settle',immediate:true})}catch(e){console.log('18.6O settle hook',e)}return ret};try{settleAAReceivable=window.settleAAReceivable}catch(_){}}
   const oldReceive=window.saveAAReceive18_6;
-  if(oldReceive){window.saveAAReceive18_6=function(){const root=document.getElementById('aa-receive18e'),rid=root&&root.getAttribute('data-rid');const ret=oldReceive.apply(this,arguments);try{syncBest(recById(rid),true)}catch(e){console.log('18.6O receive hook',e)}return ret}}
+  if(oldReceive){window.saveAAReceive18_6=function(){const root=document.getElementById('aa-receive18e'),rid=root&&root.getAttribute('data-rid');const ret=oldReceive.apply(this,arguments);try{syncBest(recById(rid),true,{reason:'receive',immediate:true})}catch(e){console.log('18.6O receive hook',e)}return ret}}
   const oldQuick=window.saveAAQuickAdd18_5C3;
-  if(oldQuick){window.saveAAQuickAdd18_5C3=function(){const before=new Set(aa().map(r=>sid(r.id)));const ret=oldQuick.apply(this,arguments);try{const r=aa().find(x=>!before.has(sid(x.id))&&x.sourceType==='manual_aa');if(r){syncBest(r,true);setTimeout(()=>syncBest(r,false),1100)}}catch(e){console.log('18.6O quickadd hook',e)}return ret}}
+  if(oldQuick){window.saveAAQuickAdd18_5C3=function(){const before=new Set(aa().map(r=>sid(r.id)));const ret=oldQuick.apply(this,arguments);try{const r=aa().find(x=>!before.has(sid(x.id))&&x.sourceType==='manual_aa');if(r)syncBest(r,true,{reason:'manual_aa_save'});}catch(e){console.log('18.6O quickadd hook',e)}return ret}}
   const oldEdit=window.saveAAEdit18_5E;
-  if(oldEdit){window.saveAAEdit18_5E=function(){const root=document.getElementById('aa-quickedit18e'),rid=root&&root.getAttribute('data-rid');const ret=oldEdit.apply(this,arguments);try{const r=rid&&recById(rid);if(r){syncBest(r,true);setTimeout(()=>syncBest(r,false),1100)}}catch(e){console.log('18.6O aa edit hook',e)}return ret}}
+  if(oldEdit){window.saveAAEdit18_5E=function(){const root=document.getElementById('aa-quickedit18e'),rid=root&&root.getAttribute('data-rid');const ret=oldEdit.apply(this,arguments);try{const r=rid&&recById(rid);if(r)syncBest(r,true,{reason:'manual_aa_edit'});}catch(e){console.log('18.6O aa edit hook',e)}return ret}}
   const oldDelRec=window.delAAReceivable14;
   if(oldDelRec){window.delAAReceivable14=function(id){const r=recById(id);if(r)cancelCloudRec(r);return oldDelRec.apply(this,arguments)}}
   const oldFixedUpsert=window.upsertFixedAAForMonth;
-  if(oldFixedUpsert){window.upsertFixedAAForMonth=function(type,fixedId,total,split,desc,ym,dueIso){const r=oldFixedUpsert.apply(this,arguments);try{if(r&&['sub','loan'].includes(sid(r.sourceType))){if(r.hidden)cancelCloudRec(r);else syncBest(r,false)}}catch(e){console.log('18.6O fixed upsert hook',e)}return r}}
+  if(oldFixedUpsert){window.upsertFixedAAForMonth=function(type,fixedId,total,split,desc,ym,dueIso){const r=oldFixedUpsert.apply(this,arguments);try{if(r&&['sub','loan'].includes(sid(r.sourceType))){if(r.hidden)cancelCloudRec(r);else syncBest(r,false,{reason:'fixed_upsert'})}}catch(e){console.log('18.6O fixed upsert hook',e)}return r}}
   function fixedCurrentRec(type,id){try{return window.findFixedAARec?window.findFixedAARec(type,id,(window.fixedPeriodMonth?window.fixedPeriodMonth():todayIso().slice(0,7))):recBySource(type,id)}catch(_){return recBySource(type,id)}}
   const oldSyncAll=window.syncAllFixedAAReceivables;
-  if(oldSyncAll){window.syncAllFixedAAReceivables=function(){const ret=oldSyncAll.apply(this,arguments);try{arr(D.subs).forEach(s=>syncBest(fixedCurrentRec('sub',s.id),false));arr(D.loans).forEach(l=>syncBest(fixedCurrentRec('loan',l.id),false))}catch(e){console.log('18.6O fixed sync hook',e)}return ret};try{syncAllFixedAAReceivables=window.syncAllFixedAAReceivables}catch(_){}}
+  if(oldSyncAll){window.syncAllFixedAAReceivables=function(){const ret=oldSyncAll.apply(this,arguments);try{arr(D.subs).forEach(s=>syncBest(fixedCurrentRec('sub',s.id),false,{reason:'fixed_sync'}));arr(D.loans).forEach(l=>syncBest(fixedCurrentRec('loan',l.id),false,{reason:'fixed_sync'}))}catch(e){console.log('18.6O fixed sync hook',e)}return ret};try{syncAllFixedAAReceivables=window.syncAllFixedAAReceivables}catch(_){}}
   const oldSaveSub=window.saveSub;
   if(oldSaveSub){window.saveSub=function(){const id=U&&U.editSubId,before=id?fixedCurrentRec('sub',id):null;const ret=oldSaveSub.apply(this,arguments);try{const obj=id?arr(D.subs).find(s=>same(s.id,id)):arr(D.subs)[arr(D.subs).length-1],r=obj?fixedCurrentRec('sub',obj.id):null;if(r&&!r.hidden)syncBest(r,true);else if(before)cancelCloudRec(before)}catch(e){console.log('18.6O saveSub hook',e)}return ret};try{saveSub=window.saveSub}catch(_){}}
   const oldSaveLoan=window.saveLoan;
