@@ -2252,6 +2252,7 @@ function renderAA(){
     _shortcutSyncing=false;
   };
   function maybeAutoSync(){
+    if(typeof U!=='undefined'&&U&&U.tab==='aa')return;/* AA-stability fix: don't auto-import / cloud-sync while the AA page is open, so a background sync can't replace the AA DOM under the user. Imports resume on other tabs / unlock / online. */
     if(localStorage.getItem(AUTO_IMPORT_KEY)==='0')return;
     if(Date.now()-_shortcutLastSync<45000)return;
     setTimeout(()=>rmSyncShortcutEntries(false),1200);
@@ -2413,7 +2414,7 @@ function renderAA(){
     }catch(e){console.log('rmSyncTelegramAA',e);if(show)toast('Telegram AA 同步失败');}
     _syncing=false;
   };
-  function maybeSyncAA(){if(U.tab!=='aa')return;if(Date.now()-_last<30000)return;setTimeout(()=>window.rmSyncTelegramAA(false),700);}
+  function maybeSyncAA(){/* AA-stability fix (root cause): this fired on every render() while the AA tab was open and scheduled a cloud re-sync that rebuilt D.aaReceivables/receipts/incomes and called render() again — a self-retriggering loop that made the AA page flicker and swing record counts (e.g. 1笔 <-> 23笔). Disabled here. Telegram AA still imports on app load / unlock / online / shortcut sync and whenever you re-enter the AA tab. */return;}
   const _baseRender=window.render||render;window.render=function(){_baseRender();maybeSyncAA();};
   const _baseShortcutSync=window.rmSyncShortcutEntries; if(_baseShortcutSync){window.rmSyncShortcutEntries=async function(show){await _baseShortcutSync(show);await window.rmSyncTelegramAA(false);};}
   const _baseAAInfo=window.aaSourceInfo||aaSourceInfo; window.aaSourceInfo=function(r){
@@ -4462,6 +4463,338 @@ function telegramFiles15(raw){
       document.head.appendChild(st);
     }
   }catch(_){ }
+})();
+
+// PHASE 18.5B — app-only correctness patch
+// Scope: manual AA visibility, display-only AA cash summary, fixed AA burden split,
+// fixed date copy, and iOS/PWA audio unlock. No cloud/schema/calculation refactor.
+(()=>{
+  const A=Array.isArray;
+  const arr=x=>A(x)?x:[];
+  const N=x=>Number(x)||0;
+  const round=x=>Math.round(N(x)*100)/100;
+  const id=x=>String(x==null?'':x);
+  const same=(a,b)=>id(a)===id(b);
+  const esc=s=>id(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const F=x=>{try{return typeof fmt==='function'?fmt(N(x)):('RM '+N(x).toFixed(2))}catch(_){return 'RM '+N(x).toFixed(2)}};
+  const todayIso=()=>{try{return typeof todayISO==='function'?todayISO():new Date().toISOString().slice(0,10)}catch(_){return new Date().toISOString().slice(0,10)}};
+  const todayShort=()=>{try{return typeof today==='function'?today():todayIso()}catch(_){return todayIso()}};
+  const nowHM=()=>{const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')};
+  function ensure18_5B(){if(!A(D.aaPeople))D.aaPeople=[];if(!A(D.aaReceivables))D.aaReceivables=[];if(!A(D.cards))D.cards=[];if(!A(D.subs))D.subs=[];if(!A(D.loans))D.loans=[];}
+  function aaName18_5B(pid){const p=arr(D.aaPeople).find(x=>same(x.id,pid));return p&&p.name?p.name:'AA 对象';}
+  function splitOwed18_5B(total,split){
+    total=N(total); split=split||{};
+    if(!split||!split.enabled)return 0;
+    if(split.method==='amount')return Math.min(total,Math.max(0,N(split.amount)));
+    if(split.method==='percent')return round(total*Math.max(0,N(split.percent))/100);
+    const parts=Math.max(2,N(split.parts||split.split||2));
+    return round(total*(parts-1)/parts);
+  }
+  function fixedAAOwed18_5B(obj,total){return obj&&obj.aaSplit&&obj.aaSplit.enabled?splitOwed18_5B(total,obj.aaSplit):0;}
+  function ownAmount18_5B(obj,total){return Math.max(0,round(N(total)-fixedAAOwed18_5B(obj,total)));}
+  window.fixedAAOwed18_5B=fixedAAOwed18_5B;
+  window.fixedOwnAmount18_5B=ownAmount18_5B;
+  window.getMonthlyFixedCashflowTotal18_5B=function(){
+    ensure18_5B();
+    let cc=[];try{cc=arr(getCreditCardMonthlyObligations())}catch(_){}
+    return round(arr(D.subs).reduce((a,s)=>a+N(s.amt),0)+arr(D.loans).reduce((a,l)=>a+N(l.monthly),0)+cc.reduce((a,o)=>a+N(o.amount),0));
+  };
+  window.getMyMonthlyFixedTotal18_5B=function(){
+    ensure18_5B();
+    let cc=[];try{cc=arr(getCreditCardMonthlyObligations())}catch(_){}
+    return round(arr(D.subs).reduce((a,s)=>a+ownAmount18_5B(s,s.amt),0)+arr(D.loans).reduce((a,l)=>a+ownAmount18_5B(l,l.monthly),0)+cc.reduce((a,o)=>a+ownAmount18_5B(o,o.amount),0));
+  };
+  function getMonthlyFixedTotal18_5B(){return window.getMyMonthlyFixedTotal18_5B();}
+  try{window.getMonthlyFixedTotal=getMonthlyFixedTotal18_5B;getMonthlyFixedTotal=getMonthlyFixedTotal18_5B;}catch(_){}
+  try{window.getFixedMonthlyTotalIncludingCardPayments=getMonthlyFixedTotal18_5B;getFixedMonthlyTotalIncludingCardPayments=getMonthlyFixedTotal18_5B;}catch(_){}
+
+  function syncManualReceivable18_5B(p,t){
+    ensure18_5B();
+    if(!p||!t)return;
+    D.aaReceivables=arr(D.aaReceivables).filter(r=>!(r.sourceType==='manual_aa'&&same(r.sourceId,t.id)));
+    if(t.paidBy!=='me')return;
+    const split={enabled:true,personId:p.id,personName:p.name,method:'equal',parts:N(t.split||2)};
+    const owed=splitOwed18_5B(t.total,split);
+    if(!owed)return;
+    D.aaReceivables.unshift({
+      id:(typeof nid==='function'?nid():Date.now()),
+      sourceType:'manual_aa',
+      sourceId:t.id,
+      personId:p.id,
+      personName:p.name||aaName18_5B(p.id),
+      desc:t.desc||'AA 分账',
+      category:t.catLabel||'其他 Others',
+      catLabel:t.catLabel||'其他 Others',
+      catIcon:t.catIcon||'ti-receipt',
+      totalAmount:N(t.total),
+      owedAmount:owed,
+      settledAmount:0,
+      status:'unpaid',
+      date:t.isoDate||todayIso(),
+      isoDate:t.isoDate||todayIso(),
+      time:t.time||nowHM()
+    });
+  }
+  const oldSaveAATxn18_5B=window.saveAATxn||saveAATxn;
+  window.saveAATxn=function(){
+    ensure18_5B();
+    const p=arr(D.aaPeople).find(x=>same(x.id,U.activePersonId));
+    if(!p){try{return oldSaveAATxn18_5B()}catch(_){toast('找不到 AA 对象');return;}}
+    if(!A(p.txns))p.txns=[];
+    const desc=(typeof v==='function'?v('aa-desc'):'').trim();
+    const total=typeof pf==='function'?pf('aa-total'):0;
+    if(!desc||!total){toast('请填写描述和金额');return;}
+    const cat=U.selCatId?arr(D.spendCats).find(c=>same(c.id,U.selCatId)):null;
+    const payCard=U.selPayId?arr(D.cards).find(c=>same(c.id,U.selPayId)):null;
+    let txn;
+    if(U.activeEditTxnId){
+      const idx=p.txns.findIndex(t=>same(t.id,U.activeEditTxnId));
+      txn=idx>-1?p.txns[idx]:{id:U.activeEditTxnId};
+      Object.assign(txn,{desc,total,paidBy:U.selPaidBy||'me',split:N(U.selSplit||2),catId:U.selCatId,catLabel:cat?cat.label:'其他 Others',catIcon:cat?cat.icon:'ti-receipt',payId:U.selPayId,payName:payCard?payCard.name:null,isoDate:txn.isoDate||todayIso(),date:txn.date||todayShort(),time:txn.time||nowHM(),settled:false});
+      if(idx>-1)p.txns[idx]=txn;else p.txns.unshift(txn);
+    }else{
+      if(payCard&&(U.selPaidBy||'me')==='me'){
+        if(payCard.type==='cc'){
+          const oldCurrent=N(payCard.currentOutstanding||payCard.owed);
+          payCard.owed=round(N(payCard.owed)+total);
+          payCard.currentOutstanding=round(oldCurrent+total);
+          try{ensureCardCycle&&ensureCardCycle(payCard);}catch(_){}
+        }else if(payCard.type==='ew'||payCard.type==='saving'){
+          if(N(payCard.balance)<total){toast('余额不足');return;}
+          payCard.balance=round(N(payCard.balance)-total);
+        }
+      }
+      txn={id:(typeof nid==='function'?nid():Date.now()),desc,total,paidBy:U.selPaidBy||'me',split:N(U.selSplit||2),catId:U.selCatId,catLabel:cat?cat.label:'其他 Others',catIcon:cat?cat.icon:'ti-receipt',payId:U.selPayId,payName:payCard?payCard.name:null,isoDate:todayIso(),date:todayShort(),time:nowHM(),settled:false};
+      p.txns.unshift(txn);
+    }
+    syncManualReceivable18_5B(p,txn);
+    save();toast(U.activeEditTxnId?'✓ 已更新':'✓ 已记录');closeModal();try{render()}catch(_){}
+  };
+  try{saveAATxn=window.saveAATxn;}catch(_){}
+  const oldDelAATxn18_5B=window.delAATxn||delAATxn;
+  window.delAATxn=function(pid,tid){
+    ensure18_5B();
+    const p=arr(D.aaPeople).find(x=>same(x.id,pid));
+    if(p&&A(p.txns))p.txns=p.txns.filter(t=>!same(t.id,tid));
+    D.aaReceivables=arr(D.aaReceivables).filter(r=>!(r.sourceType==='manual_aa'&&same(r.sourceId,tid)));
+    save();try{render()}catch(_){}
+  };
+  try{delAATxn=window.delAATxn;}catch(_){}
+  window.delAATxn18_5B=window.delAATxn;
+  if(!window.delAATxn14)window.delAATxn14=window.delAATxn;
+
+  const oldRenderHome18_5B=window.renderHome||renderHome;
+  window.renderHome=function(){
+    let h=id(oldRenderHome18_5B());
+    const aa=typeof getAAReceivableTotal==='function'?N(getAAReceivableTotal()):arr(D.aaReceivables).reduce((a,r)=>a+Math.max(0,N(r.owedAmount)-N(r.settledAmount)),0);
+    const cash=typeof getCashNow==='function'?N(getCashNow()):0;
+    h=h.replace(/月固定 Fixed Monthly/g,'我的月固定 My Fixed');
+    h=h.replace(/<div class="sec">最近记录[\s\S]*?<\/div><\/div>\s*$/,'');
+    const aaCards=`<div class="sc" style="--scc:var(--green)"><div class="sc-top"><div class="sc-ic" style="background:#0a8a541a;color:#0a8a54"><i class="ti ti-users"></i></div><div class="sl" style="margin:0">AA 待收</div></div><div class="sv g">${F(aa)}</div></div><div class="sc" style="--scc:var(--blue)"><div class="sc-top"><div class="sc-ic" style="background:#0a84ff1a;color:#0a84ff"><i class="ti ti-cash-banknote"></i></div><div class="sl" style="margin:0">收回后 Cash</div></div><div class="sv b">${F(cash+aa)}</div></div>`;
+    if(!h.includes('AA 待收</div></div><div class="sv g">')){
+      const marker='<div class="sec">储蓄目标';
+      const m=h.indexOf(marker);
+      if(m>-1){
+        const before=h.slice(0,m),after=h.slice(m),close=before.lastIndexOf('</div>');
+        h=close>-1?before.slice(0,close)+aaCards+before.slice(close)+after:h.replace(marker,aaCards+marker);
+      }else h+=`<div class="sg">${aaCards}</div>`;
+    }
+    return h;
+  };
+  try{renderHome=window.renderHome;}catch(_){}
+
+  const oldRenderFixed18_5B=window.renderFixed||renderFixed;
+  window.renderFixed=function(){
+    const full=window.getMonthlyFixedCashflowTotal18_5B();
+    const mine=window.getMyMonthlyFixedTotal18_5B();
+    const aa=Math.max(0,round(full-mine));
+    let h=oldRenderFixed18_5B();
+    function infoLine(obj,total){const a=fixedAAOwed18_5B(obj,total),mine=ownAmount18_5B(obj,total);return a>0?`<div class="fixed-aa-cost18">自己负担 ${F(mine)} · AA待收 ${F(a)}</div>`:'';}
+    function insertAfterName(html,name,line){if(!line||!name)return html;const safe=esc(name);const re=new RegExp(`(<div class="(?:acct-n|name|inst-name)">${safe.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}<\\/div>)`);return html.replace(re,`$1${line}`);}
+    arr(D.subs).forEach(s=>{h=insertAfterName(h,s.name,infoLine(s,s.amt));});
+    arr(D.loans).forEach(l=>{h=insertAfterName(h,l.name,infoLine(l,l.monthly));});
+    let cc=[];try{cc=arr(getCreditCardMonthlyObligations())}catch(_){}
+    cc.forEach(o=>{h=insertAfterName(h,o.name,infoLine(o,o.amount));});
+    const summary=`<div class="sec">固定支出 Fixed</div><div class="sg"><div class="sc" style="--scc:var(--red)"><div class="sl">本月要先付 Cash Out</div><div class="sv r">${F(full)}</div></div><div class="sc" style="--scc:var(--orange)"><div class="sl">我的真实负担 My Cost</div><div class="sv b">${F(mine)}</div></div><div class="sc" style="--scc:var(--green)"><div class="sl">AA 待收</div><div class="sv g">${F(aa)}</div></div></div><div class="ib b" style="margin:8px 0 12px">AA 分摊的账单：提醒按全额，月固定按自己负担计算。</div>`;
+    return summary+id(h).replace(/月固定 Fixed Monthly/g,'我的真实负担 My Cost');
+  };
+  try{renderFixed=window.renderFixed;}catch(_){}
+
+  function aaYm18_5C(iso){return id(iso||todayIso()).slice(0,7);}
+  function aaMonth18_5C(){const d=new Date();d.setDate(1);d.setMonth(d.getMonth()+N(U.aaMonthOffset17||0));return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
+  function aaPersonMatch18_5C(r,p){if(!r||!p)return false;if(r.personId&&same(r.personId,p.id))return true;if(r.partnerId&&same(r.partnerId,p.id))return true;const pn=id(r.personName||r.partnerName||'').trim().toLowerCase();return pn&&pn===id(p.name).trim().toLowerCase();}
+  function aaPeople18_5C(){
+    ensure18_5B();
+    const map=new Map();
+    function add(p){if(!p)return;const name=p.name||p.personName||p.partnerName||'AA 对象',key=id(name).trim().toLowerCase();if(!key)return;const old=map.get(key)||{};map.set(key,{...old,...p,id:old.id||p.id||p.personId||p.partnerId||('aa-'+key),name,color:p.color||old.color||'#0a8a54'});}
+    arr(D.aaPeople).forEach(add);
+    arr(D.aaReceivables).forEach(r=>add({id:r.personId||r.partnerId,name:r.personName||r.partnerName||aaName18_5B(r.personId),color:'#0a8a54'}));
+    return [...map.values()];
+  }
+  function aaCurrentRows18_5C(p,ym,picked){return arr(D.aaReceivables).filter(r=>aaPersonMatch18_5C(r,p)&&N(r.owedAmount)>N(r.settledAmount)&&aaYm18_5C(r.isoDate||r.date)===ym&&(!picked||r.isoDate===picked||r.date===picked));}
+  function aaDue18_5C(r){return Math.max(0,round(N(r.owedAmount)-N(r.settledAmount)));}
+  function aaTxnInfo18_5C(t){
+    const m=t&&(t.aaPermanent||t.aaMeta||t.aaSplit);
+    if(!m||m.enabled===false)return null;
+    const owed=N(m.owedAmount||m.owed||m.amount||N(t.amt)/2);
+    const settled=N(m.settledAmount||m.settled||0);
+    return {personId:m.personId||m.partnerId,personName:m.personName||m.partnerName||aaName18_5B(m.personId),owed,settled,due:Math.max(0,owed-settled)};
+  }
+  function aaHistoryRows18_5C(ym,picked){
+    const rows=[];
+    arr(D.txns).forEach(t=>{const aa=aaTxnInfo18_5C(t);if(!aa)return;const iso=t.isoDate||todayIso();if(aaYm18_5C(iso)===ym&&(!picked||iso===picked))rows.push({type:'txn',iso,time:t.time||'',t,aa});});
+    arr(D.aaSettlementReceipts).forEach(r=>{const iso=r.isoDate||r.date||'';if(!r.hidden&&aaYm18_5C(iso)===ym&&(!picked||iso===picked))rows.push({type:'receipt',iso,time:r.time||'',r});});
+    arr(D.incomes).forEach(i=>{const isAA=i&&(i.sourceType==='aa_settlement'||i.source==='telegram_aa_settlement'||i.aaSettlementId||i.settlementId);const iso=i.isoDate||'';if(isAA&&!i.hidden&&aaYm18_5C(iso)===ym&&(!picked||iso===picked))rows.push({type:'receipt',iso,time:i.time||'',r:{settlementId:i.settlementId||i.aaSettlementId||i.id,amount:i.amt,partnerName:i.partnerName,partnerId:i.partnerId,cardName:i.receiveCardName,date:i.date,isoDate:i.isoDate,time:i.time}});});
+    return rows.sort((a,b)=>id((b.iso||'')+' '+(b.time||'')).localeCompare(id((a.iso||'')+' '+(a.time||''))));
+  }
+  function aaNav18_5C(){const off=N(U.aaMonthOffset17||0),ym=aaMonth18_5C();return `<div class="month-nav"><button class="mn-btn" onclick="setAAMonth18_5C(-1)"><i class="ti ti-chevron-left"></i></button><div class="mn-lbl">${ym.slice(0,4)}年${Number(ym.slice(5,7))}月${off===0?' · 本月':''}</div><button class="mn-btn" ${off>=0?'disabled style="opacity:.3"':''} onclick="setAAMonth18_5C(1)"><i class="ti ti-chevron-right"></i></button></div>`;}
+  function aaDayStrip18_5C(dates){dates=[...new Set(arr(dates).filter(Boolean))].sort();const picked=(U.dayFilters17&&U.dayFilters17.aa)||'';if(!dates.length)return'';return `<div class="day-strip phase18-days"><button class="day-chip ${!picked?'on':''}" onclick="clearDay17&&clearDay17('aa')"><span class="dc-d">All</span><span class="dc-w">全部</span></button>${dates.map(dt=>{const d=new Date(dt+'T00:00:00');return `<button class="day-chip ${picked===dt?'on':''}" onclick="pickDay17&&pickDay17('aa','${dt}')"><span class="dc-d">${d.getDate()}</span><span class="dc-w">${d.toLocaleDateString('zh-CN',{weekday:'short'}).replace('星期','周')}</span></button>`}).join('')}</div>`;}
+  window.setAAMonth18_5C=function(delta){U.aaMonthOffset17=N(U.aaMonthOffset17||0)+N(delta||0);if(U.aaMonthOffset17>0)U.aaMonthOffset17=0;if(!U.dayFilters17)U.dayFilters17={};delete U.dayFilters17.aa;render();};
+  window.setAAMainTab18_5C=function(tab){tab=tab==='history'?'history':'current';if(U.aaMainTab18===tab)return;U.aaMainTab18=tab;U.aaHistoryLimit18_5C=30;render();};
+  window.setAAHistoryPerson18_5C=function(pid){U.aaHistoryPerson18=id(pid||'all');U.aaHistoryLimit18_5C=30;render();};
+  window.loadMoreAAHistory18_5C=function(){U.aaHistoryLimit18_5C=N(U.aaHistoryLimit18_5C||30)+30;render();};
+  function aaTabs18_5C(tab){return `<div class="aa-tabs-fast18"><button type="button" class="aa-fast-tab ${tab==='current'?'on':''}" onclick="setAAMainTab18_5C('current')">目前消费</button><button type="button" class="aa-fast-tab ${tab==='history'?'on':''}" onclick="setAAMainTab18_5C('history')">记录</button></div>`;}
+  function aaCurrentHtml18_5C(ps,ym,picked){
+    let h='';
+    ps.forEach(p=>{const rows=aaCurrentRows18_5C(p,ym,picked),cur=rows.reduce((a,r)=>a+aaDue18_5C(r),0),open=same(U.expandedId,p.id);h+=`<div class="aa-p" style="--tint:${esc(p.color||'var(--accent)')}"><div class="aa-h" onclick="toggle(${JSON.stringify(p.id)})"><div class="aa-av" style="background:${esc(p.color||'#0a8a54')}22;color:${esc(p.color||'var(--accent)')}">${esc(id(p.name||'AA').slice(0,2).toUpperCase())}</div><div class="aa-info"><div class="aa-name">${esc(p.name||'AA 对象')}</div><div class="aa-sub">目前 ${rows.length} 笔</div></div><div class="aa-bal"><div class="aa-num" style="color:${cur>0?'var(--green)':'var(--text3)'}">${cur?F(cur):'—'}</div><div class="aa-lbl">${cur?'待收':'已结清'}</div></div><i class="ti ti-chevron-down chevron ${open?'rot':''}"></i></div>`;if(open){h+=`<div class="aa-body">`;if(!rows.length)h+=`<div style="padding:18px 0;text-align:center;font-size:13px;color:var(--text3)">目前没有未结清 AA</div>`;rows.slice(0,20).forEach(r=>{const due=aaDue18_5C(r);h+=`<div class="aa-txn"><div class="aa-txn-ic"><i class="ti ${esc(r.catIcon||'ti-users')}"></i></div><div class="aa-txn-m"><div class="aa-txn-n">${esc(r.desc||'AA 分账')}</div><div class="aa-txn-s"><div class="txn-meta">${esc(r.category||r.catLabel||'其他 Others')}</div><div class="txn-meta txn-date">${esc(r.date||r.isoDate||'')}${r.time?' · '+esc(r.time):''}</div></div></div><div class="aa-txn-side"><div class="aa-txn-r"><div class="aa-txn-a" style="color:var(--green)">+${F(due)}</div><div class="aa-txn-w">待收</div></div><div class="aa-txn-tools"><i class="ti ti-trash" onclick="event.stopPropagation();window.delAAReceivable14&&window.delAAReceivable14(${JSON.stringify(r.id)})" style="color:var(--red);font-size:19px;padding:4px"></i></div></div></div>`;});if(rows.length>20)h+=`<div style="padding:10px;text-align:center;color:var(--text3);font-size:12px">只显示前 20 笔，记录页可看更多。</div>`;h+=`<div class="aa-acts"><button class="btn pay" onclick="event.stopPropagation();(window.openAAAddTxn18_2||function(pid){openModal('addAATxn',{activePersonId:pid,selPaidBy:'me',selSplit:2})})(${JSON.stringify(p.id)})"><i class="ti ti-plus"></i>加记录</button><button class="btn del" onclick="event.stopPropagation();window.delAAPerson14&&window.delAAPerson14(${JSON.stringify(p.id)})"><i class="ti ti-trash"></i></button></div></div>`;}h+=`</div>`;});
+    return h+`<button class="add-btn" onclick="(window.openAAAddPerson18_3||function(){openModal('addAAPerson')})()"><i class="ti ti-user-plus"></i>添加分账对象</button>`;
+  }
+  function aaHistoryHtml18_5C(ps,ym,picked){
+    const all=aaHistoryRows18_5C(ym,picked),sel=ps.find(p=>same(p.id,U.aaHistoryPerson18)),rows=sel?all.filter(x=>x.type==='receipt'?aaPersonMatch18_5C({partnerId:x.r.partnerId,partnerName:x.r.partnerName},sel):aaPersonMatch18_5C({personId:x.aa.personId,personName:x.aa.personName},sel)):all;
+    const limit=Math.max(30,N(U.aaHistoryLimit18_5C||30)),shown=rows.slice(0,limit);
+    let h=`<div class="day-strip phase18-persons"><button class="day-chip ${!sel?'on':''}" onclick="setAAHistoryPerson18_5C('all')"><span class="dc-d">全部</span><span class="dc-w">${all.length}笔</span></button>${ps.map(p=>`<button class="day-chip ${sel&&same(sel.id,p.id)?'on':''}" onclick="setAAHistoryPerson18_5C(${JSON.stringify(p.id)})"><span class="dc-d">${esc(p.name||'AA')}</span><span class="dc-w">${all.filter(x=>x.type==='receipt'?aaPersonMatch18_5C({partnerId:x.r.partnerId,partnerName:x.r.partnerName},p):aaPersonMatch18_5C({personId:x.aa.personId,personName:x.aa.personName},p)).length}笔</span></button>`).join('')}</div><div class="card aa-history-card18">`;
+    if(!rows.length)h+=`<div style="padding:20px 0;text-align:center;font-size:13px;color:var(--text3)">这个月份没有 AA 记录</div>`;
+    shown.forEach(x=>{if(x.type==='receipt'){const r=x.r;h+=`<div class="aa-txn"><div class="aa-txn-ic" style="color:var(--green)"><i class="ti ti-cash"></i></div><div class="aa-txn-m"><div class="aa-txn-n">${esc(r.partnerName||'AA 对象')} 收到还款 ${F(r.amount)}</div><div class="aa-txn-s"><div class="txn-meta">${esc(r.cardName||'未指定入账')} · ${esc(r.date||r.isoDate||'')}${r.time?' · '+esc(r.time):''}</div></div></div><div class="aa-txn-tools"><i class="ti ti-trash" onclick="event.stopPropagation();delAAReceipt17&&delAAReceipt17('${esc(r.settlementId||'')}')" style="color:var(--red);font-size:18px;padding:5px"></i></div></div>`;}else{const t=x.t,aa=x.aa,files=arr(t.files).length>0;h+=`<div class="aa-txn"><div class="aa-txn-ic"><i class="ti ${esc(t.catIcon||'ti-receipt')}"></i></div><div class="aa-txn-m"><div class="aa-txn-n">${esc(aa.personName||'AA 对象')} · ${esc(t.desc||'AA 消费')}</div><div class="aa-txn-s"><div class="txn-meta">${esc(t.catLabel||'其他 Others')} · 总 ${F(t.amt)} · AA ${F(aa.owed)}${aa.due<=0?' · 已结清':''}</div><div class="txn-meta txn-date">${esc(t.date||'')}${t.time?' · '+esc(t.time):''}${files?' · 有附件':''}</div></div></div><div class="aa-txn-tools">${files?`<i class="ti ti-paperclip" onclick="event.stopPropagation();viewTxn&&viewTxn(${JSON.stringify(t.id)})" style="color:var(--accent);font-size:19px;padding:5px"></i>`:''}<i class="ti ti-trash" onclick="event.stopPropagation();delAAHistory17&&delAAHistory17('txn',${JSON.stringify(t.id)})" style="color:var(--red);font-size:18px;padding:5px"></i></div></div>`;}});
+    if(rows.length>shown.length)h+=`<div style="padding:12px;text-align:center"><button class="btn" style="width:100%;justify-content:center" onclick="event.stopPropagation();loadMoreAAHistory18_5C()">加载更多 / Load more · ${shown.length}/${rows.length}</button></div>`;
+    return h+`</div><button class="add-btn" onclick="(window.openAAAddPerson18_3||function(){openModal('addAAPerson')})()"><i class="ti ti-user-plus"></i>添加分账对象</button>`;
+  }
+  window.renderAA=function(){
+    ensure18_5B();if(!U.dayFilters17||typeof U.dayFilters17!=='object')U.dayFilters17={};
+    const ym=aaMonth18_5C(),picked=U.dayFilters17.aa||'',tab=U.aaMainTab18==='history'?'history':'current',ps=aaPeople18_5C();
+    const currentDates=arr(D.aaReceivables).filter(r=>N(r.owedAmount)>N(r.settledAmount)&&aaYm18_5C(r.isoDate||r.date)===ym).map(r=>r.isoDate||r.date);
+    const dates=tab==='history'?aaHistoryRows18_5C(ym,'').map(x=>x.iso):currentDates;
+    const total=arr(D.aaReceivables).reduce((a,r)=>a+Math.max(0,N(r.owedAmount)-N(r.settledAmount)),0);
+    let h=`${aaNav18_5C()}${aaDayStrip18_5C(dates)}<div class="sg"><div class="sc" style="--scc:var(--green)"><div class="sl">AA 待收</div><div class="sv g">${F(total)}</div></div></div>${aaTabs18_5C(tab)}<div id="aa-fast-content18">`;
+    if(!ps.length)h+=`<div class="empty" style="margin-top:40px"><div class="empty-ic"><i class="ti ti-users"></i></div><div class="et">还没有分账记录</div><div class="es">添加朋友或女朋友<br>开始记录 AA 消费</div></div><button class="add-btn" onclick="(window.openAAAddPerson18_3||function(){openModal('addAAPerson')})()"><i class="ti ti-user-plus"></i>添加分账对象</button>`;
+    else h+=tab==='history'?aaHistoryHtml18_5C(ps,ym,picked):aaCurrentHtml18_5C(ps,ym,picked);
+    return h+'</div>';
+  };
+  try{renderAA=window.renderAA;}catch(_){}
+  try{if(!document.getElementById('phase18-5c-aa-css')){const st=document.createElement('style');st.id='phase18-5c-aa-css';st.textContent=`.aa-p,.aa-history-card18 .aa-txn{content-visibility:visible!important;contain-intrinsic-size:auto!important}.aa-tabs-fast18 .aa-fast-tab{touch-action:manipulation}.fixed-aa-cost18{margin-top:4px;font-size:11.5px;line-height:1.35;color:var(--green);font-weight:750}`;document.head.appendChild(st);}}catch(_){}
+
+  function closeAAQuickAdd18_5C3(){
+    const el=document.getElementById('aa-quickadd18c3');
+    if(el)el.remove();
+    try{document.body.classList.remove('aa-quickadd-open18c3')}catch(_){}
+  }
+  function aaQuickDefaultPerson18_5C3(pid){
+    ensure18_5B();
+    return arr(D.aaPeople).find(p=>same(p.id,pid))||arr(D.aaPeople)[0]||null;
+  }
+  function aaQuickCatOptions18_5C3(){
+    const cats=arr(D.spendCats);
+    if(!cats.length)return `<option value="">其他 Others</option>`;
+    return cats.map(c=>`<option value="${esc(c.id)}">${esc(c.label||'其他 Others')}</option>`).join('');
+  }
+  function saveAAQuickAdd18_5C3(){
+    ensure18_5B();
+    const root=document.getElementById('aa-quickadd18c3'); if(!root)return;
+    const pid=root.querySelector('#aaq-person')?.value;
+    const p=aaQuickDefaultPerson18_5C3(pid);
+    if(!p){toast('请先添加 AA 对象');return;}
+    const total=N(root.querySelector('#aaq-amt')?.value);
+    const desc=id(root.querySelector('#aaq-desc')?.value).trim();
+    const iso=root.querySelector('#aaq-date')?.value||todayIso();
+    const time=root.querySelector('#aaq-time')?.value||nowHM();
+    const split=Math.max(2,N(root.querySelector('#aaq-split')?.value||2));
+    if(!total){toast('请输入金额');return;}
+    if(!desc){toast('请输入描述');return;}
+    const catId=root.querySelector('#aaq-cat')?.value||'';
+    const cat=arr(D.spendCats).find(c=>same(c.id,catId));
+    const rid=(typeof nid==='function'?nid():Date.now());
+    const owed=round(total*(split-1)/split);
+    const rec={
+      id:rid,
+      sourceType:'manual_aa',
+      sourceId:rid,
+      personId:p.id,
+      personName:p.name||'AA 对象',
+      desc,
+      category:cat?cat.label:'其他 Others',
+      catLabel:cat?cat.label:'其他 Others',
+      catIcon:cat?cat.icon:'ti-receipt',
+      totalAmount:total,
+      shareAmount:round(total/split),
+      owedAmount:owed,
+      settledAmount:0,
+      split,
+      status:'unpaid',
+      date:iso,
+      isoDate:iso,
+      time
+    };
+    D.aaReceivables=arr(D.aaReceivables).filter(r=>!(r.sourceType==='manual_aa'&&same(r.sourceId,rec.sourceId)));
+    D.aaReceivables.unshift(rec);
+    U.aaMainTab18='current';
+    U.expandedId=p.id;
+    save();
+    closeAAQuickAdd18_5C3();
+    try{render()}catch(_){}
+    toast('✓ 已加入 AA 待收');
+  }
+  window.closeAAQuickAdd18_5C3=function(){closeAAQuickAdd18_5C3();};
+  window.saveAAQuickAdd18_5C3=function(){saveAAQuickAdd18_5C3();};
+  window.openAAQuickAdd=function(pid){
+    ensure18_5B();
+    const p=aaQuickDefaultPerson18_5C3(pid);
+    if(!p){toast('请先添加 AA 对象');return;}
+    closeAAQuickAdd18_5C3();
+    const people=arr(D.aaPeople).map(x=>`<option value="${esc(x.id)}" ${same(x.id,p.id)?'selected':''}>${esc(x.name||'AA 对象')}</option>`).join('');
+    const el=document.createElement('div');
+    el.id='aa-quickadd18c3';
+    el.className='aa-quickadd18c3';
+    el.innerHTML=`<div class="aaq-card18c3"><div class="aaq-top18c3"><button type="button" class="aaq-x18c3" onclick="closeAAQuickAdd18_5C3()"><i class="ti ti-x"></i></button><div><div class="aaq-title18c3">AA 加记录</div><div class="aaq-sub18c3">轻量表单 · 不需要选择付款方式</div></div></div><div class="field"><label>金额 Amount (RM)</label><input id="aaq-amt" type="number" inputmode="decimal" class="big" placeholder="0.00" autocomplete="off"/></div><div class="field"><label>描述 / 商家</label><input id="aaq-desc" placeholder="Lunch / Ticket / Parking" autocomplete="off"/></div><div class="field-row"><div class="field"><label>日期</label><input id="aaq-date" type="date" value="${esc(todayIso())}"/></div><div class="field"><label>时间</label><input id="aaq-time" type="time" value="${esc(nowHM())}"/></div></div><div class="field"><label>对象 Partner</label><select id="aaq-person">${people}</select></div><div class="field-row"><div class="field"><label>分摊 Split</label><select id="aaq-split"><option value="2" selected>AA 一人一半 / ÷2</option><option value="3">÷3</option><option value="4">÷4</option></select></div><div class="field"><label>类别 Category</label><select id="aaq-cat">${aaQuickCatOptions18_5C3()}</select></div></div><div class="aaq-note18c3"><i class="ti ti-info-circle"></i> 方向：这笔有人要还我 / Others owe me。这里只记录 AA 待收，不影响卡片余额。</div><div class="ma"><button onclick="closeAAQuickAdd18_5C3()">取消</button><button class="ok" onclick="saveAAQuickAdd18_5C3()">保存</button></div></div>`;
+    document.body.appendChild(el);
+    try{document.body.classList.add('aa-quickadd-open18c3')}catch(_){}
+    setTimeout(()=>{try{document.getElementById('aaq-desc')?.focus({preventScroll:true})}catch(_){}} ,80);
+  };
+  window.openAAAddTxn18_2=function(pid){window.openAAQuickAdd(pid);};
+  window.openAAAddTxn18_3=function(pid){window.openAAQuickAdd(pid);};
+  try{if(!document.getElementById('phase18-5c3-aa-quickadd-css')){const st=document.createElement('style');st.id='phase18-5c3-aa-quickadd-css';st.textContent=`.aa-quickadd18c3{position:fixed;inset:0;z-index:100000;background:var(--bg);color:var(--text);overflow:auto;-webkit-overflow-scrolling:touch;padding:calc(env(safe-area-inset-top) + 16px) 18px calc(env(safe-area-inset-bottom) + 22px);box-sizing:border-box}.aaq-card18c3{max-width:560px;margin:0 auto}.aaq-top18c3{display:flex;align-items:center;gap:12px;margin:4px 0 18px}.aaq-x18c3{width:42px;height:42px;border-radius:14px;border:1px solid var(--border);background:var(--card);color:var(--text2);font-size:19px}.aaq-title18c3{font-size:24px;font-weight:900;letter-spacing:-.02em}.aaq-sub18c3{font-size:13px;color:var(--text3);margin-top:3px}.aaq-note18c3{margin:12px 0 18px;padding:12px 13px;border-radius:15px;background:var(--green-bg);color:var(--text2);font-size:12.5px;line-height:1.45}.aa-quickadd18c3 input,.aa-quickadd18c3 select{font-size:16px!important}`;document.head.appendChild(st);}}catch(_){}
+
+  const oldBuildModal18_5B=window.buildModal||buildModal;
+  window.buildModal=function(){
+    let h=oldBuildModal18_5B();
+    if(U.modal==='addsub'){
+      h=id(h).replace(/续费 \/ 扣款日|扣款日/g,'每月续费日 / Due day').replace(/开始订阅日期/g,'第一期开始 / Start date');
+    }
+    if(U.modal==='addloan'){
+      h=id(h).replace(/还款日/g,'每月还款日 / 到期日').replace(/开始日期/g,'第一期开始 / Start date');
+    }
+    return h;
+  };
+  try{buildModal=window.buildModal;}catch(_){}
+
+  let audioUnlocked18_5B=false;
+  function unlockAudio18_5B(){
+    if(audioUnlocked18_5B)return;
+    audioUnlocked18_5B=true;
+    try{
+      const ac=typeof _ac==='function'?_ac():null;
+      if(!ac)return;
+      if(ac.state==='suspended')ac.resume();
+      const g=ac.createGain(),o=ac.createOscillator();
+      g.gain.value=0.00001;o.frequency.value=220;o.connect(g);g.connect(ac.destination);
+      o.start();o.stop(ac.currentTime+0.025);
+    }catch(_){}
+  }
+  ['pointerdown','touchstart','click'].forEach(ev=>{try{document.addEventListener(ev,unlockAudio18_5B,{once:true,passive:true,capture:true});}catch(_){}});
+  const oldPlaySound18_5B=window.playSound||playSound;
+  function playSound18_5B(kind,force){try{if(force||(D&&D.soundOn))unlockAudio18_5B();}catch(_){}return oldPlaySound18_5B(kind,force);}
+  window.playSound=playSound18_5B;try{playSound=playSound18_5B;}catch(_){}
+  const oldPreviewSound18_5B=window.previewSound||previewSound;
+  function previewSound18_5B(kind){unlockAudio18_5B();return oldPreviewSound18_5B?oldPreviewSound18_5B(kind):playSound18_5B(kind,true);}
+  window.previewSound=previewSound18_5B;try{previewSound=previewSound18_5B;}catch(_){}
 })();
 
 </script>
