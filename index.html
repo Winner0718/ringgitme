@@ -6544,6 +6544,142 @@ function telegramFiles15(raw){
   const baseSaveSpend=window.saveSpend||saveSpend;if(baseSaveSpend){window.saveSpend=saveSpend=function(){const id=U&&U.editId;if(id&&isLedgerRecord18_6U1(arr(D.txns).find(t=>same(t.id,id)))){window.openLedgerRecord18_6U2&&window.openLedgerRecord18_6U2(id,'expense');return}return baseSaveSpend.apply(this,arguments)}}
 })();
 
+// PHASE 18.6V-C.1 ? syncAll zero item and debug export fix.
+// PHASE 18.6V-C — person ledger cloud sync.
+(()=>{
+  const A=Array.isArray,arr=x=>A(x)?x:[],sid=x=>String(x==null?'':x),N=x=>Number(x)||0,r2=x=>Math.round(N(x)*100)/100,same=(a,b)=>sid(a)===sid(b);
+  const nowIso=()=>{try{return typeof nowISO==='function'?nowISO():new Date().toISOString()}catch(_){return new Date().toISOString()}};
+  const dateOnly=x=>/^\d{4}-\d{2}-\d{2}/.test(sid(x))?sid(x).slice(0,10):null;
+  const people=()=>arr(D&&D.aaPeople),ensureItems18_6VC=()=>{if(!D.personLedgerItems)D.personLedgerItems=[];return arr(D.personLedgerItems)},items=()=>ensureItems18_6VC();
+  const personForItem=item=>people().find(p=>same(p.id,item&&item.personId))||{};
+  const partnerIdForPerson=p=>sid(p&&(p.telegramPartnerId||p.partnerId||p.supabasePartnerId))||null;
+  const cleanRaw18_6VC=(v,seen=new WeakSet())=>{
+    if(v==null)return v;
+    if(typeof v!=='object')return v;
+    if(seen.has(v))return null;
+    seen.add(v);
+    if(A(v))return v.map(x=>cleanRaw18_6VC(x,seen));
+    const out={};
+    Object.keys(v).forEach(k=>{
+      if(/^(dataUrl|data|base64|bytes)$/i.test(k))return;
+      const val=v[k];
+      if(typeof val==='string'&&val.length>500&&/^data:/i.test(val))return;
+      out[k]=cleanRaw18_6VC(val,seen);
+    });
+    return out;
+  };
+  const attachmentRaw18_6VC=att=>({...(cleanRaw18_6VC(att)||{}),hasLocalDataUrl:!!(att&&(att.dataUrl||att.data)),storagePending:!!(att&&(att.dataUrl||att.data))});
+  async function owner18_6VC(){try{if(window.rmCurrentOwnerUserId18_6O1)return await window.rmCurrentOwnerUserId18_6O1()}catch(_){}return ''}
+  function ownerHint18_6VC(){try{if(typeof SESSION!=='undefined'&&SESSION&&SESSION.user&&SESSION.user.id)return SESSION.user.id}catch(_){}try{if(window.SESSION&&window.SESSION.user&&window.SESSION.user.id)return window.SESSION.user.id}catch(_){}try{return localStorage.getItem('rm_owner')||''}catch(_){return ''}}
+  function fail18_6VC(reason,details={}){try{console.warn('[18.6V-C person ledger cloud sync]',reason,details)}catch(_){}return {ok:false,reason,...details}}
+  function client18_6VC(){try{return typeof supa!=='undefined'&&supa?supa:null}catch(_){return null}}
+  function personLedgerCloudItemPayload18_6VC(item,person={},ownerUserId=''){
+    const p=person&&person.id?person:personForItem(item),partnerId=partnerIdForPerson(p);
+    return {owner_user_id:ownerUserId,partner_id:partnerId,app_item_id:sid(item&&item.id),person_local_id:sid(item&&item.personId),person_name:sid(p.name||item&&item.personName),title:sid(item&&item.title),direction:sid(item&&item.direction),item_type:sid(item&&item.itemType),total_amount:r2(item&&item.totalAmount),monthly_amount:r2(item&&item.monthlyAmount),opening_paid_amount:r2(item&&item.openingPaidAmount),paid_amount:r2(item&&item.paidAmount),remaining_amount:r2(item&&item.remainingAmount),start_date:dateOnly(item&&item.startDate),due_day:N(item&&item.dueDay)||null,installment_total:N(item&&item.installmentTotal)||0,installment_paid:N(item&&item.installmentPaid)||0,status:sid(item&&item.status)||'active',notes:sid(item&&item.notes),raw:{source:'ringgitme_app',phase:'18.6V-C',local:sid(item&&item.id),synced_at:nowIso(),item:cleanRaw18_6VC({...item,payments:arr(item&&item.payments).map(p=>({...p,attachments:arr(p.attachments).map(a=>attachmentRaw18_6VC(a))}))})}};
+  }
+  function personLedgerCloudPaymentPayload18_6VC(payment,item,person={},cloudItemId='',ownerUserId=''){
+    const p=person&&person.id?person:personForItem(item),partnerId=partnerIdForPerson(p),atts=arr(payment&&payment.attachments);
+    return {owner_user_id:ownerUserId,ledger_item_id:cloudItemId||item&&item.cloudLedgerItemId||null,partner_id:partnerId,app_payment_id:sid(payment&&payment.id),app_item_id:sid(item&&item.id),payment_date:dateOnly(payment&&payment.date),amount:r2(payment&&payment.amount),direction:sid(payment&&payment.direction),account_id:sid(payment&&payment.accountId),account_type:sid(payment&&payment.accountType),account_name:sid(payment&&payment.accountName),affects_balance:!!(payment&&payment.affectsBalance),note:sid(payment&&payment.note),linked_txn_id:sid(payment&&payment.linkedTxnId),reversed_at:payment&&payment.reversedAt?sid(payment.reversedAt):null,edited_at:payment&&payment.editedAt?sid(payment.editedAt):null,edit_history:cleanRaw18_6VC(arr(payment&&payment.editHistory)),attachments_count:atts.length,raw:{source:'ringgitme_app',phase:'18.6V-C',local:sid(payment&&payment.id),synced_at:nowIso(),payment:cleanRaw18_6VC({...payment,attachments:atts.map(a=>attachmentRaw18_6VC(a))})}};
+  }
+  function personLedgerCloudAttachmentPayload18_6VC(att,payment,item,person={},cloudItemId='',cloudPaymentId='',ownerUserId=''){
+    const p=person&&person.id?person:personForItem(item),partnerId=partnerIdForPerson(p);
+    return {owner_user_id:ownerUserId,ledger_item_id:cloudItemId||item&&item.cloudLedgerItemId||null,ledger_payment_id:cloudPaymentId||payment&&payment.cloudLedgerPaymentId||null,partner_id:partnerId,app_attachment_id:sid(att&&att.id),app_payment_id:sid(payment&&payment.id),name:sid(att&&att.name),mime_type:sid(att&&att.type),size_bytes:N(att&&att.size)||null,storage_bucket:null,storage_path:null,source:sid(att&&att.source)||'app_upload',raw:attachmentRaw18_6VC(att)};
+  }
+  const inFlight18_6VC=new Map(),pending18_6VC=new Map();
+  function queue18_6VC(key,fn){
+    if(!key)return Promise.resolve().then(fn);
+    if(inFlight18_6VC.has(key)){pending18_6VC.set(key,fn);return inFlight18_6VC.get(key)}
+    const p=Promise.resolve().then(fn).finally(()=>{inFlight18_6VC.delete(key);const next=pending18_6VC.get(key);if(next){pending18_6VC.delete(key);queue18_6VC(key,next)}});
+    inFlight18_6VC.set(key,p);return p;
+  }
+  async function syncPersonLedgerItemCloud18_6VC(item,opts={}){
+    if(!item||!item.id)return fail18_6VC('invalid_item');
+    return queue18_6VC('item:'+sid(item.id),async()=>{
+      const ownerUserId=await owner18_6VC();if(!ownerUserId)return {ok:false,reason:'not_logged_in'};
+      const db=client18_6VC();if(!db)return fail18_6VC('supabase_error',{message:'supabase client not ready'});
+      const person=opts.person||personForItem(item),payload=personLedgerCloudItemPayload18_6VC(item,person,ownerUserId);
+      if(opts.status){payload.status=opts.status;payload.updated_at=nowIso();}
+      try{const {data,error}=await db.from('person_ledger_items').upsert(payload,{onConflict:'owner_user_id,app_item_id'}).select('id').maybeSingle();if(error)throw error;if(data&&data.id)item.cloudLedgerItemId=data.id;try{save()}catch(_){}return {ok:true,id:data&&data.id||item.cloudLedgerItemId,action:'upsert'}}catch(e){return fail18_6VC('supabase_error',{message:e&&e.message?e.message:String(e)})}
+    });
+  }
+  async function syncPersonLedgerPaymentCloud18_6VC(payment,item,opts={}){
+    if(!payment||!payment.id||!item)return fail18_6VC('invalid_payment');
+    return queue18_6VC('payment:'+sid(payment.id),async()=>{
+      const ownerUserId=await owner18_6VC();if(!ownerUserId)return {ok:false,reason:'not_logged_in'};
+      const db=client18_6VC();if(!db)return fail18_6VC('supabase_error',{message:'supabase client not ready'});
+      const person=opts.person||personForItem(item);let cloudItemId=item.cloudLedgerItemId;
+      if(!cloudItemId){const ir=await syncPersonLedgerItemCloud18_6VC(item,{person});if(!ir.ok)return ir;cloudItemId=ir.id||item.cloudLedgerItemId}
+      const payload=personLedgerCloudPaymentPayload18_6VC(payment,item,person,cloudItemId,ownerUserId);
+      try{const {data,error}=await db.from('person_ledger_payments').upsert(payload,{onConflict:'owner_user_id,app_payment_id'}).select('id').maybeSingle();if(error)throw error;if(data&&data.id)payment.cloudLedgerPaymentId=data.id;try{save()}catch(_){}return {ok:true,id:data&&data.id||payment.cloudLedgerPaymentId,action:'upsert'}}catch(e){return fail18_6VC('supabase_error',{message:e&&e.message?e.message:String(e)})}
+    });
+  }
+  async function syncPersonLedgerAttachmentMetadata18_6VC(att,payment,item,opts={}){
+    if(!att||!payment||!item)return fail18_6VC('invalid_attachment');
+    if(!att.id)att.id='att-'+sid(payment.id)+'-'+Math.random().toString(16).slice(2);
+    return queue18_6VC('attachment:'+sid(att.id),async()=>{
+      const ownerUserId=await owner18_6VC();if(!ownerUserId)return {ok:false,reason:'not_logged_in'};
+      const db=client18_6VC();if(!db)return fail18_6VC('supabase_error',{message:'supabase client not ready'});
+      const person=opts.person||personForItem(item);let cloudItemId=item.cloudLedgerItemId,cloudPaymentId=payment.cloudLedgerPaymentId;
+      if(!cloudItemId){const ir=await syncPersonLedgerItemCloud18_6VC(item,{person});if(!ir.ok)return ir;cloudItemId=ir.id||item.cloudLedgerItemId}
+      if(!cloudPaymentId){const pr=await syncPersonLedgerPaymentCloud18_6VC(payment,item,{person});if(!pr.ok)return pr;cloudPaymentId=pr.id||payment.cloudLedgerPaymentId}
+      const payload=personLedgerCloudAttachmentPayload18_6VC(att,payment,item,person,cloudItemId,cloudPaymentId,ownerUserId);
+      try{const {data,error}=await db.from('person_ledger_attachments').upsert(payload,{onConflict:'owner_user_id,app_attachment_id'}).select('id').maybeSingle();if(error)throw error;if(data&&data.id)att.cloudLedgerAttachmentId=data.id;try{save()}catch(_){}return {ok:true,id:data&&data.id||att.cloudLedgerAttachmentId,action:'upsert'}}catch(e){return fail18_6VC('supabase_error',{message:e&&e.message?e.message:String(e)})}
+    });
+  }
+  async function syncAllPersonLedgerCloud18_6VC(opts={}){
+    ensureItems18_6VC();
+    const ownerUserId=await owner18_6VC();if(!ownerUserId)return {ok:false,reason:'not_logged_in',localItems:items().length,items:0,payments:0,attachments:0,errors:[]};
+    const localItems=items().filter(item=>sid(item&&item.status)!=='deleted'),out={ok:true,localItems:localItems.length,items:0,payments:0,attachments:0,errors:[]};
+    for(const item of localItems){
+      const person=personForItem(item),ir=await syncPersonLedgerItemCloud18_6VC(item,{...opts,force:true,person});if(ir&&ir.ok)out.items++;else out.errors.push({type:'item',id:item&&item.id,result:ir});
+      for(const payment of arr(item&&item.payments)){
+        const pr=await syncPersonLedgerPaymentCloud18_6VC(payment,item,{...opts,force:true,person});if(pr&&pr.ok)out.payments++;else out.errors.push({type:'payment',itemId:item&&item.id,id:payment&&payment.id,result:pr});
+        for(const att of arr(payment&&payment.attachments)){const ar=await syncPersonLedgerAttachmentMetadata18_6VC(att,payment,item,{...opts,force:true,person});if(ar&&ar.ok)out.attachments++;else out.errors.push({type:'attachment',itemId:item&&item.id,paymentId:payment&&payment.id,id:att&&att.id,result:ar});}
+      }
+    }
+    out.ok=!out.errors.length;
+    if(out.localItems>0&&out.items===0)return {...out,ok:false,reason:'no_items_synced'};
+    return out;
+  }
+  function inspectPersonLedgerLocal18_6VC(){
+    ensureItems18_6VC();
+    const ps=people(),xs=items(),payments=xs.flatMap(it=>arr(it.payments).map(p=>({itemId:sid(it.id),paymentId:sid(p.id),amount:N(p.amount),date:p.date||'',attachments:arr(p.attachments).length,cloudLedgerPaymentId:p.cloudLedgerPaymentId||''})));
+    return {people:ps.map(p=>({id:sid(p.id),name:sid(p.name),telegramPartnerId:sid(p.telegramPartnerId||p.partnerId||p.supabasePartnerId)})),items:xs.map(it=>({id:sid(it.id),personId:sid(it.personId),personName:sid((personForItem(it)||{}).name),title:sid(it.title),status:sid(it.status)||'active',payments:arr(it.payments).length,cloudLedgerItemId:it.cloudLedgerItemId||'',partnerId:partnerIdForPerson(personForItem(it))})),payments};
+  }
+  function debugPersonLedgerCloud18_6VC(){
+    ensureItems18_6VC();
+    const xs=items(),paymentRows=xs.flatMap(it=>arr(it.payments).map(p=>({itemId:sid(it.id),paymentId:sid(p.id),cloudLedgerPaymentId:p.cloudLedgerPaymentId||'',attachments:arr(p.attachments).length}))),attachmentRows=xs.flatMap(it=>arr(it.payments).flatMap(p=>arr(p.attachments).map(a=>({itemId:sid(it.id),paymentId:sid(p.id),attachmentId:sid(a.id),cloudLedgerAttachmentId:a.cloudLedgerAttachmentId||'',hasLocalDataUrl:!!(a.dataUrl||a.data)}))));
+    return {hasSupabase:!!client18_6VC(),hasSession:!!ownerHint18_6VC(),ownerUserId:ownerHint18_6VC(),localItems:xs.length,items:xs.map(it=>({id:sid(it.id),personId:sid(it.personId),personName:sid((personForItem(it)||{}).name),title:sid(it.title),status:sid(it.status)||'active',partnerId:partnerIdForPerson(personForItem(it)),payments:arr(it.payments).length,cloudLedgerItemId:it.cloudLedgerItemId||''})),localPayments:paymentRows.length,localAttachments:attachmentRows.length,cloudIds:{items:xs.filter(it=>it.cloudLedgerItemId).length,payments:paymentRows.filter(p=>p.cloudLedgerPaymentId).length,attachments:attachmentRows.filter(a=>a.cloudLedgerAttachmentId).length},payments:paymentRows,attachments:attachmentRows};
+  }
+  function queueItem18_6VC(item,opts={}){if(item&&item.id)syncPersonLedgerItemCloud18_6VC(item,opts).catch(e=>fail18_6VC('queue_item_failed',{message:e&&e.message}))}
+  function queuePayment18_6VC(payment,item,opts={}){if(payment&&item)syncPersonLedgerPaymentCloud18_6VC(payment,item,opts).then(()=>{arr(payment.attachments).forEach(att=>syncPersonLedgerAttachmentMetadata18_6VC(att,payment,item,opts).catch(e=>fail18_6VC('queue_attachment_failed',{message:e&&e.message})))}).catch(e=>fail18_6VC('queue_payment_failed',{message:e&&e.message}))}
+  const oldSaveItem=window.savePersonLedgerItem18_6T2||window.savePersonLedgerItem18_6T;
+  if(oldSaveItem){window.savePersonLedgerItem18_6T2=window.savePersonLedgerItem18_6T=function(pid,itemId=''){const res=oldSaveItem.apply(this,arguments);try{const id=res&&res.id||itemId;const it=items().find(x=>same(x.id,id))||items().find(x=>same(x.personId,pid)&&sid(x.updatedAt));if(res&&res.ok!==false&&it)queueItem18_6VC(it)}catch(e){fail18_6VC('hook_save_item_failed',{message:e&&e.message})}return res};}
+  const oldSavePay=window.savePersonLedgerPayment18_6T;
+  if(oldSavePay){window.savePersonLedgerPayment18_6T=function(itemId){const res=oldSavePay.apply(this,arguments);try{const it=items().find(x=>same(x.id,itemId)),p=it&&arr(it.payments).find(x=>same(x.id,res&&res.id));if(res&&res.ok&&it&&p){queueItem18_6VC(it);queuePayment18_6VC(p,it)}}catch(e){fail18_6VC('hook_save_payment_failed',{message:e&&e.message})}return res};}
+  const oldEditPay=window.savePersonLedgerPaymentEdit18_6U2;
+  if(oldEditPay){window.savePersonLedgerPaymentEdit18_6U2=function(itemId,paymentId){const res=oldEditPay.apply(this,arguments);try{const it=items().find(x=>same(x.id,itemId)),p=it&&arr(it.payments).find(x=>same(x.id,paymentId));if(res&&res.ok&&it&&p){queueItem18_6VC(it);queuePayment18_6VC(p,it)}}catch(e){fail18_6VC('hook_edit_payment_failed',{message:e&&e.message})}return res};}
+  const oldUndoPay=window.undoPersonLedgerPayment18_6U;
+  if(oldUndoPay){window.undoPersonLedgerPayment18_6U=function(itemId,paymentId){const ret=oldUndoPay.apply(this,arguments);setTimeout(()=>{try{const it=items().find(x=>same(x.id,itemId)),p=it&&arr(it.payments).find(x=>same(x.id,paymentId));if(it&&p&&p.reversedAt){queueItem18_6VC(it);queuePayment18_6VC(p,it)}}catch(e){fail18_6VC('hook_undo_payment_failed',{message:e&&e.message})}},50);return ret};}
+  const oldUndoDirect=window.undoPersonLedgerPaymentDirect18_6U2;
+  if(oldUndoDirect){window.undoPersonLedgerPaymentDirect18_6U2=function(itemId,paymentId){const ret=oldUndoDirect.apply(this,arguments);try{const it=items().find(x=>same(x.id,itemId)),p=it&&arr(it.payments).find(x=>same(x.id,paymentId));if(it&&p&&p.reversedAt){queueItem18_6VC(it);queuePayment18_6VC(p,it)}}catch(e){fail18_6VC('hook_undo_direct_failed',{message:e&&e.message})}return ret};}
+  const oldReopenItem=window.reopenPersonLedgerItem18_6U;
+  if(oldReopenItem){window.reopenPersonLedgerItem18_6U=function(itemId){const ret=oldReopenItem.apply(this,arguments);try{const it=items().find(x=>same(x.id,itemId));if(it)queueItem18_6VC(it)}catch(e){fail18_6VC('hook_reopen_item_failed',{message:e&&e.message})}return ret};}
+  const oldSettleItem=window.settlePersonLedgerItem18_6T;
+  if(oldSettleItem){window.settlePersonLedgerItem18_6T=function(itemId){const ret=oldSettleItem.apply(this,arguments);setTimeout(()=>{try{const it=items().find(x=>same(x.id,itemId));if(it&&it.status==='settled')queueItem18_6VC(it)}catch(e){fail18_6VC('hook_settle_item_failed',{message:e&&e.message})}},50);return ret};}
+  const oldDeleteItem=window.deletePersonLedgerItem18_6U;
+  if(oldDeleteItem){window.deletePersonLedgerItem18_6U=function(itemId){const it=items().find(x=>same(x.id,itemId));if(!it)return oldDeleteItem.apply(this,arguments);const live=arr(it.payments).some(p=>p&&p.affectsBalance&&!p.reversedAt);if(live){try{toast('这个项目已有影响余额的记录，请先撤销还款/收款再删除。')}catch(_){}return}const clone=JSON.parse(JSON.stringify(it));const go=()=>{D.personLedgerItems=items().filter(x=>!same(x.id,itemId));save();render();toast('已删除');clone.status='cancelled';clone.updatedAt=nowIso();syncPersonLedgerItemCloud18_6VC(clone,{status:'cancelled'}).catch(e=>fail18_6VC('hook_delete_item_failed',{message:e&&e.message}))};if(typeof confirmSheet==='function')confirmSheet('确定删除这个账本项目吗？','已有还款/收款记录会一起移除。',go,{danger:true,okText:'删除'});else if(confirm('确定删除这个账本项目吗？已有还款/收款记录会一起移除。'))go()};}
+  window.personLedgerCloudItemPayload18_6VC=personLedgerCloudItemPayload18_6VC;
+  window.personLedgerCloudPaymentPayload18_6VC=personLedgerCloudPaymentPayload18_6VC;
+  window.personLedgerCloudAttachmentPayload18_6VC=personLedgerCloudAttachmentPayload18_6VC;
+  window.syncPersonLedgerItemCloud18_6VC=syncPersonLedgerItemCloud18_6VC;
+  window.syncPersonLedgerPaymentCloud18_6VC=syncPersonLedgerPaymentCloud18_6VC;
+  window.syncPersonLedgerAttachmentMetadata18_6VC=syncPersonLedgerAttachmentMetadata18_6VC;
+  window.syncAllPersonLedgerCloud18_6VC=syncAllPersonLedgerCloud18_6VC;
+  window.debugPersonLedgerCloud18_6VC=debugPersonLedgerCloud18_6VC;
+  window.inspectPersonLedgerLocal18_6VC=inspectPersonLedgerLocal18_6VC;
+})();
+
 </script>
 
 </body>
