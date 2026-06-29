@@ -7132,6 +7132,141 @@ function telegramFiles15(raw){
   window.inspectObjectLedgerRenderState18_6YA3=inspectObjectLedgerRenderState18_6YA3;
 })();
 
+// PHASE 18.7E - Telegram-created Object Ledger App bridge.
+(()=>{
+  const A=Array.isArray,arr=x=>A(x)?x:[],sid=x=>String(x==null?'':x),N=x=>Number(x)||0,r2=x=>Math.round(N(x)*100)/100,same=(a,b)=>sid(a)===sid(b);
+  const uuidish=x=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sid(x));
+  const nowIso=()=>{try{return typeof nowISO==='function'?nowISO():new Date().toISOString()}catch(_){return new Date().toISOString()}};
+  const todayIso=()=>{try{return typeof todayISO==='function'?todayISO():new Date().toISOString().slice(0,10)}catch(_){return new Date().toISOString().slice(0,10)}};
+  const cleanDate=v=>{const s=sid(v).trim();if(!s)return '';if(/^\d{4}-\d{2}-\d{2}/.test(s))return s.slice(0,10);const m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);return m?`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`:''};
+  const rawOf=x=>x&&typeof x.raw==='object'&&x.raw?x.raw:{};
+  const data=()=>{try{return D}catch(_){return null}};
+  const items=()=>{const d=data();if(!d)return [];if(!A(d.personLedgerItems))d.personLedgerItems=[];return d.personLedgerItems};
+  const people=()=>{const d=data();if(!d)return [];if(!A(d.aaPeople))d.aaPeople=[];return d.aaPeople};
+  const safeRaw=(v,seen=new WeakSet())=>{if(v==null||typeof v!=='object')return v;if(seen.has(v))return null;seen.add(v);if(A(v))return v.map(x=>safeRaw(x,seen));const out={};Object.keys(v).forEach(k=>{const val=v[k];if(/^(dataUrl|data|base64|bytes)$/i.test(k))return;if(typeof val==='string'&&(/^data:/i.test(val)||val.length>1200))return;out[k]=safeRaw(val,seen)});return out};
+  const fmtMY=v=>{
+    try{
+      const d=v?new Date(v):new Date();if(Number.isNaN(d.getTime()))return '';
+      const parts=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Kuala_Lumpur',day:'numeric',month:'numeric',year:'numeric',weekday:'short',hour:'numeric',minute:'2-digit',hour12:true}).formatToParts(d);
+      const get=t=>(parts.find(p=>p.type===t)||{}).value||'',wk={Mon:'星期一',Tue:'星期二',Wed:'星期三',Thu:'星期四',Fri:'星期五',Sat:'星期六',Sun:'星期日'};
+      return `${Number(get('day'))}/${Number(get('month'))}/${get('year')} ${wk[get('weekday')]||''} ${get('hour')}:${get('minute')} ${sid(get('dayPeriod')).toUpperCase()}`.replace(/\s+/g,' ').trim();
+    }catch(_){return ''}
+  };
+  function db18_7E(){try{return typeof supa!=='undefined'&&supa?supa:null}catch(_){return null}}
+  async function owner18_7E(){
+    try{if(typeof window.rmCurrentOwnerUserId18_6O1==='function'){const id=await window.rmCurrentOwnerUserId18_6O1();if(uuidish(id))return sid(id)}}catch(_){}
+    try{if(typeof SESSION!=='undefined'&&SESSION&&SESSION.user&&uuidish(SESSION.user.id))return sid(SESSION.user.id)}catch(_){}
+    try{if(window.SESSION&&window.SESSION.user&&uuidish(window.SESSION.user.id))return sid(window.SESSION.user.id)}catch(_){}
+    return '';
+  }
+  const appIdOf=row=>sid(row&&row.app_item_id)||sid(rawOf(row).app_item_id)||sid(rawOf(row).telegram_app_item_id)||sid(row&&row.id);
+  function isTelegramCloudItem18_7E(row){const raw=rawOf(row),app=appIdOf(row);return raw.source==='telegram_bot'||raw.telegram_created===true||app.startsWith('tg_')||!!raw.telegram_app_item_id}
+  function findLocalItem18_7E(row){
+    const raw=rawOf(row),ids=[row&&row.id,row&&row.app_item_id,raw.app_item_id,raw.telegram_app_item_id].map(sid).filter(Boolean);
+    return items().find(it=>ids.some(id=>same(it.cloudLedgerItemId,id)||same(it.id,id)||same(it.appItemId,id)||same(it.app_item_id,id)||same(it.sourceId,id)))||null;
+  }
+  function stableLocalId18_7E(prefix,seed){return `${prefix}_${sid(seed||Date.now()).replace(/[^a-zA-Z0-9_-]/g,'_').slice(0,48)||Math.random().toString(36).slice(2,8)}`}
+  function personNameFromRow18_7E(row){const raw=rawOf(row);return sid(raw.person_display_name||raw.person||raw.partner_name||row.person_name||raw.name||'Telegram 对象')}
+  function ensureLedgerType18_7E(person,item){
+    if(!person)return;const add=item.direction==='they_owe_me'?'receivable':'payable';
+    person.ledgerTypes=A(person.ledgerTypes)?person.ledgerTypes.slice():['aa'];
+    [add,item.itemType==='monthly'?'recurring':'',item.itemType==='installment'?'installment':''].filter(Boolean).forEach(t=>{if(!person.ledgerTypes.includes(t))person.ledgerTypes.push(t)});
+    person.ledgerMode=person.ledgerTypes.length>1?'mixed':(add==='receivable'?'they_owe_me':'i_owe_them');
+  }
+  function ensurePersonForRow18_7E(row){
+    const raw=rawOf(row),partner=sid(row&&row.partner_id||raw.partner_id),local=sid(raw.person_id||raw.person_local_id||row&&row.person_local_id),name=personNameFromRow18_7E(row);
+    let p=people().find(x=>local&&same(x.id,local))||people().find(x=>partner&&[x.telegramPartnerId,x.partnerId,x.supabasePartnerId].some(v=>same(v,partner)));
+    if(!p&&name)p=people().find(x=>same(x.name,name));
+    if(p)return p;
+    const id=local||stableLocalId18_7E('tg_person',partner||appIdOf(row)||row&&row.id);
+    p={id,name,color:'#229ED9',ledgerTypes:['aa'],ledgerMode:'mixed',telegramPartnerId:partner||'',source:'telegram_bot',isTelegramLedgerPerson18_7E:true,createdAt:sid(row&&row.created_at)||nowIso()};
+    people().push(p);return p;
+  }
+  function paymentStatus18_7E(p){const raw=rawOf(p);return sid(raw.proof_status||raw.status||p&&p.status)}
+  function isMessagePayment18_7E(p){return sid(p&&p.direction)==='message'||(N(p&&p.amount)===0&&!!sid(p&&p.note||rawOf(p).message_text))}
+  function localPaymentFromCloud18_7E(p,item){
+    const raw=rawOf(p),app=sid(p&&p.app_payment_id)||sid(raw.app_payment_id)||sid(raw.telegram_app_payment_id),id=app||stableLocalId18_7E('cloudpay',p&&p.id),st=paymentStatus18_7E(p)||(app.startsWith('tgpay_')?'pending_owner_review':'');
+    const confirmed=st==='confirmed'||!!(raw.confirmed_at||raw.confirmed_by_role||raw.confirmed_by_chat_id);
+    return {id,cloudLedgerPaymentId:sid(p&&p.id),appPaymentId:app,app_payment_id:app,date:cleanDate(p&&p.payment_date)||cleanDate(p&&p.created_at)||todayIso(),amount:r2(p&&p.amount),direction:sid(p&&p.direction)||(item&&item.direction==='i_owe_them'?'payment_out':'payment_in'),note:sid(p&&p.note||raw.note),source:sid(raw.source)||'telegram_submit_payment',status:confirmed?'confirmed':st,pendingOwnerReview:!confirmed&&st==='pending_owner_review',displayOnly:true,fromCloud:true,affectsBalance:false,raw:safeRaw(raw),createdAt:sid(p&&p.created_at),updatedAt:sid(p&&p.updated_at),attachments:[]};
+  }
+  function mergePayment18_7E(item,p){
+    if(!item||!p||p.reversed_at||isMessagePayment18_7E(p))return false;
+    if(!A(item.payments))item.payments=[];
+    const fresh=localPaymentFromCloud18_7E(p,item),ids=[fresh.cloudLedgerPaymentId,fresh.appPaymentId,fresh.id].filter(Boolean);
+    let local=item.payments.find(x=>ids.some(id=>same(x.cloudLedgerPaymentId,id)||same(x.appPaymentId,id)||same(x.app_payment_id,id)||same(x.id,id)));
+    if(local){
+      const attachments=arr(local.attachments).slice(),editHistory=arr(local.editHistory).slice();
+      Object.assign(local,{...fresh,id:local.id||fresh.id,attachments,editHistory});
+      return true;
+    }
+    item.payments.push(fresh);return true;
+  }
+  function timelineForCloud18_7E(row){
+    const raw=rawOf(row),created=sid(raw.created_at||row&&row.created_at)||nowIso(),base=arr(raw.timeline).map(safeRaw);
+    if(!base.length)base.push({at:created,when:fmtMY(created),title:'创建账本项目',source:isTelegramCloudItem18_7E(row)?'Telegram Bot 创建':'Cloud sync',createdByRole:sid(raw.created_by_role||'owner')});
+    return base;
+  }
+  function cloudToLocalFields18_7E(row,person){
+    const raw=rawOf(row),app=appIdOf(row),itemType=sid(row&&row.item_type||raw.item_type||raw.type)||'one_time',monthly=r2(row&&row.monthly_amount||raw.monthly_amount),total=r2(row&&row.total_amount||raw.total_amount),paid=r2(row&&row.paid_amount||raw.paid_amount||0);
+    const rem=row&&row.remaining_amount!=null?r2(row.remaining_amount):(total>0?Math.max(0,r2(total-paid)):0);
+    return {id:app,appItemId:app,app_item_id:app,sourceId:app,cloudLedgerItemId:sid(row&&row.id),personId:person&&person.id,personName:person&&person.name||personNameFromRow18_7E(row),title:sid(row&&row.title||raw.title||'Telegram 账本项目'),direction:sid(row&&row.direction||raw.direction)||'they_owe_me',itemType,totalAmount:total,monthlyAmount:monthly,openingPaidAmount:r2(row&&row.opening_paid_amount||raw.opening_paid_amount||0),paidAmount:paid,remainingAmount:rem,startDate:cleanDate(row&&row.start_date||raw.start_date||raw.date),dueDay:N(row&&row.due_day||raw.due_day)||1,installmentTotal:N(row&&row.installment_total||raw.installment_total||raw.installment_count)||0,installmentPaid:N(row&&row.installment_paid||raw.installment_paid)||0,status:sid(row&&row.status||raw.status)||'active',notes:sid(row&&row.notes||raw.note||raw.notes),source:sid(raw.source)||'cloud',cloudSynced:true,fromCloud:true,telegramCreated18_7E:isTelegramCloudItem18_7E(row),createdAt:sid(raw.created_at||row&&row.created_at)||nowIso(),updatedAt:sid(row&&row.updated_at)||sid(raw.updated_at)||nowIso(),cloudUpdatedAt:sid(row&&row.updated_at)||'',raw:safeRaw(raw),cloudRaw18_7E:safeRaw(raw)};
+  }
+  function mergeItem18_7E(row,paymentRows){
+    const existing=findLocalItem18_7E(row),person=ensurePersonForRow18_7E(row),fresh=cloudToLocalFields18_7E(row,person),raw=rawOf(row);
+    let item=existing,changed=false,localNewer=false;
+    if(!item){item={...fresh,payments:[],editHistory:timelineForCloud18_7E(row),timeline:timelineForCloud18_7E(row)};items().unshift(item);changed=true}
+    else{
+      const cloudMs=Date.parse(sid(row&&row.updated_at))||0,localMs=Math.max(Date.parse(sid(item.updatedAt))||0,Date.parse(sid(item.updated_at))||0,Date.parse(sid(item.editedAt))||0);
+      localNewer=!!(localMs&&cloudMs&&localMs>cloudMs);
+      item.cloudLedgerItemId=fresh.cloudLedgerItemId||item.cloudLedgerItemId;item.appItemId=item.appItemId||fresh.appItemId;item.app_item_id=item.app_item_id||fresh.app_item_id;item.sourceId=item.sourceId||fresh.sourceId;item.cloudSynced=true;item.fromCloud=item.fromCloud||fresh.fromCloud;item.cloudUpdatedAt=fresh.cloudUpdatedAt;item.cloudRaw18_7E=fresh.cloudRaw18_7E;
+      if(!localNewer){const keepPayments=arr(item.payments).slice(),keepEdit=arr(item.editHistory).slice(),keepTimeline=arr(item.timeline).slice();Object.assign(item,{...fresh,id:item.id||fresh.id,payments:keepPayments,editHistory:keepEdit.length?keepEdit:timelineForCloud18_7E(row),timeline:keepTimeline.length?keepTimeline:timelineForCloud18_7E(row)});changed=true}
+    }
+    if(raw.deleted===true||['deleted','cancelled'].includes(sid(row&&row.status||raw.status))){item.status=sid(row&&row.status||raw.status)||'cancelled';changed=true}
+    ensureLedgerType18_7E(person,item);
+    arr(paymentRows).forEach(p=>{if(mergePayment18_7E(item,p))changed=true});
+    return {item,created:!existing,changed,localNewer};
+  }
+  function paymentBelongsToRow18_7E(p,row){const raw=rawOf(p),rowRaw=rawOf(row),cloud=sid(row&&row.id),app=appIdOf(row),payCloud=sid(p&&p.ledger_item_id),payApp=sid(p&&p.app_item_id||raw.app_item_id||raw.telegram_app_item_id);return !!((cloud&&same(cloud,payCloud))||(app&&same(app,payApp))||(rowRaw.telegram_app_item_id&&same(rowRaw.telegram_app_item_id,payApp)))}
+  const bridgeState={lastPull:null,cloudRows:[],mergedIds:[],paymentsMerged:0,recordsCreated:0,lastError:''};
+  async function pullTelegramPersonLedgerItems18_7E(options={}){
+    const owner=await owner18_7E();if(!owner)return {ok:false,reason:'not_logged_in'};
+    const db=db18_7E();if(!db)return {ok:false,reason:'supabase_error',message:'supabase client not ready'};
+    const ires=await db.from('person_ledger_items').select('id,owner_user_id,partner_id,app_item_id,title,direction,item_type,total_amount,monthly_amount,opening_paid_amount,paid_amount,remaining_amount,start_date,due_day,installment_total,installment_paid,status,notes,raw,created_at,updated_at').eq('owner_user_id',owner).order('updated_at',{ascending:false}).limit(500);
+    if(ires.error){bridgeState.lastError=ires.error.message;return {ok:false,reason:'supabase_error',message:ires.error.message}}
+    const allRows=arr(ires.data),targetRows=allRows.filter(row=>isTelegramCloudItem18_7E(row)||!findLocalItem18_7E(row));
+    const pres=await db.from('person_ledger_payments').select('id,ledger_item_id,app_payment_id,app_item_id,partner_id,payment_date,amount,direction,note,attachments_count,raw,created_at,updated_at,reversed_at').eq('owner_user_id',owner).order('created_at',{ascending:false}).limit(500);
+    if(pres.error){bridgeState.lastError=pres.error.message;return {ok:false,reason:'supabase_error',message:pres.error.message}}
+    let localMergedItems=0,createdItems=0,paymentsMerged=0,localNewerSkipped=0;
+    targetRows.forEach(row=>{
+      const pays=arr(pres.data).filter(p=>paymentBelongsToRow18_7E(p,row)),before=items().flatMap(it=>arr(it.payments)).length,res=mergeItem18_7E(row,pays),after=items().flatMap(it=>arr(it.payments)).length;
+      if(res.created)createdItems++;if(res.changed)localMergedItems++;if(res.localNewer)localNewerSkipped++;paymentsMerged+=Math.max(0,after-before);
+    });
+    let submissionPull=null;try{if(typeof window.pullPersonLedgerTelegramSubmissions18_6XC==='function')submissionPull=await window.pullPersonLedgerTelegramSubmissions18_6XC({noRender:true,reason:'18.7E'})}catch(e){bridgeState.lastError=e&&e.message||sid(e)}
+    let recordSync=null;try{if(typeof window.syncObjectLedgerConfirmedRecords18_6REC==='function')recordSync=window.syncObjectLedgerConfirmedRecords18_6REC()}catch(e){bridgeState.lastError=e&&e.message||sid(e)}
+    try{if(localMergedItems||paymentsMerged||(recordSync&&recordSync.created))save()}catch(_){}
+    if(!options.noRender&&(localMergedItems||paymentsMerged||(recordSync&&recordSync.created)))try{render()}catch(_){}
+    const localAppIds=new Set(items().flatMap(it=>[it.id,it.appItemId,it.app_item_id,it.sourceId,it.cloudLedgerItemId].map(sid)).filter(Boolean));
+    const missingTelegramItemsInApp=targetRows.filter(row=>![appIdOf(row),row.id].some(id=>localAppIds.has(sid(id)))).map(row=>({id:sid(row.id),app_item_id:appIdOf(row),title:sid(row.title)}));
+    const result={ok:true,cloudTelegramItems:targetRows.length,localMergedItems,createdItems,missingTelegramItemsInApp:missingTelegramItemsInApp.length,paymentsMerged,recordsCreatedFromConfirmedPayments:recordSync&&recordSync.created||0,bareDebtCreatedInIncomeExpense:false,localNewerSkipped,submissionPull};
+    bridgeState.lastPull=result;bridgeState.cloudRows=targetRows;bridgeState.mergedIds=targetRows.map(row=>appIdOf(row));bridgeState.paymentsMerged=paymentsMerged;bridgeState.recordsCreated=result.recordsCreatedFromConfirmedPayments;return result;
+  }
+  function inspectTelegramLedgerAppBridge18_7E(){
+    const xs=items(),ids=xs.flatMap(it=>[it.id,it.appItemId,it.app_item_id,it.sourceId,it.cloudLedgerItemId].map(sid)).filter(Boolean),seen=new Set(),dups=[];
+    ids.forEach(id=>{if(seen.has(id)&&!dups.includes(id))dups.push(id);seen.add(id)});
+    const localTelegram=xs.filter(it=>it&&((it.telegramCreated18_7E||it.source==='telegram_bot'||sid(it.appItemId||it.app_item_id||it.id).startsWith('tg_')||it.cloudRaw18_7E&&it.cloudRaw18_7E.telegram_created)));
+    const itemIds=new Set(localTelegram.flatMap(it=>[it.id,it.appItemId,it.app_item_id,it.cloudLedgerItemId].map(sid)).filter(Boolean));
+    const bareRecordCount=arr(data()&&data().txns).concat(arr(data()&&data().incomes)).filter(r=>r&&itemIds.has(sid(r.personLedgerItemId||r.linkedPersonLedgerItemId))&&!sid(r.personLedgerPaymentId||r.linkedPersonLedgerPaymentId)).length;
+    const missing=arr(bridgeState.cloudRows).filter(row=>![appIdOf(row),row.id].some(id=>ids.includes(sid(id)))).map(row=>({id:sid(row.id),app_item_id:appIdOf(row),title:sid(row.title)}));
+    return {phase:'18.7E',cloudTelegramItems:arr(bridgeState.cloudRows).length,localMergedItems:localTelegram.length,missingTelegramItemsInApp:missing,duplicateAppItemIds:dups,paymentsMerged:bridgeState.paymentsMerged,recordsCreatedFromConfirmedPayments:bridgeState.recordsCreated,bareDebtCreatedInIncomeExpense:bareRecordCount>0,objectLedgerPageCanRenderTelegramItems:localTelegram.every(it=>!!people().find(p=>same(p.id,it.personId))),recordsPageUntouched:true,incomePageUntouched:true,lastPull:bridgeState.lastPull,lastError:bridgeState.lastError};
+  }
+  window.formatMYDateTimeWeek18_7E=fmtMY;
+  window.pullTelegramPersonLedgerItems18_7E=pullTelegramPersonLedgerItems18_7E;
+  window.inspectTelegramLedgerAppBridge18_7E=inspectTelegramLedgerAppBridge18_7E;
+  const baseHydrate=window.hydrateObjectLedgerBeforeRender18_6YA3;
+  if(typeof baseHydrate==='function'&&!window.__telegramLedgerHydrateWrapped18_7E){window.__telegramLedgerHydrateWrapped18_7E=true;window.hydrateObjectLedgerBeforeRender18_6YA3=async function(options={}){const res=await baseHydrate.apply(this,arguments);try{await pullTelegramPersonLedgerItems18_7E({noRender:true,reason:'hydrate_object_ledger'})}catch(e){bridgeState.lastError=e&&e.message||sid(e)}return res};}
+  if(!window.__telegramLedgerInit18_7E){window.__telegramLedgerInit18_7E=true;setTimeout(()=>{pullTelegramPersonLedgerItems18_7E({noRender:true,reason:'app_load'}).catch(e=>{bridgeState.lastError=e&&e.message||sid(e)})},2400)}
+})();
+
 // PHASE 18.6Y-A3 — late-bind final Object Ledger renderer after all AA overrides.
 (()=>{
   if(window.__objectLedgerRenderWrapped18_6YA3B)return;
