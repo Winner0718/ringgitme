@@ -299,6 +299,97 @@ function telegramFiles15(raw){
   if(migrated){try{save()}catch(_){}}
 })();
 
+// PHASE 18.6Y-A3 — Object Ledger first-render hydration and stable UI.
+(()=>{
+  const A=Array.isArray,arr=x=>A(x)?x:[],sid=x=>String(x==null?'':x),N=x=>Number(x)||0,r2=x=>Math.round(N(x)*100)/100,same=(a,b)=>sid(a)===sid(b);
+  const state={hydrationRan:false,hydrationInFlight:null,lastSummary:null,normalized:0,lastError:null,renderQueued:false};
+  const nowIso=()=>{try{return typeof nowISO==='function'?nowISO():new Date().toISOString()}catch(_){return new Date().toISOString()}};
+  const dateMs=v=>{const n=Date.parse(sid(v));return Number.isFinite(n)?n:0};
+  const payStatus=p=>sid((p&&p.raw&&p.raw.proof_status)||p&&p.status);
+  const isConfirmed=p=>payStatus(p)==='confirmed';
+  const isPending=p=>payStatus(p)==='pending_owner_review'||!!(p&&p.pendingOwnerReview);
+  const isDisputed=p=>['disputed','rejected'].includes(payStatus(p));
+  const isActionable=p=>!p.reversedAt&&!p.reversed_at&&(isPending(p)||isDisputed(p));
+  const isBalancePayment=p=>!p.reversedAt&&!p.reversed_at&&!['message','reminder'].includes(sid(p&&p.direction))&&N(p&&p.amount)>0;
+  function items(){if(!D.personLedgerItems)D.personLedgerItems=[];return arr(D.personLedgerItems)}
+  function normalizeObjectLedgerLocalState18_6YA3(){
+    let changed=0;
+    items().forEach(it=>{
+      if(!it||typeof it!=='object')return;
+      if(!A(it.payments)){it.payments=[];changed++}
+      it.payments.sort((a,b)=>String(a&&a.createdAt||a&&a.created_at||a&&a.date||'').localeCompare(String(b&&b.createdAt||b&&b.created_at||b&&b.date||'')));
+      it.payments.forEach(p=>{
+        const st=payStatus(p);
+        if(st==='confirmed'&&p.pendingOwnerReview){p.pendingOwnerReview=false;changed++}
+        if(st==='pending_owner_review'&&!p.pendingOwnerReview){p.pendingOwnerReview=true;changed++}
+        if(st==='confirmed'&&p.status!=='confirmed'){p.status='confirmed';changed++}
+        if((st==='disputed'||st==='rejected')&&p.status!==st){p.status=st;changed++}
+      });
+      const total=Math.max(N(it.totalAmount),N(it.total_amount));
+      const paid=Math.max(N(it.paidAmount),N(it.paid_amount));
+      const remainingField=it.remainingAmount!=null?N(it.remainingAmount):N(it.remaining_amount);
+      const confirmedSum=r2(it.payments.filter(p=>isConfirmed(p)&&isBalancePayment(p)).reduce((a,p)=>a+N(p.amount),0));
+      let newPaid=Math.max(paid,confirmedSum),newRemaining=remainingField;
+      if(total>0)newRemaining=Math.max(0,r2(total-newPaid));
+      if(it.total_amount!==total&&total>0){it.total_amount=total;changed++}
+      if(it.totalAmount!==total&&total>0){it.totalAmount=total;changed++}
+      if(it.paidAmount!==newPaid){it.paidAmount=newPaid;changed++}
+      if(it.paid_amount!==newPaid){it.paid_amount=newPaid;changed++}
+      if(it.remainingAmount!==newRemaining){it.remainingAmount=newRemaining;changed++}
+      if(it.remaining_amount!==newRemaining){it.remaining_amount=newRemaining;changed++}
+      if(it.due_day==null&&it.dueDay!=null){it.due_day=it.dueDay;changed++}
+      if(it.dueDay==null&&it.due_day!=null){it.dueDay=it.due_day;changed++}
+      if(confirmedSum>0){
+        const raw=it.raw&&typeof it.raw==='object'?it.raw:{};
+        it.raw={...raw,confirmed_paid_sum_18_6Y_A1:confirmedSum,normalized_18_6Y_A3_at:raw.normalized_18_6Y_A3_at||nowIso()};
+        if(newRemaining<=0&&sid(it.status)!=='settled'){it.status='settled';changed++}
+      }
+      if(['settled','cancelled','deleted'].includes(sid(it.status))&&arr(it.payments).some(isActionable))it.hasActionable18_6YA3=true;
+    });
+    D.personLedgerItems=items().sort((a,b)=>String(a&&a.createdAt||a&&a.startDate||a&&a.updatedAt||'').localeCompare(String(b&&b.createdAt||b&&b.startDate||b&&b.updatedAt||'')));
+    state.normalized+=changed;
+    if(changed)try{save()}catch(_){}
+    return {ok:true,normalized:changed};
+  }
+  async function hydrateObjectLedgerBeforeRender18_6YA3(options={}){
+    if(state.hydrationInFlight)return {...(state.lastSummary||{}),ok:true,skipped:'inFlight',inFlight:true};
+    state.hydrationInFlight=(async()=>{
+      const out={ok:true,reason:options.reason||'',reconciled:false,cloudPulled:false,telegramPulled:false,normalized:0,skipped:[]};
+      try{if(typeof window.reconcilePersonLedgerConfirmedPayments18_6YA1==='function'){await window.reconcilePersonLedgerConfirmedPayments18_6YA1({noRender:true});out.reconciled=true}}catch(e){out.skipped.push('reconcile_failed');state.lastError=e&&e.message;try{console.warn('[18.6Y-A3 hydrate] reconcile_failed',e)}catch(_){}}
+      try{if(typeof window.pullPersonLedgerCloudItems18_6FP21==='function'){await window.pullPersonLedgerCloudItems18_6FP21({noRender:true,skipConfirmedReconcile:false});out.cloudPulled=true}}catch(e){out.skipped.push('cloud_pull_failed');state.lastError=e&&e.message;try{console.warn('[18.6Y-A3 hydrate] cloud_pull_failed',e)}catch(_){}}
+      try{if(typeof window.pullPersonLedgerTelegramSubmissions18_6XC==='function'){await window.pullPersonLedgerTelegramSubmissions18_6XC({noRender:true});out.telegramPulled=true}}catch(e){out.skipped.push('telegram_pull_failed');state.lastError=e&&e.message;try{console.warn('[18.6Y-A3 hydrate] telegram_pull_failed',e)}catch(_){}}
+      try{const nr=normalizeObjectLedgerLocalState18_6YA3();out.normalized=nr.normalized||0}catch(e){out.skipped.push('normalize_failed');state.lastError=e&&e.message;try{console.warn('[18.6Y-A3 hydrate] normalize_failed',e)}catch(_){}}
+      state.hydrationRan=true;state.lastSummary=out;return out;
+    })().finally(()=>{state.hydrationInFlight=null});
+    return state.hydrationInFlight;
+  }
+  function inspectObjectLedgerRenderState18_6YA3(){
+    normalizeObjectLedgerLocalState18_6YA3();
+    const xs=items(),payments=xs.flatMap(it=>arr(it.payments).map(p=>({item:it,payment:p})));
+    const active=xs.filter(it=>!['cancelled','deleted'].includes(sid(it.status))&&(arr(it.payments).some(isActionable)||(!['settled'].includes(sid(it.status))&&N(it.remainingAmount||it.remaining_amount)>0)));
+    const settled=xs.filter(it=>sid(it.status)==='settled'||N(it.remainingAmount||it.remaining_amount)<=0);
+    const fp=xs.find(it=>sid(it.title).includes('确认流程测试FP21'));
+    return {hydrationRan:state.hydrationRan,hydrationInFlight:!!state.hydrationInFlight,activeItems:active.length,settledItems:settled.length,pendingPayments:payments.filter(x=>isPending(x.payment)).length,confirmedPayments:payments.filter(x=>isConfirmed(x.payment)).length,disputedPayments:payments.filter(x=>isDisputed(x.payment)).length,firstRenderReady:state.hydrationRan&&!state.hydrationInFlight,sampleActiveTitles:active.slice(0,6).map(x=>sid(x.title)),sampleSettledTitles:settled.slice(0,6).map(x=>sid(x.title)),confirmFlowTestItem:fp?{title:sid(fp.title),status:sid(fp.status),remainingAmount:N(fp.remainingAmount||fp.remaining_amount),active:active.some(x=>x===fp),settled:settled.some(x=>x===fp)}:null,lastSummary:state.lastSummary,lastError:state.lastError};
+  }
+  window.normalizeObjectLedgerLocalState18_6YA3=normalizeObjectLedgerLocalState18_6YA3;
+  window.hydrateObjectLedgerBeforeRender18_6YA3=hydrateObjectLedgerBeforeRender18_6YA3;
+  window.inspectObjectLedgerRenderState18_6YA3=inspectObjectLedgerRenderState18_6YA3;
+  const prevRenderAA=window.renderAA;
+  if(typeof prevRenderAA==='function'){
+    window.renderAA=renderAA=function(){
+      try{normalizeObjectLedgerLocalState18_6YA3()}catch(_){}
+      if(!state.hydrationRan){
+        if(!state.hydrationInFlight){
+          hydrateObjectLedgerBeforeRender18_6YA3({reason:'enter_object_ledger'}).then(()=>{if(!state.renderQueued){state.renderQueued=true;setTimeout(()=>{state.renderQueued=false;try{if(U&&U.tab==='aa')render()}catch(e){console.warn('[18.6Y-A3 hydrate] render_failed',e)}},0)}}).catch(()=>{});
+        }
+        return `<div class="pl-sec18t"><div class="pl-note18t"><i class="ti ti-loader-2"></i><span>对象账本同步中...</span></div></div>`;
+      }
+      return prevRenderAA.apply(this,arguments);
+    };
+  }
+  setTimeout(()=>{try{normalizeObjectLedgerLocalState18_6YA3()}catch(_){}},0);
+})();
+
 </script>
 <link rel="icon" type="image/svg+xml" href="icon.svg"/>
 <link rel="apple-touch-icon" href="icon.svg"/>
@@ -4074,7 +4165,7 @@ function telegramFiles15(raw){
   function dayLabel(iso){try{return new Date(iso+'T00:00:00').toLocaleDateString('en-MY',{weekday:'short',month:'short',day:'numeric'});}catch(_){return iso||'';}}
   function shortDate(iso){try{return new Date(iso+'T00:00:00').toLocaleDateString('en-MY',{month:'short',day:'numeric'});}catch(_){return iso||'';}}
   function monthTarget(off){const d=new Date();d.setDate(1);d.setMonth(d.getMonth()+(Number(off)||0));return d;}
-  function monthISOFromOffset(off){return monthTarget(off).toISOString().slice(0,7);}
+  function monthISOFromOffset(off){const d=monthTarget(off);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
   function monthTitleFromOffset(off){const d=monthTarget(off);return d.toLocaleDateString('zh-CN',{year:'numeric',month:'long'})+((Number(off)||0)===0?' · 本月':'');}
   function isoForDay(ym,day){return ym+'-'+String(day).padStart(2,'0');}
   function monthDays(ym){const [y,m]=ym.split('-').map(Number);return new Date(y,m,0).getDate();}
@@ -4180,7 +4271,7 @@ function telegramFiles15(raw){
   async function syncReceipts17(show){if(!(typeof supaReady==='function'&&supaReady()))return;try{ensure17();const {data:sets,error}=await supa.from('aa_settlements').select('id,partner_id,amount,status,receive_card_id,receive_card_name,receive_card_type,applied_to_ledger,created_at,updated_at,note').eq('owner_user_id',SESSION.user.id).eq('status','confirmed').order('created_at',{ascending:true}).limit(400);if(error)throw error;const pids=[...new Set(arr(sets).map(s=>s.partner_id).filter(Boolean))];let pmap={};if(pids.length){const {data:ps}=await supa.from('aa_partners').select('id,display_name').in('id',pids);arr(ps).forEach(p=>pmap[String(p.id)]=p.display_name||'女朋友');}let changed=false;arr(sets).forEach(s=>{const key=String(s.id);if(String(s.note||'').includes('hidden_from_app')||String(s.note||'').includes('hidden_from_check')){D.aaHiddenSettlementIds[key]=true;return;}if(isHiddenSettle17(key))return;const d=new Date(s.updated_at||s.created_at||Date.now()),iso=d.toISOString().slice(0,10),hm=d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',hour12:false});const pn=pmap[String(s.partner_id)]||'女朋友';let rec=arr(D.aaSettlementReceipts).find(x=>same(receiptKey17(x),key));if(!rec){rec={settlementId:key,createdAt:s.created_at,edits:[]};D.aaSettlementReceipts.unshift(rec);changed=true;}Object.assign(rec,{hidden:false,amount:num(s.amount),partnerId:s.partner_id,partnerName:pn,cardId:String(s.receive_card_id||''),cardName:s.receive_card_name||'',cardType:s.receive_card_type||'',isoDate:rec.isoDate||iso,date:rec.date||shortDate(iso),time:rec.time||hm,source:'telegram_bot'});let inc=arr(D.incomes).find(i=>isAAIncome17(i)&&same(receiptKey17(i),key));if(!inc){inc={id:nid(),source:'telegram_aa_settlement',sourceType:'aa_settlement',settlementId:key,aaSettlementId:key,catId:'aa_repay',files:[],edits:[]};D.incomes.unshift(inc);changed=true;}Object.assign(inc,{hidden:false,amt:num(s.amount),desc:`${pn} AA 还款`,partnerName:pn,partnerId:s.partner_id,receiveCardId:String(s.receive_card_id||''),receiveCardName:s.receive_card_name||'',receiveCardType:s.receive_card_type||'',isoDate:inc.isoDate||iso,date:inc.date||shortDate(iso),time:inc.time||hm});});if(changed){save();if(show)toast('✓ 已同步 AA 收款');render();}}catch(err){console.log('syncReceipts17',err);if(show)toast('AA 收款同步失败');}}
   window.syncSettlementReceipts16=syncReceipts17; const oldSync17=window.rmSyncTelegramAA; window.rmSyncTelegramAA=async function(show){if(oldSync17)await oldSync17(show);await syncReceipts17(false);};
 
-  window.renderRecord=renderRecord=function(){ensure17();if(!U._lastR17||Date.now()-U._lastR17>45000){U._lastR17=Date.now();setTimeout(()=>syncReceipts17(false),250);}const off=offsetOf('record'),ym=monthISOFromOffset(off),picked=U.dayFilters17.record||'';const incomes=arr(D.incomes).filter(i=>!i.hidden&&YM(i.isoDate)===ym&&(!picked||i.isoDate===picked));const txns=arr(D.txns).filter(t=>YM(t.isoDate)===ym&&(!picked||t.isoDate===picked));const mInc=incomes.reduce((a,i)=>a+num(i.amt),0),mExp=txns.reduce((a,t)=>a+num(t.amt),0),bal=num(mInc-mExp);let h=`${nav17('record')}${dayStrip17('record',calendarDates17('record',ym))}<div class="card" style="padding:16px"><div style="font-size:12px;color:var(--text3);font-weight:600;margin-bottom:7px">收支 · ${Number(ym.slice(5,7))}月</div><div style="display:flex;align-items:baseline;gap:8px;margin-bottom:13px"><span style="font-family:var(--font-display);font-size:28px;font-weight:700;color:${bal>=0?'var(--green)':'var(--red)'}">${bal>=0?'+':'−'}${F(Math.abs(bal))}</span><span style="font-size:12px;color:var(--text3)">本月结余</span></div><div style="display:flex;gap:10px"><div style="flex:1;background:var(--green-bg);border-radius:12px;padding:10px 12px"><div style="font-size:11px;color:var(--text3)">收入 / 收款</div><div style="font-size:16px;font-weight:700;color:var(--green)">${F(mInc)}</div></div><div style="flex:1;background:color-mix(in srgb,var(--red) 9%,var(--bg2));border-radius:12px;padding:10px 12px"><div style="font-size:11px;color:var(--text3)">支出</div><div style="font-size:16px;font-weight:700;color:var(--red)">${F(mExp)}</div></div></div></div><div class="record-actions-title">Quick Actions</div><div style="display:flex;gap:10px;margin-bottom:16px"><button class="btn" style="flex:1;flex-direction:column;gap:6px;justify-content:center;padding:15px;font-size:14px;background:var(--orange);color:#fff;border-color:transparent" onclick="openModal('spend')"><i class="ti ti-shopping-bag" style="font-size:21px"></i>记一笔支出</button><button class="btn" style="flex:1;flex-direction:column;gap:6px;justify-content:center;padding:15px;font-size:14px;background:var(--green);color:#fff;border-color:transparent" onclick="openModal('addincome')"><i class="ti ti-trending-up" style="font-size:21px"></i>记一笔收入</button></div>`;const receipts=allReceipts17().filter(r=>YM(r.isoDate)===ym&&(!picked||r.isoDate===picked));if(receipts.length){h+=`<div class="sec">收到还款 <span class="sec-a">AA Repayments · ${F(receipts.reduce((a,r)=>a+num(r.amount),0))}</span></div><div class="card">`;receipts.slice().sort((a,b)=>String(b.isoDate+' '+b.time).localeCompare(String(a.isoDate+' '+a.time))).forEach(r=>{h+=`<div class="swipe"><div class="txn-swipe-del" onclick="delAAReceipt17('${e(r.settlementId)}')"><i class="ti ti-trash"></i></div><div class="swipe-fg txn"><div class="txn-ic" style="background:var(--green-bg);color:var(--green)"><i class="ti ti-users"></i></div><div class="txn-m"><div class="txn-n">${e(r.partnerName||'女朋友')} 还款</div><div class="txn-s"><div class="txn-meta">AA 收款 · ${e(r.cardName||'未指定入账')}</div><div class="txn-meta txn-date">${e(r.date||'')}${r.time?' · '+e(r.time):''}</div></div></div><div class="txn-x"><div class="txn-a g">+${F(r.amount)}</div><div class="txn-tools"><i class="ti ti-history" onclick="event.stopPropagation();openAAReceiptAudit14&&openAAReceiptAudit14('${e(r.settlementId)}')"></i><i class="ti ti-edit" onclick="event.stopPropagation();openAAReceiptEdit14&&openAAReceiptEdit14('${e(r.settlementId)}')"></i></div></div></div></div>`;});h+=`</div>`;}const normal=incomes.filter(i=>!isAAIncome17(i));const by={};normal.forEach(i=>{(by[i.isoDate||todayIso()]=by[i.isoDate||todayIso()]||[]).push(i);});Object.keys(by).sort((a,b)=>b.localeCompare(a)).forEach(date=>{const rows=by[date],sum=rows.reduce((a,i)=>a+num(i.amt),0);h+=`<div class="dgroup" id="dg-${date}"><div class="dh"><span class="dh-l">${dayLabel(date)}</span><span class="dh-r" style="color:var(--green)">+ ${F(sum)}</span></div><div class="card">`;rows.forEach(inc=>{const cat=arr(D.incomeCats).find(c=>same(c.id,inc.catId)),md=inc.metadata||{},isLedger=!!(inc&&(inc.sourceType==='person_ledger_payment'||inc.source==='person_ledger_payment'||inc.personLedgerItemId||inc.personLedgerPaymentId||inc.catId==='person_ledger_receive')),itemId=inc.personLedgerItemId||md.personLedgerItemId,paymentId=inc.personLedgerPaymentId||md.personLedgerPaymentId,dest=inc.receiveCardName||inc.accountName||inc.cardName||'未指定账户',hist=isLedger&&itemId&&paymentId?`<i class="ti ti-history" onclick="event.stopPropagation();openPersonLedgerPaymentHistory18_6U2&&openPersonLedgerPaymentHistory18_6U2(${JSON.stringify(itemId)},${JSON.stringify(paymentId)})"></i>`:arr(inc.editHistory).length?`<i class="ti ti-history" onclick="event.stopPropagation();openIncomeHistory18_6U1&&openIncomeHistory18_6U1(${JSON.stringify(inc.id)})"></i>`:'';h+=`<div class="txn"><div class="txn-ic" style="background:var(--green-bg);color:var(--green)"><i class="ti ${isLedger?'ti-book':'ti-trending-up'}"></i></div><div class="txn-m"><div class="txn-n">${e(inc.desc||cat?.label||inc.catLabel||'收入')}</div><div class="txn-s"><div class="txn-meta">${e(inc.catLabel||cat?.label||'收入')} · ${e(dest)}</div><div class="txn-meta txn-date">${e(inc.date||'')}${inc.time?' · '+e(inc.time):''}</div></div></div><div class="txn-x"><div class="txn-a g">+${F(inc.amt)}</div><div class="txn-tools">${hist}${arr(inc.files).length?`<i class="ti ti-paperclip" onclick="event.stopPropagation();viewInc&&viewInc(${JSON.stringify(inc.id)})" style="color:var(--accent)"></i>`:''}<i class="ti ti-edit" onclick="event.stopPropagation();${isLedger?`openLedgerRecord18_6U2&&openLedgerRecord18_6U2(${JSON.stringify(inc.id)},'income')`:`openIncomeEdit18_6U1&&openIncomeEdit18_6U1(${JSON.stringify(inc.id)})`}"></i><i class="ti ti-trash" onclick="event.stopPropagation();${isLedger?`undoLedgerRecord18_6U2&&undoLedgerRecord18_6U2(${JSON.stringify(inc.id)},'income')`:`deleteIncome18_6U1&&deleteIncome18_6U1(${JSON.stringify(inc.id)})`}"></i></div></div></div>`;});h+=`</div></div>`;});return h;};
+  window.renderRecord=renderRecord=function(){ensure17();if(!U._lastR17||Date.now()-U._lastR17>45000){U._lastR17=Date.now();setTimeout(()=>syncReceipts17(false),250);}const off=offsetOf('record'),ym=monthISOFromOffset(off),picked=U.dayFilters17.record||'';const incomes=arr(D.incomes).filter(i=>!i.hidden&&YM(i.isoDate)===ym&&(!picked||i.isoDate===picked));const txns=arr(D.txns).filter(t=>YM(t.isoDate)===ym&&(!picked||t.isoDate===picked));const mInc=incomes.reduce((a,i)=>a+num(i.amt),0),mExp=txns.reduce((a,t)=>a+num(t.amt),0),bal=num(mInc-mExp);let h=`${nav17('record')}${dayStrip17('record',calendarDates17('record',ym))}<div class="card" style="padding:16px"><div style="font-size:12px;color:var(--text3);font-weight:600;margin-bottom:7px">收支 · ${Number(ym.slice(5,7))}月</div><div style="display:flex;align-items:baseline;gap:8px;margin-bottom:13px"><span style="font-family:var(--font-display);font-size:28px;font-weight:700;color:${bal>=0?'var(--green)':'var(--red)'}">${bal>=0?'+':'−'}${F(Math.abs(bal))}</span><span style="font-size:12px;color:var(--text3)">本月结余</span></div><div style="display:flex;gap:10px"><div style="flex:1;background:var(--green-bg);border-radius:12px;padding:10px 12px"><div style="font-size:11px;color:var(--text3)">收入 / 收款</div><div style="font-size:16px;font-weight:700;color:var(--green)">${F(mInc)}</div></div><div style="flex:1;background:color-mix(in srgb,var(--red) 9%,var(--bg2));border-radius:12px;padding:10px 12px"><div style="font-size:11px;color:var(--text3)">支出</div><div style="font-size:16px;font-weight:700;color:var(--red)">${F(mExp)}</div></div></div></div><div class="record-actions-title">Quick Actions</div><div style="display:flex;gap:10px;margin-bottom:16px"><button class="btn" style="flex:1;flex-direction:column;gap:6px;justify-content:center;padding:15px;font-size:14px;background:var(--orange);color:#fff;border-color:transparent" onclick="openModal('spend')"><i class="ti ti-shopping-bag" style="font-size:21px"></i>记一笔支出</button><button class="btn" style="flex:1;flex-direction:column;gap:6px;justify-content:center;padding:15px;font-size:14px;background:var(--green);color:#fff;border-color:transparent" onclick="openModal('addincome')"><i class="ti ti-trending-up" style="font-size:21px"></i>记一笔收入</button></div>`;h+=(window.incomeFilterBar18_6RECA2?window.incomeFilterBar18_6RECA2(incomes):'');const receipts=allReceipts17().filter(r=>YM(r.isoDate)===ym&&(!picked||r.isoDate===picked));if(receipts.length&&!(window.incomeFilterHidesReceipts18_6RECA2&&window.incomeFilterHidesReceipts18_6RECA2())){h+=`<div class="sec">收到还款 <span class="sec-a">AA Repayments · ${F(receipts.reduce((a,r)=>a+num(r.amount),0))}</span></div><div class="card">`;receipts.slice().sort((a,b)=>String(b.isoDate+' '+b.time).localeCompare(String(a.isoDate+' '+a.time))).forEach(r=>{h+=`<div class="swipe"><div class="txn-swipe-del" onclick="delAAReceipt17('${e(r.settlementId)}')"><i class="ti ti-trash"></i></div><div class="swipe-fg txn"><div class="txn-ic" style="background:var(--green-bg);color:var(--green)"><i class="ti ti-users"></i></div><div class="txn-m"><div class="txn-n">${e(r.partnerName||'女朋友')} 还款</div><div class="txn-s"><div class="txn-meta">AA 收款 · ${e(r.cardName||'未指定入账')}</div><div class="txn-meta txn-date">${e(r.date||'')}${r.time?' · '+e(r.time):''}</div></div></div><div class="txn-x"><div class="txn-a g">+${F(r.amount)}</div><div class="txn-tools"><i class="ti ti-history" onclick="event.stopPropagation();openAAReceiptAudit14&&openAAReceiptAudit14('${e(r.settlementId)}')"></i><i class="ti ti-edit" onclick="event.stopPropagation();openAAReceiptEdit14&&openAAReceiptEdit14('${e(r.settlementId)}')"></i></div></div></div></div>`;});h+=`</div>`;}const normal=incomes.filter(i=>!isAAIncome17(i)).filter(i=>window.incomeFilterMatch18_6RECA2?window.incomeFilterMatch18_6RECA2(i):true);const by={};normal.forEach(i=>{(by[i.isoDate||todayIso()]=by[i.isoDate||todayIso()]||[]).push(i);});Object.keys(by).sort((a,b)=>b.localeCompare(a)).forEach(date=>{const rows=by[date],sum=rows.reduce((a,i)=>a+num(i.amt),0);h+=`<div class="dgroup" id="dg-${date}"><div class="dh"><span class="dh-l">${dayLabel(date)}</span><span class="dh-r" style="color:var(--green)">+ ${F(sum)}</span></div><div class="card">`;rows.forEach(inc=>{const cat=arr(D.incomeCats).find(c=>same(c.id,inc.catId)),md=inc.metadata||{},isLedger=!!(inc&&(inc.sourceType==='person_ledger_payment'||inc.source==='person_ledger_payment'||inc.personLedgerItemId||inc.personLedgerPaymentId||inc.catId==='person_ledger_receive')),itemId=inc.personLedgerItemId||md.personLedgerItemId,paymentId=inc.personLedgerPaymentId||md.personLedgerPaymentId,dest=inc.receiveCardName||inc.accountName||inc.cardName||'未指定账户',hist=isLedger&&itemId&&paymentId?`<i class="ti ti-history" onclick="event.stopPropagation();openPersonLedgerPaymentHistory18_6U2&&openPersonLedgerPaymentHistory18_6U2(${JSON.stringify(itemId)},${JSON.stringify(paymentId)})"></i>`:arr(inc.editHistory).length?`<i class="ti ti-history" onclick="event.stopPropagation();openIncomeHistory18_6U1&&openIncomeHistory18_6U1(${JSON.stringify(inc.id)})"></i>`:'';h+=`<div class="txn"><div class="txn-ic" style="background:var(--green-bg);color:var(--green)"><i class="ti ${isLedger?'ti-book':'ti-trending-up'}"></i></div><div class="txn-m"><div class="txn-n">${e(inc.desc||cat?.label||inc.catLabel||'收入')}</div><div class="txn-s"><div class="txn-meta">${e(inc.catLabel||cat?.label||'收入')} · ${e(dest)}</div><div class="txn-meta txn-date">${e(inc.date||'')}${inc.time?' · '+e(inc.time):''}</div></div></div><div class="txn-x"><div class="txn-a g">+${F(inc.amt)}</div><div class="txn-tools">${(window.isObjectLedgerAppRecord18_6REC&&window.isObjectLedgerAppRecord18_6REC(inc)&&window.incomeOlRowTools18_6RECA2)?window.incomeOlRowTools18_6RECA2(inc):`${hist}${arr(inc.files).length?`<i class="ti ti-paperclip" onclick="event.stopPropagation();viewInc&&viewInc(${JSON.stringify(inc.id)})" style="color:var(--accent)"></i>`:''}<i class="ti ti-edit" onclick="event.stopPropagation();${isLedger?`openLedgerRecord18_6U2&&openLedgerRecord18_6U2(${JSON.stringify(inc.id)},'income')`:`openIncomeEdit18_6U1&&openIncomeEdit18_6U1(${JSON.stringify(inc.id)})`}"></i><i class="ti ti-trash" onclick="event.stopPropagation();${isLedger?`undoLedgerRecord18_6U2&&undoLedgerRecord18_6U2(${JSON.stringify(inc.id)},'income')`:`deleteIncome18_6U1&&deleteIncome18_6U1(${JSON.stringify(inc.id)})`}"></i>`}</div></div></div>`;});h+=`</div></div>`;});return h;};
 
   window.renderAA=renderAA=function(){ensure17();const off=offsetOf('aa'),ym=monthISOFromOffset(off),picked=U.dayFilters17.aa||'';const people=collectPeople17();if(!people.length)return`<div class="empty" style="margin-top:40px"><div class="empty-ic"><i class="ti ti-users"></i></div><div class="et">还没有分账记录</div><div class="es">添加朋友或女朋友<br>开始记录 AA 消费</div></div><button class="add-btn" onclick="openModal('addAAPerson')"><i class="ti ti-user-plus"></i>添加分账对象</button>`;const allRows=aaHistoryAll17().filter(x=>YM(x.isoDate)===ym&&(!picked||x.isoDate===picked));let total=0;people.forEach(p=>arr(D.aaReceivables).forEach(r=>{if(matchesPerson17(r,p))total+=Math.max(0,num(r.owedAmount)-num(r.settledAmount));}));let h=`${nav17('aa')}${dayStrip17('aa',calendarDates17('aa',ym))}<div class="sg"><div class="sc" style="--scc:var(--green)"><div class="sl">AA 待收</div><div class="sv g">${F(total)}</div></div></div>`;people.forEach(p=>{const current=arr(D.aaReceivables).filter(r=>matchesPerson17(r,p)&&num(r.owedAmount)>num(r.settledAmount)&&YM(r.isoDate||r.date)===ym&&(!picked||r.isoDate===picked||r.date===picked));const hist=allRows.filter(x=>x.type==='receipt'?matchesPerson17({partnerId:x.r.partnerId,partnerName:x.r.partnerName},p):matchesPerson17({personId:x.aa.personId,personName:x.aa.person},p));const open=same(U.expandedId,p.id),tab=(U.aaSubTabs17&&U.aaSubTabs17[String(p.id)])||(U.aaSubTabs16&&U.aaSubTabs16[String(p.id)])||'current';const curTotal=current.reduce((a,r)=>a+Math.max(0,num(r.owedAmount)-num(r.settledAmount)),0);h+=`<div class="aa-p" style="--tint:${e(p.color||'var(--accent)')}"><div class="aa-h" onclick="toggle(${JSON.stringify(p.id)})"><div class="aa-av" style="background:${e(p.color||'#0a8a54')}22;color:${e(p.color||'var(--accent)')}">${e((p.name||'AA').slice(0,2).toUpperCase())}</div><div class="aa-info"><div class="aa-name">${e(p.name||'AA对象')}</div><div class="aa-sub">目前 ${current.length} 笔 · 记录 ${hist.length} 笔</div></div><div class="aa-bal"><div class="aa-num" style="color:${curTotal>0?'var(--green)':'var(--text3)'}">${curTotal?F(curTotal):'—'}</div><div class="aa-lbl">${curTotal?'待收':'已结清'}</div></div><i class="ti ti-chevron-down chevron ${open?'rot':''}"></i></div>`;if(open){h+=`<div class="aa-body"><div class="pill-row" style="margin-bottom:10px"><div class="pill ${tab==='current'?'on':''}" onclick="event.stopPropagation();U.aaSubTabs17=U.aaSubTabs17||{};U.aaSubTabs17['${e(p.id)}']='current';render()">目前消费</div><div class="pill ${tab==='history'?'on':''}" onclick="event.stopPropagation();U.aaSubTabs17=U.aaSubTabs17||{};U.aaSubTabs17['${e(p.id)}']='history';render()">记录</div></div>`;if(tab==='current'){if(!current.length)h+=`<div style="padding:18px 0;text-align:center;font-size:13px;color:var(--text3)">目前没有未结清 AA</div>`;current.slice(0,30).forEach(r=>{const due=Math.max(0,num(r.owedAmount)-num(r.settledAmount));h+=`<div class="aa-txn"><div class="aa-txn-ic"><i class="ti ti-users"></i></div><div class="aa-txn-m"><div class="aa-txn-n">${e(r.desc||'AA 分账')}</div><div class="aa-txn-s"><div class="txn-meta">${e(r.category||'其他 Others')} · ${e(r.date||r.isoDate||'')}${r.time?' · '+e(r.time):''}</div></div></div><div class="aa-txn-side"><div class="aa-txn-r"><div class="aa-txn-a" style="color:var(--green)">+${F(due)}</div><div class="aa-txn-w">待收</div></div><div class="aa-txn-tools"><i class="ti ti-trash" onclick="event.stopPropagation();window.delAAReceivable14(${JSON.stringify(r.id)})" style="color:var(--red);font-size:19px;padding:4px"></i></div></div></div>`;});}else{h+=`<div class="aa-acts" style="margin:0 0 10px"><button class="btn del" onclick="event.stopPropagation();clearAAHistory17(${JSON.stringify(p.id)})"><i class="ti ti-trash"></i>清空已结清记录</button></div>`;if(!hist.length)h+=`<div style="padding:18px 0;text-align:center;font-size:13px;color:var(--text3)">这个月份没有历史记录</div>`;hist.slice(0,60).forEach(x=>{if(x.type==='receipt'){const r=x.r;h+=`<div class="aa-txn"><div class="aa-txn-ic" style="color:var(--green)"><i class="ti ti-cash"></i></div><div class="aa-txn-m"><div class="aa-txn-n">收到还款 ${F(r.amount)}</div><div class="aa-txn-s"><div class="txn-meta">${e(r.cardName||'未指定入账')} · ${e(r.date||'')}${r.time?' · '+e(r.time):''}</div></div></div><div class="aa-txn-tools"><i class="ti ti-trash" onclick="event.stopPropagation();delAAReceipt17('${e(r.settlementId)}')" style="color:var(--red);font-size:18px;padding:5px"></i></div></div>`;}else{const t=x.t,aa=x.aa;h+=`<div class="aa-txn"><div class="aa-txn-ic"><i class="ti ${t.catIcon||'ti-receipt'}"></i></div><div class="aa-txn-m"><div class="aa-txn-n">${e(t.desc||'AA 消费')}</div><div class="aa-txn-s"><div class="txn-meta">${e(t.catLabel||'其他 Others')} · 总 ${F(t.amt)} · AA ${F(aa.owed)}${aa.due<=0?' · 已结清':''}</div><div class="txn-meta txn-date">${e(t.date||'')}${t.time?' · '+e(t.time):''}</div></div></div><div class="aa-txn-tools"><i class="ti ti-trash" onclick="event.stopPropagation();delAAHistory17('txn',${JSON.stringify(t.id)})" style="color:var(--red);font-size:18px;padding:5px"></i></div></div>`;}});}h+=`<div class="aa-acts"><button class="btn pay" onclick="openModal('addAATxn',{activePersonId:${JSON.stringify(p.id)},selPaidBy:'me',selSplit:2})"><i class="ti ti-plus"></i>加记录</button><button class="btn del" onclick="window.delAAPerson14(${JSON.stringify(p.id)})"><i class="ti ti-trash"></i></button></div></div>`;}h+=`</div>`;});h+=`<button class="add-btn" onclick="openModal('addAAPerson')"><i class="ti ti-user-plus"></i>添加分账对象</button>`;return h;};
   window.delAAHistory17=function(type,key){if(type==='receipt')return delAAReceipt17(key);const t=arr(D.txns).find(x=>same(x.id,key));if(!t)return;confirmSheet('删除这条 AA 记录？','会删除对应消费记录，并同步取消 AA。',()=>{window.delTxn(t.id);},{danger:true,okText:'删除'});};
@@ -5978,7 +6069,7 @@ function telegramFiles15(raw){
     txns.forEach(t=>{const a=aaInfo(t);if(a){const key=sid(a.personId||('n-'+personKeyName(a.person)));if(!map.has(key))map.set(key,{id:a.personId||key,name:a.person||'AA对象',color:'#0a8a54'});}});
     return [...map.values()];
   }
-  function typeLabel(k){return({all:'全部记录',normal:'普通消费',aa:'AA 分账',fixed:'固定支出',attachment:'有附件',edited:'已编辑',recordOnly:'只记录'})[k||'all']||'全部记录';}
+  function typeLabel(k){return({all:'全部记录',normal:'普通消费',aa:'AA 分账',fixed:'固定支出',attachment:'有附件',edited:'已编辑',recordOnly:'只记录',objectLedger:'对象账本',ol_they_owe:'他欠我',ol_i_owe:'我欠他',ol_monthly:'每月账',ol_installment:'分期',ol_receive:'账本收款',ol_repay:'账本还款',ol_pending:'待确认'})[k||'all']||'全部记录';}
   function sortLabel(k){return({new:'新到旧',old:'旧到新',amountDesc:'金额大到小',amountAsc:'金额小到大'})[k||'new']||'新到旧';}
   function currentFilters(){
     if(!U.histFilter18_6K||typeof U.histFilter18_6K!=='object')U.histFilter18_6K={type:'all',pay:'all',aa:'all',sort:'new',file:false,edited:false,recordOnly:false};
@@ -5996,7 +6087,20 @@ function telegramFiles15(raw){
     const f=currentFilters();let out=[...allM];
     out=out.filter(t=>{
       const aa=aaInfo(t), fixed=txnFixed(t), edited=txnEdited(t), rec=txnRecordOnly(t), files=arr(t.files).length>0;
-      if(f.type==='normal'&&(aa||fixed||rec))return false;
+      const ol=!!(window.isObjectLedgerAppRecord18_6REC&&window.isObjectLedgerAppRecord18_6REC(t));
+      const olDir=ol?sid(t.olDirection||t.ledgerDirection||(t.metadata&&t.metadata.ledgerDirection)):'';
+      const olType=ol?sid(t.olItemType||t.itemType||t.item_type):'';
+      const olCat=ol?sid(t.catLabel):'';
+      const olPending=ol&&!!t.olPending;
+      if(f.type==='objectLedger'&&!ol)return false;
+      if(f.type==='ol_they_owe'&&!(ol&&(olDir==='they_owe_me'||olCat==='账本收款')))return false;
+      if(f.type==='ol_i_owe'&&!(ol&&(olDir==='i_owe_them'||olCat==='账本还款')))return false;
+      if(f.type==='ol_monthly'&&!(ol&&olType==='monthly'))return false;
+      if(f.type==='ol_installment'&&!(ol&&olType==='installment'))return false;
+      if(f.type==='ol_receive'&&!(ol&&olCat==='账本收款'))return false;
+      if(f.type==='ol_repay'&&!(ol&&olCat==='账本还款'))return false;
+      if(f.type==='ol_pending'&&!olPending)return false;
+      if(f.type==='normal'&&(aa||fixed||rec||ol))return false;
       if(f.type==='aa'&&!aa)return false;
       if(f.type==='fixed'&&!fixed)return false;
       if(f.type==='attachment'&&!files)return false;
@@ -6024,15 +6128,16 @@ function telegramFiles15(raw){
     const f=currentFilters();const cards=cardListFor(allM);const people=aaPeopleFor(allM);const pay=f.pay==='all'?'付款：全部':'付款：'+(payName(f.pay)||'已选');const aa=f.aa==='all'?'AA：全部对象':'AA：'+((people.find(p=>same(p.id,f.aa))||{}).name||'已选');
     const active=[];if(f.type!=='all')active.push(typeLabel(f.type));if(f.pay!=='all')active.push(payName(f.pay)||'付款');if(f.type==='aa'&&f.aa!=='all')active.push((people.find(p=>same(p.id,f.aa))||{}).name||'AA对象');if(f.file)active.push('有附件');if(f.edited)active.push('已编辑');if(f.recordOnly)active.push('只记录');if(f.sort!=='new')active.push('排序：'+sortLabel(f.sort));
     let h=`<div class="filter-center18k"><button class="filter-btn18k ${f.type!=='all'?'on':''}" onclick="rmOpenHistFilter18_6K('type')"><i class="ti ti-filter"></i>${esc(typeLabel(f.type))}<i class="ti ti-chevron-down"></i></button>${f.type==='aa'?`<button class="filter-btn18k ${f.aa!=='all'?'on':''}" onclick="rmOpenHistFilter18_6K('aa')"><i class="ti ti-users"></i>${esc(aa)}<i class="ti ti-chevron-down"></i></button>`:''}<button class="filter-btn18k ${f.pay!=='all'?'on':''}" onclick="rmOpenHistFilter18_6K('pay')"><i class="ti ti-credit-card"></i>${esc(pay)}<i class="ti ti-chevron-down"></i></button><button class="filter-btn18k ${f.file||f.edited||f.recordOnly||f.sort!=='new'?'on':''}" onclick="rmOpenHistFilter18_6K('more')"><i class="ti ti-adjustments-horizontal"></i>更多<i class="ti ti-chevron-down"></i></button></div>`;
-    h+=`<div class="filter-summary18k"><div><b>${mTx.length}</b> 笔 · ${F(mTx.reduce((a,t)=>a+N(t.amt),0))}</div>${active.length?`<button onclick="rmClearHistFilters18_6K()"><i class="ti ti-x"></i>清除筛选</button>`:''}</div>`;
+    h+=`<div class="filter-summary18k"><div><b>${mTx.length}</b> 笔 · ${F(mTx.reduce((a,t)=>a+(t&&t.__olIncome18?0:N(t.amt)),0))}</div>${active.length?`<button onclick="rmClearHistFilters18_6K()"><i class="ti ti-x"></i>清除筛选</button>`:''}</div>`;
     if(active.length)h+=`<div class="active-chips18k">${active.map(x=>`<span>${esc(x)}</span>`).join('')}</div>`;
     return h;
   }
   function insightCard(mTx){
-    const total=mTx.reduce((a,t)=>a+N(t.amt),0),aaCount=mTx.filter(t=>aaInfo(t)).length,fileCount=mTx.filter(t=>arr(t.files).length).length;
+    const total=mTx.reduce((a,t)=>a+(t&&t.__olIncome18?0:N(t.amt)),0),aaCount=mTx.filter(t=>aaInfo(t)).length,fileCount=mTx.filter(t=>arr(t.files).length).length;
     return `<div class="sec">消费分析</div><div class="card"><div class="ins-head"><div><div class="ins-hl">当前筛选消费</div><div class="ins-total r">${F(total)}</div></div><div class="ins-cnt">${mTx.length} 笔</div></div><div class="ins-mini"><div class="ins-mi"><div class="ins-mil">AA 分账</div><div class="ins-miv">${aaCount} 笔</div></div><div class="ins-mi"><div class="ins-mil">有附件</div><div class="ins-miv">${fileCount} 笔</div></div></div></div>`;
   }
   function txnRow(t){
+    if(t&&window.isObjectLedgerAppRecord18_6REC&&window.isObjectLedgerAppRecord18_6REC(t)&&window.objectLedgerTxnRow18_6REC){try{return window.objectLedgerTxnRow18_6REC(t)}catch(_){}}
     const aa=aaInfo(t),events=(()=>{try{return typeof txnAuditEvents14==='function'?arr(txnAuditEvents14(t)):[]}catch(_){return[]}})();
     const aaLine=aa?`<div class="txn-meta" style="color:var(--green);font-weight:800"><i class="ti ti-users" style="font-size:12px"></i> ${esc(aa.label)}</div>`:'';
     const fixedLine=txnFixed(t)?`<div class="txn-meta" style="color:var(--orange);font-weight:750"><i class="ti ti-repeat" style="font-size:12px"></i> 固定支出</div>`:'';
@@ -6044,10 +6149,11 @@ function telegramFiles15(raw){
     return `<div class="day-strip phase18k-days"><button class="day-chip ${!picked?'on':''}" onclick="clearDay17&&clearDay17('history')"><span class="dc-d">All</span><span class="dc-w">全部</span></button>${dates.map(dt=>{const d=new Date(dt+'T00:00:00');return `<button class="day-chip ${picked===dt?'on':''}" onclick="pickDay17&&pickDay17('history','${dt}')"><span class="dc-d">${d.getDate()}</span><span class="dc-w">${d.toLocaleDateString('zh-CN',{weekday:'short'}).replace('星期','周')}</span></button>`}).join('')}</div>`;
   }
   window.renderHistory=function(){
-    if(!arr(D.txns).length)return`<div class="empty" style="margin-top:50px"><div class="empty-ic"><i class="ti ti-calendar"></i></div><div class="et">还没有消费记录</div><div class="es">去「记账」开始记第一笔</div></div>`;
+    const olInc18=(window.objectLedgerHistoryIncomeRows18_6REC?window.objectLedgerHistoryIncomeRows18_6REC():[]);
+    if(!arr(D.txns).length&&!olInc18.length)return`<div class="empty" style="margin-top:50px"><div class="empty-ic"><i class="ti ti-calendar"></i></div><div class="et">还没有消费记录</div><div class="es">去「记账」开始记第一笔</div></div>`;
     if(!U.dayFilters17||typeof U.dayFilters17!=='object')U.dayFilters17={};
     const off=N(U.histMonth||0),ym=monthFromOffset(off),picked=U.dayFilters17.history||'';
-    const allM=arr(D.txns).filter(t=>monthKey(t.isoDate)===ym);
+    const allM=arr(D.txns).concat(olInc18).filter(t=>monthKey(t.isoDate)===ym);
     let mTx=applyFilters(allM);if(picked)mTx=mTx.filter(t=>t.isoDate===picked);
     let h=`<div class="search-bar"><div class="search-wrap"><i class="ti ti-search si"></i><input class="search-input" id="hist-q" placeholder="搜索描述 / 类别 / 卡片 / AA对象…" oninput="histFilter(this.value)"/><span class="search-clear" id="hist-clear" style="display:none" onclick="document.getElementById('hist-q').value='';histFilter('')"><i class="ti ti-x"></i></span></div></div>`;
     h+=`<div class="month-nav"><button class="mn-btn" onclick="setHistMonth(-1)"><i class="ti ti-chevron-left"></i></button><div class="mn-lbl">${monthTitle(ym,off)}</div><button class="mn-btn" ${off>=0?'disabled style="opacity:.3"':''} onclick="setHistMonth(1)"><i class="ti ti-chevron-right"></i></button></div>`;
@@ -6058,7 +6164,7 @@ function telegramFiles15(raw){
     if(!mTx.length)return h+`<div class="empty"><div class="empty-ic"><i class="ti ti-calendar-off"></i></div><div class="et">没有记录</div><div class="es">试试看换月份或清除筛选</div></div>`;
     const by={};mTx.forEach(t=>{const k=t.isoDate||todayIso();(by[k]=by[k]||[]).push(t);});
     const ds=Object.keys(by).sort((a,b)=>currentFilters().sort==='old'?a.localeCompare(b):b.localeCompare(a));
-    ds.forEach(date=>{const txns=by[date],dayTotal=txns.reduce((a,t)=>a+N(t.amt),0);h+=`<div class="dgroup" id="dg-${date}"><div class="dh"><span class="dh-l">${showDate(date)}</span><span class="dh-r">− ${FR(dayTotal)}</span></div><div class="card">`;txns.forEach(t=>h+=txnRow(t));h+=`</div></div>`;});
+    ds.forEach(date=>{const txns=by[date],dayTotal=txns.reduce((a,t)=>a+(t&&t.__olIncome18?0:N(t.amt)),0);h+=`<div class="dgroup" id="dg-${date}"><div class="dh"><span class="dh-l">${showDate(date)}</span><span class="dh-r">− ${FR(dayTotal)}</span></div><div class="card">`;txns.forEach(t=>h+=txnRow(t));h+=`</div></div>`;});
     return h;
   };
   try{renderHistory=window.renderHistory}catch(_){ }
@@ -6070,9 +6176,10 @@ function telegramFiles15(raw){
         const kind=U.histFilterModal18_6K||'type',f=currentFilters(),all=arr(D.txns).filter(t=>monthKey(t.isoDate)===monthFromOffset(N(U.histMonth||0))),cards=cardListFor(all),people=aaPeopleFor(all);
         const opt=(label,sub,on,click,icon)=>`<button class="filter-sheet-opt18k ${on?'on':''}" onclick="${click}"><div class="fso-ic18k"><i class="ti ${icon||'ti-circle'}"></i></div><div><b>${esc(label)}</b>${sub?`<span>${esc(sub)}</span>`:''}</div><i class="ti ti-check fso-check18k"></i></button>`;
         let body='',title='筛选';
-        if(kind==='type'){title='记录类型';[
-          ['all','全部记录','全部消费记录','ti-list'],['normal','普通消费','不含 AA / 固定 / 只记录','ti-receipt'],['aa','AA 分账','只看有 AA 对象的消费','ti-users'],['fixed','固定支出','订阅 / 贷款 / 租金生成记录','ti-repeat'],['attachment','有附件','收据 / 图片 / PDF','ti-paperclip'],['edited','已编辑','有编辑记录 timeline','ti-history'],['recordOnly','只记录','不扣余额的记录','ti-file-description']
-        ].forEach(x=>body+=opt(x[1],x[2],f.type===x[0],`rmSetHistFilter18_6K('type','${x[0]}')`,x[3]));}
+        if(kind==='type'){title='记录类型';const typeOpts18rec=[
+          ['all','全部记录','全部消费记录','ti-list'],['normal','普通消费','不含 AA / 固定 / 只记录','ti-receipt'],['aa','AA 分账','只看有 AA 对象的消费','ti-users'],['fixed','固定支出','订阅 / 贷款 / 租金生成记录','ti-repeat'],['attachment','有附件','收据 / 图片 / PDF','ti-paperclip'],['edited','已编辑','有编辑记录 timeline','ti-history'],['recordOnly','只记录','不扣余额的记录','ti-file-description'],
+          ['objectLedger','对象账本','所有对象账本记录','ti-book'],['ol_they_owe','他欠我','对象账本收款','ti-arrow-down-left'],['ol_i_owe','我欠他','对象账本还款','ti-arrow-up-right'],['ol_monthly','每月账','每月账记录','ti-calendar-repeat'],['ol_installment','分期','分期记录','ti-stack-2'],['ol_receive','账本收款','收款记录','ti-cash'],['ol_repay','账本还款','还款记录','ti-cash-banknote'],['ol_pending','待确认','待确认对象账本','ti-clock']
+        ];try{window.__olHistTypeOpts18_6REC=typeOpts18rec.map(x=>x[1])}catch(_){}typeOpts18rec.forEach(x=>body+=opt(x[1],x[2],f.type===x[0],`rmSetHistFilter18_6K('type','${x[0]}')`,x[3]));}
         else if(kind==='pay'){title='付款方式';body+=opt('全部付款方式',`${all.length} 笔`,f.pay==='all',`rmSetHistFilter18_6K('pay','all')`,'ti-credit-card');cards.forEach(c=>{const xs=all.filter(t=>same(t.payId,c.id)||(!t.payId&&t.payName===c.name));body+=opt(c.name,`${xs.length} 笔 · ${F(xs.reduce((a,t)=>a+N(t.amt),0))}`,same(f.pay,c.id),`rmSetHistFilter18_6K('pay',${JSON.stringify(c.id)})`,c.type==='cc'?'ti-credit-card':c.type==='ew'?'ti-wallet':'ti-building-bank');});}
         else if(kind==='aa'){title='AA 对象';body+=opt('全部 AA 对象',`所有 AA 分账`,f.aa==='all',`rmSetHistFilter18_6K('aa','all')`,'ti-users');people.forEach(p=>{const xs=all.filter(t=>{const a=aaInfo(t);return a&&(same(a.personId,p.id)||personKeyName(a.person)===personKeyName(p.name));});body+=opt(p.name,`${xs.length} 笔 · ${F(xs.reduce((a,t)=>a+N(t.amt),0))}`,same(f.aa,p.id),`rmSetHistFilter18_6K('aa',${JSON.stringify(p.id)})`,'ti-user');});}
         else {title='更多筛选';body+=`<div class="filter-sheet-sub18k">排序</div>`;[['new','新到旧','最新记录在上面'],['old','旧到新','旧记录在上面'],['amountDesc','金额大到小','适合找大额消费'],['amountAsc','金额小到大','适合找小额记录']].forEach(x=>body+=opt(x[1],x[2],f.sort===x[0],`rmSetHistFilter18_6K('sort','${x[0]}')`,'ti-sort-descending'));body+=`<div class="filter-sheet-sub18k">快速条件</div>`;body+=opt('只看有附件','收据 / 图片 / PDF',f.file,`rmToggleHistFlag18_6K('file')`,'ti-paperclip');body+=opt('只看已编辑','有编辑记录 timeline',f.edited,`rmToggleHistFlag18_6K('edited')`,'ti-history');body+=opt('只看只记录','不扣余额',f.recordOnly,`rmToggleHistFlag18_6K('recordOnly')`,'ti-file-description');}
@@ -6384,21 +6491,25 @@ function telegramFiles15(raw){
   function ensure(){if(!A(D.personLedgerItems))D.personLedgerItems=[];return D.personLedgerItems}
   window.ensurePersonLedgerItems18_6T=ensure;
   function personById(id){return arr(D.aaPeople).find(p=>same(p.id,id))||null}
-  function itemsFor(pid,all=false){return ensure().filter(x=>same(x.personId,pid)&&(all||x.status!=='settled'))}
+  function itemsFor(pid,all=false){return ensure().filter(x=>same(x.personId,pid)&&(all||isActiveLocalPersonLedgerItem18_6FP22(x)))}
   window.hasPersonLedgerItems18_6T=function(){return ensure().some(x=>x&&x.status!=='settled')};
-  window.personLedgerItemCount18_6T=function(pid){return itemsFor(pid,true).length};
+  window.personLedgerItemCount18_6T=function(pid){return itemsFor(pid,true).filter(isActiveLocalPersonLedgerItem18_6FP22).length};
   function isOpenMonthly(it){return it&&it.itemType==='monthly'&&!N(it.totalAmount)}
   function baseAmount(it){return N(it&&it.totalAmount)}
   function recomputePersonLedgerItemStatus18_6U1(it,afterUndo=false){if(!it)return it;const rem=N(it.remainingAmount),total=baseAmount(it),paid=N(it.paidAmount);if(isOpenMonthly(it)){if(afterUndo)it.status='active';else if(!it.status)it.status='active';return it}if(rem<=0&&total>0&&paid>=total)it.status='settled';else if(rem>0||afterUndo)it.status='active';else if(!it.status)it.status='active';return it}
   window.recomputePersonLedgerItemStatus18_6U1=recomputePersonLedgerItemStatus18_6U1;
-  function recompute(it){const paid=arr(it.payments).filter(p=>!p.reversedAt).reduce((a,p)=>a+N(p.amount),0),opening=N(it.openingPaidAmount);it.paidAmount=r2(opening+paid);if(isOpenMonthly(it)){it.remainingAmount=0;if(!it.status)it.status='active';it.updatedAt=nowIso();return it}const rem=Math.max(0,r2(baseAmount(it)-N(it.paidAmount)));it.remainingAmount=rem;recomputePersonLedgerItemStatus18_6U1(it,false);it.updatedAt=nowIso();return it}
+  function proofStatus18_6YA2(p){if(window.objectLedgerPaymentLabel18_6YA3C){try{const lbl=String(window.objectLedgerPaymentLabel18_6YA3C(p)||'');if(lbl.indexOf('已确认')===0)return 'confirmed';if(lbl.indexOf('有问题')===0)return 'disputed';if(lbl.indexOf('待确认')===0)return 'pending_owner_review';}catch(_){}}const raw=p&&p.raw||{},inner=raw.payment&&raw.payment.raw||raw.payment||{};if(sid(raw.proof_status).toLowerCase()==='confirmed'||sid(raw.status).toLowerCase()==='confirmed'||raw.confirmed_at||inner.confirmed_at)return 'confirmed';return sid(raw.proof_status||inner.proof_status||p&&p.proof_status||p&&p.status)}
+  function isPendingPersonLedgerCloud18_6XC(p){const st=proofStatus18_6YA2(p);if(['confirmed','cancelled'].includes(st))return false;return !!(p&&(st==='disputed'||st==='rejected'||p.pendingOwnerReview||p.source==='telegram_submit_payment'||p.status==='pending_owner_review'||st==='pending_owner_review'||(p.displayOnly&&st!=='confirmed')))}
+  function isActionablePersonLedgerPayment18_6YA2(p){const st=proofStatus18_6YA2(p);if(['confirmed','cancelled'].includes(st))return false;return !p.reversedAt&&!p.reversed_at&&(st==='pending_owner_review'||st==='disputed'||st==='rejected'||p.pendingOwnerReview)}
+  function isActiveLocalPersonLedgerItem18_6FP22(it){if(window.getObjectLedgerEffectiveState18_6YA3C){try{return !!window.getObjectLedgerEffectiveState18_6YA3C(it).isActive}catch(_){}}if(!it||['cancelled','deleted'].includes(sid(it.status)))return false;if(arr(it.payments).some(isActionablePersonLedgerPayment18_6YA2))return true;if(['settled'].includes(sid(it.status)))return false;return isOpenMonthly(it)||N(it.remainingAmount||it.remaining_amount)>0}
+  function recompute(it){if(it&&it.cloudAuthoritative18_6FP22&&['settled','cancelled'].includes(sid(it.status)))return it;const paid=arr(it.payments).filter(p=>!p.reversedAt&&!isPendingPersonLedgerCloud18_6XC(p)).reduce((a,p)=>a+N(p.amount),0),opening=N(it.openingPaidAmount);it.paidAmount=r2(opening+paid);if(isOpenMonthly(it)){it.remainingAmount=0;if(!it.status)it.status='active';it.updatedAt=nowIso();return it}const rem=Math.max(0,r2(baseAmount(it)-N(it.paidAmount)));it.remainingAmount=rem;recomputePersonLedgerItemStatus18_6U1(it,false);it.updatedAt=nowIso();return it}
   function applyLedgerType(pid,dir,type){try{const p=personById(pid);if(!p)return;if(!A(p.ledgerTypes))p.ledgerTypes=['aa'];const add=dir==='they_owe_me'?'receivable':'payable';if(!p.ledgerTypes.includes(add))p.ledgerTypes.push(add);if(type==='monthly'&&!p.ledgerTypes.includes('recurring'))p.ledgerTypes.push('recurring');if(type==='installment'&&!p.ledgerTypes.includes('installment'))p.ledgerTypes.push('installment');p.ledgerMode=p.ledgerTypes.length>1?'mixed':(add==='receivable'?'they_owe_me':'i_owe_them')}catch(_){}}
   function ensureCss(){
     if(document.getElementById('phase18-6t-css'))return;
     const st=document.createElement('style');st.id='phase18-6t-css';st.textContent=`
       .pl-sum18t{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}.pl-sum18t span{font-size:10.5px;font-weight:850;color:var(--text3);background:var(--bg3);border:1px solid var(--border);border-radius:999px;padding:3px 6px}
       .pl-sec18t{margin:12px 0 2px}.pl-note18t{display:flex;gap:7px;align-items:flex-start;margin:8px 0 10px;padding:9px 10px;border-radius:12px;background:var(--bg3);color:var(--text3);font-size:11.5px;line-height:1.4}.pl-list18t{display:grid;gap:8px;margin:8px 0 10px}.pl-item18t{border:1px solid var(--border);border-radius:14px;background:var(--bg2);padding:10px 11px}.pl-item18t.settled{opacity:.62}.pl-head18t{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.pl-title18t{font-size:13px;font-weight:900;color:var(--text)}.pl-kind18t{font-size:10.5px;font-weight:850;color:var(--text3);white-space:nowrap}.pl-meta18t{font-size:11.5px;color:var(--text3);line-height:1.45;margin-top:4px}.pl-rem18t{font-size:12px;font-weight:900;margin-top:5px;color:var(--green)}.pl-rem18t.owe{color:var(--orange)}.pl-actions18t{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.pl-actions18t button{border:1px solid var(--border);background:var(--bg3);color:var(--text2);border-radius:999px;padding:6px 9px;font-size:11.5px;font-weight:850}
-      .pl-payhist18u{display:grid;gap:5px;margin-top:8px}.pl-payrow18u{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:10.8px;color:var(--text3);background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:6px 7px}.pl-payrow18u b{color:var(--text);font-size:11px}.pl-payrow18u.rev{opacity:.58}.pl-payrow18u em{font-style:normal;color:var(--orange);font-weight:850}.pl-payrow18u button{margin-left:auto;border:0;background:transparent;color:var(--accent);font-size:10.8px;font-weight:900;padding:2px 4px}
+      .pl-payhist18u{display:grid;gap:7px;margin-top:10px}.pl-payrow18u{display:grid;gap:4px;font-size:11px;color:var(--text3);background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:8px 9px;line-height:1.35}.pl-payrow18u b{color:var(--text);font-size:11.5px}.pl-payrow18u.rev{opacity:.58}.pl-payrow18u.pending b{color:var(--orange)}.pl-payrow18u.confirmed b{color:var(--green)}.pl-payrow18u.disputed b{color:var(--red)}.pl-payrow18u em{font-style:normal;color:var(--orange);font-weight:850}.pl-payrow18u button{justify-self:start;border:0;background:transparent;color:var(--accent);font-size:10.8px;font-weight:900;padding:2px 0}
       .pl-modal18t{position:fixed;inset:0;z-index:99999;background:rgba(15,18,24,.42);display:flex;align-items:flex-end;justify-content:center}.pl-sheet18t{width:100%;max-width:560px;max-height:88dvh;overflow:auto;background:var(--bg);border-radius:22px 22px 0 0;padding:18px 18px calc(env(safe-area-inset-bottom) + 18px);box-shadow:var(--shadow-lg)}.pl-sheet18t h2{font-size:18px;margin:0 0 12px}.pl-sheet18t label{display:block;font-size:12px;font-weight:850;color:var(--text2);margin:12px 0 6px}.pl-sheet18t input,.pl-sheet18t select,.pl-sheet18t textarea{width:100%;border:1px solid var(--border);border-radius:13px;background:var(--bg2);color:var(--text);font-size:16px;padding:11px 12px;box-sizing:border-box}.pl-grid18t{display:grid;grid-template-columns:1fr 1fr;gap:9px}.pl-hide18t{display:none!important}.pl-actions-sheet18t{display:grid;grid-template-columns:1fr 1fr;gap:10px;position:sticky;bottom:0;background:linear-gradient(to top,var(--bg) 75%,transparent);padding-top:14px;margin-top:14px}.pl-actions-sheet18t button{height:48px;border-radius:14px;border:1px solid var(--border);font-weight:900;background:var(--bg2);color:var(--text2)}.pl-actions-sheet18t .ok{background:var(--accent);color:#fff;border-color:transparent}
     `;document.head.appendChild(st);
   }
@@ -6411,11 +6522,35 @@ function telegramFiles15(raw){
     if(it.itemType==='monthly')return [`每月 ${F(it.monthlyAmount)} · 每月${N(it.dueDay)||1}号`,`已还 ${paid} · 剩 ${rem}`];
     return [`总额 ${total} · 已还 ${paid}`,`剩 ${rem}`];
   }
-  window.personLedgerSummary18_6T=function(p){const xs=itemsFor(p&&p.id);let recv=0,pay=0;xs.forEach(it=>{recompute(it);const v=isOpenMonthly(it)?N(it.monthlyAmount):N(it.remainingAmount);if(it.direction==='they_owe_me')recv+=v;else pay+=v});if(!recv&&!pay)return '';return `<div class="pl-sum18t">${recv?`<span>他欠我 ${F(recv)}</span>`:''}${pay?`<span>我欠他 ${F(pay)}</span>`:''}</div>`}
-  function payFiles18_6U1(p){return arr(p&&p.attachments).map(f=>({name:f.name,type:f.type,data:f.dataUrl||f.data||''})).filter(f=>f.data)}
-  window.viewPersonLedgerPaymentAttachment18_6U1=function(itemId,paymentId){const it=ensure().find(x=>same(x.id,itemId)),p=it&&arr(it.payments).find(x=>same(x.id,paymentId));if(p)try{openViewer(payFiles18_6U1(p))}catch(_){}};
-  function payHistoryHTML18_6U(it){const ps=arr(it.payments);if(!ps.length)return '';let h='<div class="pl-payhist18u">';ps.slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||''))).forEach(p=>{const incoming=p.direction==='payment_in',rev=!!p.reversedAt,src=p.affectsBalance?(p.accountName||'Account'):'只记账',verb=incoming?'收款':'还款',hasFiles=payFiles18_6U1(p).length,hasHist=arr(p.editHistory).length;h+=`<div class="pl-payrow18u ${rev?'rev':''}"><span>${esc(p.date||'')}</span><b>${esc(verb)} ${F(p.amount)}</b><span>${esc(src)}</span>${p.note?`<span>${esc(p.note)}</span>`:''}${hasFiles?`<button onclick="event.stopPropagation();viewPersonLedgerPaymentAttachment18_6U1(${JSON.stringify(it.id)},${JSON.stringify(p.id)})"><i class="ti ti-paperclip"></i></button>`:''}${hasHist?`<button onclick="event.stopPropagation();openPersonLedgerPaymentHistory18_6U2&&openPersonLedgerPaymentHistory18_6U2(${JSON.stringify(it.id)},${JSON.stringify(p.id)})"><i class="ti ti-history"></i></button>`:''}${rev?'<em>已撤销</em>':`<button onclick="event.stopPropagation();editPersonLedgerPayment18_6U2&&editPersonLedgerPayment18_6U2(${JSON.stringify(it.id)},${JSON.stringify(p.id)})">编辑</button><button onclick="event.stopPropagation();undoPersonLedgerPayment18_6U(${JSON.stringify(it.id)},${JSON.stringify(p.id)})">撤销</button>`}</div>`});return h+'</div>'}
-  window.renderPersonLedgerItems18_6T=function(p){const xs=itemsFor(p&&p.id,true);let h='<div class="pl-sec18t">';if(xs.length)h+='<div class="po-lbl" style="margin:12px 0 7px">账本项目</div><div class="pl-list18t">';xs.forEach(it=>{const lines=itemLines(it),owe=it.direction==='i_owe_them',settled=it.status==='settled';h+=`<div class="pl-item18t ${settled?'settled':''}"><div class="pl-head18t"><div><div class="pl-title18t">${esc(dirText(it.direction))} · ${esc(it.title||'账本项目')}</div><div class="pl-meta18t">${esc(lines[0])}</div></div><div class="pl-kind18t">${esc(typeText(it.itemType))}${settled?' · 已结清':''}</div></div><div class="pl-rem18t ${owe?'owe':''}">${esc(lines[1])}</div>${it.notes?`<div class="pl-meta18t">${esc(it.notes)}</div>`:''}${payHistoryHTML18_6U(it)}<div class="pl-actions18t"><button onclick="event.stopPropagation();openPersonLedgerPayment18_6T(${JSON.stringify(it.id)})">${it.direction==='i_owe_them'?'记录还款':'记录收款'}</button>${settled?`<button onclick="event.stopPropagation();reopenPersonLedgerItem18_6U(${JSON.stringify(it.id)})">重新打开</button>`:`<button onclick="event.stopPropagation();settlePersonLedgerItem18_6T(${JSON.stringify(it.id)})">结清</button>`}<button onclick="event.stopPropagation();openPersonLedgerItem18_6T(${JSON.stringify(it.personId)},${JSON.stringify(it.id)})">编辑</button><button onclick="event.stopPropagation();deletePersonLedgerItem18_6U(${JSON.stringify(it.id)})">删除</button></div></div>`});if(xs.length)h+='</div>';h+=`<div class="pl-note18t"><i class="ti ti-info-circle"></i><span>账本项目目前保存在 App，本阶段只连接本机余额和本机记录，不同步 Telegram。</span></div></div>`;return h}
+  window.personLedgerSummary18_6T=function(p){const xs=itemsFor(p&&p.id,true).filter(isActiveLocalPersonLedgerItem18_6FP22);let recv=0,pay=0;xs.forEach(it=>{recompute(it);if(!isActiveLocalPersonLedgerItem18_6FP22(it))return;const v=isOpenMonthly(it)?N(it.monthlyAmount):N(it.remainingAmount||it.remaining_amount);if(it.direction==='they_owe_me')recv+=v;else pay+=v});if(!recv&&!pay)return '';return `<div class="pl-sum18t">${recv?`<span>他欠我 ${F(recv)}</span>`:''}${pay?`<span>我欠他 ${F(pay)}</span>`:''}</div>`}
+  window.__personLedgerAttachmentPreview18_6XC2=window.__personLedgerAttachmentPreview18_6XC2||new Map();
+  function attKey18_6XC2(att){return ('att_'+sid(att&&(att.cloudAttachmentId||att.appAttachmentId||att.id||Math.random().toString(36).slice(2)))).replace(/[^a-zA-Z0-9_-]/g,'_')}
+  function registerPersonLedgerAttachment18_6XC2(att){const key=attKey18_6XC2(att);window.__personLedgerAttachmentPreview18_6XC2.set(key,att);return key}
+  function proofButtons18_6XC2(p){return arr(p&&p.attachments).map(att=>`<button type="button" data-action="open-person-ledger-attachment-18-6xc2" data-attachment-key="${esc(registerPersonLedgerAttachment18_6XC2(att))}"><i class="ti ti-paperclip"></i> Telegram 凭证</button>`).join('')}
+  function payFiles18_6U1(p){return arr(p&&p.attachments).map(f=>({name:f.name||'Telegram proof',type:f.type||f.mime_type||'',data:f.dataUrl||f.data||f.url||''})).filter(f=>f.data)}
+  window.viewPersonLedgerPaymentAttachment18_6U1=function(itemId,paymentId){const it=ensure().find(x=>same(x.id,itemId)),p=it&&arr(it.payments).find(x=>same(x.id,paymentId));if(p)try{const files=payFiles18_6U1(p);if(files.length)openViewer(files);else toastMsg('凭证资料已记录，但暂时无法预览。')}catch(_){}};
+  if(!window.__plPreviewDelegated18_6XC2){document.addEventListener('click',e=>{const btn=e.target&&e.target.closest&&e.target.closest('[data-action="open-person-ledger-attachment-18-6xc2"]');if(!btn)return;e.preventDefault();e.stopPropagation();const key=btn.dataset.attachmentKey||'',att=window.__personLedgerAttachmentPreview18_6XC2&&window.__personLedgerAttachmentPreview18_6XC2.get(key);if(!att){toastMsg('找不到这个凭证资料。');return}const raw=att.raw||{},url=att.data||att.url||raw.proxy_url||raw.url||'';if(!url){toastMsg('凭证资料已记录，但暂时无法预览。');return}const type=att.type||att.mime_type||'',name=att.name||'Telegram proof';if(/^image\//i.test(type)||/\.(png|jpe?g|webp|gif)(\?|$)/i.test(url))openViewer([{data:url,name,type:type||'image/*'}]);else window.open(url,'_blank','noopener')});window.__plPreviewDelegated18_6XC2=true}
+  window.debugPersonLedgerAttachmentPreview18_6XC2=function(){const m=window.__personLedgerAttachmentPreview18_6XC2||new Map(),vals=[...m.values()];return {registrySize:m.size,keys:[...m.keys()],attachmentsWithUrl:vals.filter(a=>a&&(a.data||a.url||(a.raw&&(a.raw.proxy_url||a.raw.url)))).length,sample:vals[0]?{id:vals[0].id,cloudAttachmentId:vals[0].cloudAttachmentId,name:vals[0].name,type:vals[0].type,url:sid(vals[0].url||vals[0].data||vals[0].raw&&vals[0].raw.proxy_url).slice(0,80)}:null}}
+  function formatDateDMY18_6Y(d){const s=sid(d);if(!s)return '';if(/^\d{4}-\d{2}-\d{2}/.test(s)){const [y,m,day]=s.slice(0,10).split('-');return `${Number(day)}/${Number(m)}/${y}`}const m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);return m?`${Number(m[1])}/${Number(m[2])}/${m[3]}`:s}
+  function formatTimeAMPM18_6Y(d){const s=sid(d);let dt=null;if(/T\d{2}:\d{2}/.test(s)||/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}/.test(s))dt=new Date(s.replace(' ','T'));else if(/^\d{1,2}:\d{2}/.test(s))dt=new Date(`${todayIso()}T${s.slice(0,5)}:00`);if(!dt||Number.isNaN(dt.getTime()))return '';let h=dt.getHours(),m=String(dt.getMinutes()).padStart(2,'0'),ap=h>=12?'PM':'AM';h=h%12||12;return `${h}:${m} ${ap}`}
+  function formatDateTimeDMYAMPM18_6Y(d){const date=formatDateDMY18_6Y(d),time=formatTimeAMPM18_6Y(d);return date&&time?`${date} ${time}`:(date||time||'')}
+  function sortLedgerPaymentsOldToNew18_6Y(ps){return arr(ps).slice().sort((a,b)=>String(a.createdAt||a.created_at||a.date||'').localeCompare(String(b.createdAt||b.created_at||b.date||'')))}
+  function fmtDate18_6XC(d){return formatDateDMY18_6Y(d)}
+  // PHASE 18.6Y-A2 payment labels: 已确认 RM / 待确认 RM / 有问题 RM
+  function paymentDisplay18_6YA2(p){const st=proofStatus18_6YA2(p);if(st==='confirmed')return {status:'confirmed',verb:'已确认',source:'Telegram 凭证',action:''};if(st==='disputed'||st==='rejected')return {status:'disputed',verb:'有问题',source:'Telegram 凭证',action:'<em>有问题</em>'};if(st==='pending_owner_review'||(!['confirmed','cancelled'].includes(st)&&p.pendingOwnerReview))return {status:'pending',verb:'待确认',source:'Telegram 凭证',action:'<em>待确认</em>'};return {status:'normal',verb:p.direction==='payment_in'?'收款':'还款',source:p.affectsBalance?(p.accountName||'Account'):'只记账',action:''}}
+  function payHistoryHTML18_6U(it){
+    const ps=arr(it.payments);if(!ps.length)return '';let h='<div class="pl-payhist18u">';
+    sortLedgerPaymentsOldToNew18_6Y(ps).forEach(p=>{
+      const display=paymentDisplay18_6YA2(p),pending=display.status==='pending',confirmed=display.status==='confirmed',disputed=display.status==='disputed',rev=!!p.reversedAt;
+      const hasFiles=payFiles18_6U1(p).length||arr(p.attachments).length,hasHist=!pending&&!confirmed&&!disputed&&arr(p.editHistory).length;
+      const fileBtn=hasFiles?(pending||confirmed||disputed?proofButtons18_6XC2(p):`<button onclick="event.stopPropagation();viewPersonLedgerPaymentAttachment18_6U1(${JSON.stringify(it.id)},${JSON.stringify(p.id)})"><i class="ti ti-paperclip"></i> 凭证</button>`):'';
+      const histBtn=hasHist?`<button onclick="event.stopPropagation();openPersonLedgerPaymentHistory18_6U2&&openPersonLedgerPaymentHistory18_6U2(${JSON.stringify(it.id)},${JSON.stringify(p.id)})"><i class="ti ti-history"></i></button>`:'';
+      const actions=display.action||(rev?'<em>已撤销</em>':`<button onclick="event.stopPropagation();editPersonLedgerPayment18_6U2&&editPersonLedgerPayment18_6U2(${JSON.stringify(it.id)},${JSON.stringify(p.id)})">编辑</button><button onclick="event.stopPropagation();undoPersonLedgerPayment18_6U(${JSON.stringify(it.id)},${JSON.stringify(p.id)})">撤销</button>`);
+      h+=`<div class="pl-payrow18u ${rev?'rev':''} ${display.status}"><span>${esc(formatDateTimeDMYAMPM18_6Y(p.createdAt||p.created_at||p.date||''))} · ${esc(display.verb)} ${F(p.amount)}${display.source?' · '+esc(display.source):''}</span>${p.note?`<span>${esc(p.note)}</span>`:''}${fileBtn}${histBtn}${actions}</div>`;
+    });
+    return h+'</div>';
+  }
+  window.renderPersonLedgerItems18_6T=function(p){ensureCss();try{window.normalizeObjectLedgerLocalState18_6YA3&&window.normalizeObjectLedgerLocalState18_6YA3()}catch(_){}const xs=itemsFor(p&&p.id,true).filter(isActiveLocalPersonLedgerItem18_6FP22);let h='<div class="pl-sec18t">';if(xs.length)h+='<div class="po-lbl" style="margin:12px 0 7px">账本项目</div><div class="pl-list18t">';xs.forEach(it=>{const lines=itemLines(it),owe=it.direction==='i_owe_them',settled=it.status==='settled';h+=`<div class="pl-item18t ${settled?'settled':''}"><div class="pl-head18t"><div><div class="pl-title18t">${esc(dirText(it.direction))} · ${esc(it.title||'账本项目')}</div><div class="pl-meta18t">${esc(lines[0])}</div></div><div class="pl-kind18t">${esc(typeText(it.itemType))}${settled?' · 已结清':''}</div></div><div class="pl-rem18t ${owe?'owe':''}">${esc(lines[1])}</div>${it.notes?`<div class="pl-meta18t">${esc(it.notes)}</div>`:''}${payHistoryHTML18_6U(it)}<div class="pl-actions18t"><button onclick="event.stopPropagation();openPersonLedgerPayment18_6T(${JSON.stringify(it.id)})">${it.direction==='i_owe_them'?'记录还款':'记录收款'}</button>${settled?`<button onclick="event.stopPropagation();reopenPersonLedgerItem18_6U(${JSON.stringify(it.id)})">重新打开</button>`:`<button onclick="event.stopPropagation();settlePersonLedgerItem18_6T(${JSON.stringify(it.id)})">结清</button>`}<button onclick="event.stopPropagation();openPersonLedgerItem18_6T(${JSON.stringify(it.personId)},${JSON.stringify(it.id)})">编辑</button><button onclick="event.stopPropagation();deletePersonLedgerItem18_6U(${JSON.stringify(it.id)})">删除</button></div></div>`});if(xs.length)h+='</div>';h+=`<div class="pl-note18t"><i class="ti ti-info-circle"></i><span>对象账本已连接 Telegram；结清后会进入记录页。</span></div></div>`;return h}
   function closeModal18T(){const el=document.getElementById('pl-modal18t');if(el)el.remove()}
   function val(id){const el=document.getElementById(id);return el?el.value:''}
   function toastMsg(msg){try{toast(msg)}catch(_){alert(msg)}}
@@ -6428,7 +6563,7 @@ function telegramFiles15(raw){
     ensureCss();ensure();closeModal18T();const p=personById(pid)||{},it=itemId?ensure().find(x=>same(x.id,itemId)):null;
     const item=it||{direction:'i_owe_them',itemType:'one_time',startDate:todayIso(),dueDay:1,status:'active'};
     const el=document.createElement('div');el.id='pl-modal18t';el.className='pl-modal18t';el.onclick=e=>{if(e.target===el)closeModal18T()};
-    el.innerHTML=`<div class="pl-sheet18t"><h2>${it?'编辑账本项目':'新增账本项目'}</h2><label>所属对象</label><input readonly value="${esc(p.name||'账本对象')}"/><label>项目名称</label><input id="pl-title18t" value="${esc(item.title||'')}" placeholder="房租 / 借钱 / 床 Shopee 分期"/><div class="pl-grid18t"><div><label>方向</label><select id="pl-dir18t"><option value="i_owe_them" ${item.direction==='i_owe_them'?'selected':''}>我欠他</option><option value="they_owe_me" ${item.direction==='they_owe_me'?'selected':''}>他欠我</option></select></div><div><label>类型</label><select id="pl-type18t"><option value="one_time" ${item.itemType==='one_time'?'selected':''}>一次性</option><option value="monthly" ${item.itemType==='monthly'?'selected':''}>每月固定</option><option value="installment" ${item.itemType==='installment'?'selected':''}>分期</option></select></div></div><div class="pl-grid18t"><div><label>总金额</label><input id="pl-total18t" type="number" inputmode="decimal" value="${esc(item.totalAmount||'')}"/></div><div><label>每月金额</label><input id="pl-monthly18t" type="number" inputmode="decimal" value="${esc(item.monthlyAmount||'')}"/></div></div><div class="pl-grid18t"><div><label>开始日期</label><input id="pl-start18t" type="text" value="${esc(item.startDate||todayIso())}" placeholder="YYYY-MM-DD 或 DD/MM/YYYY"/></div><div><label>每月还款日</label><input id="pl-due18t" type="number" inputmode="numeric" value="${esc(item.dueDay||1)}"/></div></div><div class="pl-grid18t"><div><label>分期期数</label><input id="pl-inst-total18t" type="number" inputmode="numeric" value="${esc(item.installmentTotal||'')}"/></div><div><label>已还期数</label><input id="pl-inst-paid18t" type="number" inputmode="numeric" value="${esc(item.installmentPaid||0)}"/></div></div><label>已还 / 已收金额</label><input id="pl-paid18t" type="number" inputmode="decimal" value="${esc(item.paidAmount||'')}"/><label>备注</label><textarea id="pl-notes18t" rows="3">${esc(item.notes||'')}</textarea><div class="pl-actions-sheet18t"><button type="button" onclick="closePersonLedgerModal18_6T()">取消</button><button type="button" class="ok" data-action="save-person-ledger-item" data-person-id="${esc(pid)}" data-item-id="${esc(itemId)}">保存</button></div></div>`;
+    el.innerHTML=`<div class="pl-sheet18t"><h2>${it?'编辑账本项目':'新增账本项目'}</h2><label>所属对象</label><input readonly value="${esc(p.name||'账本对象')}"/><label>项目名称</label><input id="pl-title18t" value="${esc(item.title||'')}" placeholder="房租 / 借钱 / 床 Shopee 分期"/><div class="pl-grid18t"><div><label>方向</label><select id="pl-dir18t"><option value="i_owe_them" ${item.direction==='i_owe_them'?'selected':''}>我欠他</option><option value="they_owe_me" ${item.direction==='they_owe_me'?'selected':''}>他欠我</option></select></div><div><label>类型</label><select id="pl-type18t"><option value="one_time" ${item.itemType==='one_time'?'selected':''}>一次性</option><option value="monthly" ${item.itemType==='monthly'?'selected':''}>每月固定</option><option value="installment" ${item.itemType==='installment'?'selected':''}>分期</option></select></div></div><div class="pl-grid18t"><div><label>总金额</label><input id="pl-total18t" type="number" inputmode="decimal" value="${esc(item.totalAmount||'')}"/></div><div><label>每月金额</label><input id="pl-monthly18t" type="number" inputmode="decimal" value="${esc(item.monthlyAmount||'')}"/></div></div><div class="pl-grid18t"><div><label>开始日期</label><input id="pl-start18t" type="text" value="${esc(item.startDate||todayIso())}" placeholder="YYYY-MM-DD 或 DD/MM/YYYY"/></div><div><label>每月还款日</label><input id="pl-due18t" type="number" inputmode="numeric" value="${esc(item.dueDay||1)}"/></div></div><div class="pl-grid18t"><div><label>分期期数</label><input id="pl-inst-total18t" type="number" inputmode="numeric" value="${esc(item.installmentTotal||'')}"/></div><div><label>已还期数</label><input id="pl-inst-paid18t" type="number" inputmode="numeric" value="${esc(item.installmentPaid||0)}"/></div></div><label>已还 / 已收金额</label><input id="pl-paid18t" type="number" inputmode="decimal" value="${esc(item.paidAmount||'')}"/><label style="display:flex;align-items:center;gap:8px;font-weight:850"><input id="pl-reminder18y" type="checkbox" ${item.telegramDueReminderEnabled===false?'':'checked'} style="width:auto;padding:0"/> Telegram 自动提醒</label><label>备注</label><textarea id="pl-notes18t" rows="3">${esc(item.notes||'')}</textarea><div class="pl-actions-sheet18t"><button type="button" onclick="closePersonLedgerModal18_6T()">取消</button><button type="button" class="ok" data-action="save-person-ledger-item" data-person-id="${esc(pid)}" data-item-id="${esc(itemId)}">保存</button></div></div>`;
     document.body.appendChild(el);
     el.querySelectorAll('button').forEach(b=>b.type='button');const typeEl=document.getElementById('pl-type18t');if(typeEl)typeEl.addEventListener('change',window.refreshPersonLedgerForm18_6T);window.refreshPersonLedgerForm18_6T();
   };
@@ -6456,7 +6591,8 @@ function telegramFiles15(raw){
     if(itemType==='installment'){if(!(totalAmount>0))return failSave18T2('invalid_total_amount','分期项目需要填写总金额',{totalRaw,itemType});if(!(monthlyAmount>0))return failSave18T2('invalid_monthly_amount','分期项目需要填写每月金额',{monthlyRaw,itemType});if(!(installmentTotal>0))return failSave18T2('invalid_installment_total','分期项目需要填写分期总数',{instTotalRaw,itemType});if(paidRaw==='')paidAmount=r2(installmentPaid*monthlyAmount)}
     if(itemType==='monthly'&&totalRaw==='')totalAmount=0;
     let it=itemId?ensure().find(x=>same(x.id,itemId)):null;const now=nowIso();if(!it){it={id:nidSafe(),personId:pid,createdAt:now,payments:[]};ensure().unshift(it)}
-    Object.assign(it,{personId:pid,title,direction,itemType,totalAmount,monthlyAmount,paidAmount,openingPaidAmount:paidAmount,startDate:normalizeDate18T2(val('pl-start18t'))||'',dueDay:Math.max(1,Math.min(31,N(val('pl-due18t'))||1)),installmentTotal:itemType==='installment'?installmentTotal:0,installmentPaid:itemType==='installment'?installmentPaid:0,status:it.status||'active',notes:val('pl-notes18t')||'',updatedAt:now});
+    const reminderEl=document.getElementById('pl-reminder18y'),telegramDueReminderEnabled=reminderEl?!!reminderEl.checked:true;
+    Object.assign(it,{personId:pid,title,direction,itemType,totalAmount,monthlyAmount,paidAmount,openingPaidAmount:paidAmount,startDate:normalizeDate18T2(val('pl-start18t'))||'',dueDay:Math.max(1,Math.min(31,N(val('pl-due18t'))||1)),telegramDueReminderEnabled,installmentTotal:itemType==='installment'?installmentTotal:0,installmentPaid:itemType==='installment'?installmentPaid:0,status:it.status||'active',notes:val('pl-notes18t')||'',updatedAt:now});
     it.payments=arr(it.payments);recompute(it);applyLedgerType(pid,it.direction,it.itemType);try{save();render();toast('✓ 账本项目已保存')}catch(e){return failSave18T2('save_exception','保存失败，请再试一次',{message:e&&e.message})}closeModal18T();return {ok:true,id:it.id};
   }
   window.savePersonLedgerItem18_6T2=savePersonLedgerItem18_6T2;
@@ -6551,6 +6687,17 @@ function telegramFiles15(raw){
   const nowIso=()=>{try{return typeof nowISO==='function'?nowISO():new Date().toISOString()}catch(_){return new Date().toISOString()}};
   const dateOnly=x=>/^\d{4}-\d{2}-\d{2}/.test(sid(x))?sid(x).slice(0,10):null;
   const people=()=>arr(D&&D.aaPeople),ensureItems18_6VC=()=>{if(!D.personLedgerItems)D.personLedgerItems=[];return arr(D.personLedgerItems)},items=()=>ensureItems18_6VC();
+  function isPendingPersonLedgerCloud18_6XC(p){const raw=p&&p.raw||{},st=sid(raw.proof_status||p&&p.status);if(['confirmed','disputed','rejected','cancelled'].includes(st))return false;return !!(p&&(p.pendingOwnerReview||p.source==='telegram_submit_payment'||p.status==='pending_owner_review'||raw.proof_status==='pending_owner_review'||(p.displayOnly&&st!=='confirmed')))}
+  function isPendingOrDisputedPersonLedgerPayment18_6FP22(payment){
+    const raw=payment&&payment.raw||{},st=sid(raw.proof_status||payment&&payment.status),app=sid(payment&&payment.appPaymentId||payment&&payment.app_payment_id||payment&&payment.id);
+    if(['confirmed','cancelled'].includes(st))return false;
+    if(st==='disputed'||st==='rejected')return true;
+    return st==='pending_owner_review'||!!(payment&&(payment.pendingOwnerReview||payment.source==='telegram_submit_payment'||app.startsWith('tgpay_')));
+  }
+  function hasActionablePendingOrDisputed18_6FP22(item){if(window.getObjectLedgerEffectiveState18_6YA3C){try{const s=window.getObjectLedgerEffectiveState18_6YA3C(item);return !!(s.pendingPayments.length||s.disputedPayments.length)}catch(_){}}return arr(item&&item.payments).some(p=>!p.reversedAt&&!p.reversed_at&&isPendingOrDisputedPersonLedgerPayment18_6FP22(p))}
+  function localRemaining18_6FP22(item){const a=item&&item.remainingAmount,b=item&&item.remaining_amount;return a!=null?N(a):N(b)}
+  function isSettledLocalPersonLedgerItem18_6FP22(item){if(window.getObjectLedgerEffectiveState18_6YA3C){try{return !!window.getObjectLedgerEffectiveState18_6YA3C(item).isSettled}catch(_){}}if(!item)return false;const st=sid(item.status);if(['cancelled','deleted'].includes(st))return true;if(hasActionablePendingOrDisputed18_6FP22(item))return false;if(st==='settled')return true;return localRemaining18_6FP22(item)<=0}
+  function isActiveLocalPersonLedgerItem18_6FP22(item){if(window.getObjectLedgerEffectiveState18_6YA3C){try{return !!window.getObjectLedgerEffectiveState18_6YA3C(item).isActive}catch(_){}}if(!item)return false;const st=sid(item.status);if(['cancelled','deleted'].includes(st))return false;if(hasActionablePendingOrDisputed18_6FP22(item))return true;if(localRemaining18_6FP22(item)>0)return true;if(st==='settled')return false;return false}
   const personForItem=item=>people().find(p=>same(p.id,item&&item.personId))||{};
   const partnerIdForPerson=p=>sid(p&&(p.telegramPartnerId||p.partnerId||p.supabasePartnerId))||null;
   const cleanRaw18_6VC=(v,seen=new WeakSet())=>{
@@ -6573,9 +6720,119 @@ function telegramFiles15(raw){
   function ownerHint18_6VC(){try{if(typeof SESSION!=='undefined'&&SESSION&&SESSION.user&&SESSION.user.id)return SESSION.user.id}catch(_){}try{if(window.SESSION&&window.SESSION.user&&window.SESSION.user.id)return window.SESSION.user.id}catch(_){}try{return localStorage.getItem('rm_owner')||''}catch(_){return ''}}
   function fail18_6VC(reason,details={}){try{console.warn('[18.6V-C person ledger cloud sync]',reason,details)}catch(_){}return {ok:false,reason,...details}}
   function client18_6VC(){try{return typeof supa!=='undefined'&&supa?supa:null}catch(_){return null}}
+  const cloudItemStats18_6FP21={merged:0,staleSkipped:0,cancelled:0,lastPull:null,rows:[]};
+  const confirmedReconcileStats18_6YA1={confirmedPayments:0,affectedItems:0,repairedCloudItems:0,blockedStaleUpserts:0,sample:[],lastRun:null,lastPayments:[]};
+  function dateMs18_6FP21(v){const n=Date.parse(sid(v));return Number.isFinite(n)?n:0}
+  function itemLocalStamp18_6FP21(item){return Math.max(dateMs18_6FP21(item&&item.updatedAt),dateMs18_6FP21(item&&item.editedAt),dateMs18_6FP21(item&&item.updated_at),dateMs18_6FP21(item&&item.cloudUpdatedAt))}
+  function isPersonLedgerCloudNewer18_6FP21(localItem,cloudRow){
+    const cloudMs=dateMs18_6FP21(cloudRow&&cloudRow.updated_at);if(!cloudMs)return false;
+    const localMs=itemLocalStamp18_6FP21(localItem);
+    return !localMs||cloudMs>localMs;
+  }
+  function findLocalItemForCloud18_6FP21(cloudRow){
+    const cid=sid(cloudRow&&cloudRow.id),app=sid(cloudRow&&cloudRow.app_item_id);
+    return items().find(it=>cid&&same(it.cloudLedgerItemId,cid))||items().find(it=>app&&(same(it.appItemId,app)||same(it.sourceId,app)||same(it.id,app)))||null;
+  }
+  function isConfirmedPersonLedgerPayment18_6YA1(payment){
+    const raw=payment&&payment.raw||{},st=sid(raw.proof_status||payment&&payment.status);
+    return st==='confirmed'||!!(raw.confirmed_at||raw.confirmed_by_role||raw.confirmed_by_chat_id);
+  }
+  function confirmedPaymentMatchesItem18_6YA1(item,payment){
+    const itemCloud=sid(item&&item.cloudLedgerItemId),payCloud=sid(payment&&payment.ledger_item_id);
+    const payApp=sid(payment&&payment.app_item_id),ids=[item&&item.appItemId,item&&item.app_item_id,item&&item.sourceId,item&&item.id].map(sid).filter(Boolean);
+    return !!((itemCloud&&payCloud&&same(itemCloud,payCloud))||(payApp&&ids.some(id=>same(id,payApp))));
+  }
+  function confirmedPaymentsForItem18_6YA1(item,confirmedPayments){return arr(confirmedPayments).filter(p=>isConfirmedPersonLedgerPayment18_6YA1(p)&&confirmedPaymentMatchesItem18_6YA1(item,p))}
+  async function pullPersonLedgerConfirmedPayments18_6YA1(options={}){
+    const ownerUserId=options.ownerUserId||await owner18_6VC();if(!ownerUserId)return {ok:false,reason:'not_logged_in',payments:[]};
+    const db=options.db||client18_6VC();if(!db)return fail18_6VC('supabase_error',{message:'supabase client not ready'});
+    const {data,error}=await db.from('person_ledger_payments').select('id,owner_user_id,ledger_item_id,partner_id,app_payment_id,app_item_id,amount,direction,note,raw,created_at,updated_at').eq('owner_user_id',ownerUserId).order('updated_at',{ascending:false}).limit(500);
+    if(error)return fail18_6VC('confirmed_payments_pull_failed',{message:error.message,payments:[]});
+    const payments=arr(data).filter(isConfirmedPersonLedgerPayment18_6YA1);
+    confirmedReconcileStats18_6YA1.confirmedPayments=payments.length;confirmedReconcileStats18_6YA1.lastPayments=payments;return {ok:true,payments,count:payments.length};
+  }
+  function reconcilePersonLedgerItemFromConfirmedPayments18_6YA1(item,confirmedPayments,cloudRow){
+    if(!item)return {ok:false,reason:'invalid_item'};
+    const matches=confirmedPaymentsForItem18_6YA1(item,confirmedPayments),confirmedPaidSum=r2(matches.reduce((a,p)=>a+N(p.amount),0));
+    if(!(confirmedPaidSum>0))return {ok:false,reason:'no_confirmed_payments',confirmedPaidSum:0};
+    const total=r2(N(item.totalAmount||item.total_amount||(cloudRow&&cloudRow.total_amount)));
+    const currentPaid=r2(N(item.paidAmount||item.paid_amount));
+    const newPaid=Math.max(currentPaid,confirmedPaidSum),newRemaining=total>0?Math.max(0,r2(total-newPaid)):N(item.remainingAmount||item.remaining_amount);
+    const newStatus=total>0&&newRemaining<=0?'settled':(sid(item.status)==='settled'?'settled':sid(item.status)||'active');
+    item.paidAmount=newPaid;item.paid_amount=newPaid;item.remainingAmount=newRemaining;item.remaining_amount=newRemaining;item.status=newStatus;
+    const raw=item.raw&&typeof item.raw==='object'?item.raw:{};item.raw={...raw,confirmed_paid_sum_18_6Y_A1:confirmedPaidSum,reconciled_from_confirmed_payments_at:nowIso()};
+    item.confirmedPaidSum18_6YA1=confirmedPaidSum;item.updatedAt=nowIso();
+    confirmedReconcileStats18_6YA1.affectedItems++;if(confirmedReconcileStats18_6YA1.sample.length<12)confirmedReconcileStats18_6YA1.sample.push({id:sid(item.id),title:sid(item.title),confirmedPaidSum,status:newStatus});
+    return {ok:true,id:sid(item.id),confirmedPaidSum,newPaid,newRemaining,status:newStatus,matches:matches.length};
+  }
+  async function patchCloudItemFromConfirmed18_6YA1(db,ownerUserId,cloudRow,confirmedPaidSum){
+    if(!db||!ownerUserId||!cloudRow||!cloudRow.id||!(confirmedPaidSum>N(cloudRow.paid_amount)))return {ok:false,reason:'not_needed'};
+    const total=r2(N(cloudRow.total_amount)),remaining=total>0?Math.max(0,r2(total-confirmedPaidSum)):N(cloudRow.remaining_amount),status=total>0&&remaining<=0?'settled':(sid(cloudRow.status)==='settled'?'settled':'active'),raw={...(cloudRow.raw||{}),reconciled_from_confirmed_payments_18_6Y_A1:true,confirmed_paid_sum_18_6Y_A1:confirmedPaidSum,reconciled_at:nowIso()};
+    const patch={paid_amount:confirmedPaidSum,remaining_amount:remaining,status,updated_at:nowIso(),raw};
+    const {error}=await db.from('person_ledger_items').update(patch).eq('owner_user_id',ownerUserId).eq('id',cloudRow.id);
+    if(error)return fail18_6VC('confirmed_repair_patch_failed',{message:error.message,itemId:sid(cloudRow.id)});
+    confirmedReconcileStats18_6YA1.repairedCloudItems++;return {ok:true,id:sid(cloudRow.id),patch};
+  }
+  async function reconcilePersonLedgerConfirmedPayments18_6YA1(options={}){
+    ensureItems18_6VC();confirmedReconcileStats18_6YA1.affectedItems=0;confirmedReconcileStats18_6YA1.repairedCloudItems=0;confirmedReconcileStats18_6YA1.sample=[];confirmedReconcileStats18_6YA1.lastRun=nowIso();
+    const ownerUserId=await owner18_6VC();if(!ownerUserId)return {ok:false,reason:'not_logged_in'};
+    const db=client18_6VC();if(!db)return fail18_6VC('supabase_error',{message:'supabase client not ready'});
+    const pr=await pullPersonLedgerConfirmedPayments18_6YA1({db,ownerUserId});if(!pr.ok)return pr;const confirmedPayments=arr(pr.payments);
+    const ir=await db.from('person_ledger_items').select('id,app_item_id,title,total_amount,paid_amount,remaining_amount,status,raw,updated_at').eq('owner_user_id',ownerUserId).limit(500);
+    if(ir.error)return fail18_6VC('confirmed_reconcile_items_pull_failed',{message:ir.error.message});
+    for(const row of arr(ir.data)){
+      const local=findLocalItemForCloud18_6FP21(row),fake=local||{id:row.app_item_id,appItemId:row.app_item_id,cloudLedgerItemId:row.id,title:row.title,totalAmount:row.total_amount,total_amount:row.total_amount,paidAmount:row.paid_amount,remainingAmount:row.remaining_amount,status:row.status,raw:row.raw};
+      const matches=confirmedPaymentsForItem18_6YA1(fake,confirmedPayments),sum=r2(matches.reduce((a,p)=>a+N(p.amount),0));if(!(sum>0))continue;
+      if(local)reconcilePersonLedgerItemFromConfirmedPayments18_6YA1(local,confirmedPayments,row);
+      if(options.repairCloud!==false&&sum>N(row.paid_amount))await patchCloudItemFromConfirmed18_6YA1(db,ownerUserId,row,sum);
+    }
+    try{save()}catch(_){}if(!options.noRender)try{render()}catch(_){}
+    return {ok:true,confirmedPayments:confirmedPayments.length,affectedItems:confirmedReconcileStats18_6YA1.affectedItems,repairedCloudItems:confirmedReconcileStats18_6YA1.repairedCloudItems,sample:confirmedReconcileStats18_6YA1.sample};
+  }
+  function mergePersonLedgerCloudItem18_6FP21(item,cloudRow,opts={}){
+    if(!item||!cloudRow)return false;
+    if(sid(item.status)==='deleted')return false;
+    const cloudUpdated=sid(cloudRow.updated_at);
+    if(cloudRow.id)item.cloudLedgerItemId=sid(cloudRow.id);
+    const newer=!!opts.force||isPersonLedgerCloudNewer18_6FP21(item,cloudRow)||sid(cloudRow.status)==='cancelled';
+    item.cloudUpdatedAt=cloudUpdated;
+    if(!newer)return false;
+    if(cloudRow.paid_amount!=null){item.paidAmount=r2(cloudRow.paid_amount);item.paid_amount=item.paidAmount}
+    if(cloudRow.remaining_amount!=null){item.remainingAmount=r2(cloudRow.remaining_amount);item.remaining_amount=item.remainingAmount}
+    if(cloudRow.installment_paid!=null){item.installmentPaid=N(cloudRow.installment_paid)||0;item.installment_paid=item.installmentPaid}
+    if(cloudRow.due_day!=null){item.dueDay=Math.max(1,Math.min(31,N(cloudRow.due_day)||item.dueDay||1));item.due_day=item.dueDay}
+    if(cloudRow.status){item.status=sid(cloudRow.status);item.cloudStatus18_6FP22=item.status}
+    item.cloudRaw18_6FP21=cleanRaw18_6VC(cloudRow.raw||{});
+    if(cloudRow.raw&&cloudRow.raw.telegram_due_reminder_enabled!=null)item.telegramDueReminderEnabled=cloudRow.raw.telegram_due_reminder_enabled!==false;
+    item.cloudMergedAt=nowIso();
+    item.cloudAuthoritative18_6FP22=['settled','cancelled'].includes(sid(cloudRow.status))||N(cloudRow.remaining_amount)<=0;
+    if(sid(cloudRow.status)==='cancelled')cloudItemStats18_6FP21.cancelled++;
+    cloudItemStats18_6FP21.merged++;
+    return true;
+  }
+  async function fetchCloudItemForLocal18_6FP21(db,ownerUserId,item){
+    if(!db||!ownerUserId||!item)return null;
+    let q=db.from('person_ledger_items').select('id,app_item_id,partner_id,total_amount,status,paid_amount,remaining_amount,installment_paid,due_day,raw,updated_at').eq('owner_user_id',ownerUserId).limit(1);
+    if(item.cloudLedgerItemId)q=q.eq('id',item.cloudLedgerItemId);else q=q.eq('app_item_id',sid(item.appItemId||item.sourceId||item.id));
+    const {data,error}=await q.maybeSingle();if(error){fail18_6VC('cloud_item_fetch_failed',{message:error.message,itemId:sid(item.id)});return null}
+    return data||null;
+  }
+  async function pullPersonLedgerCloudItems18_6FP21(options={}){
+    ensureItems18_6VC();const ownerUserId=await owner18_6VC();if(!ownerUserId)return {ok:false,reason:'not_logged_in'};
+    const db=client18_6VC();if(!db)return fail18_6VC('supabase_error',{message:'supabase client not ready'});
+    const {data,error}=await db.from('person_ledger_items').select('id,app_item_id,partner_id,total_amount,status,paid_amount,remaining_amount,installment_paid,due_day,raw,updated_at').eq('owner_user_id',ownerUserId).order('updated_at',{ascending:false}).limit(300);
+    if(error)return fail18_6VC('cloud_items_pull_failed',{message:error.message});
+    let merged=0,linked=0,cancelled=0;
+    arr(data).forEach(row=>{const it=findLocalItemForCloud18_6FP21(row);if(!it)return;if(row.id&&!it.cloudLedgerItemId){it.cloudLedgerItemId=sid(row.id);linked++}const before=sid(it.status);if(mergePersonLedgerCloudItem18_6FP21(it,row)){merged++;if(sid(row.status)==='cancelled'&&before!=='cancelled')cancelled++;}});
+    let reconciled=null;if(options.skipConfirmedReconcile!==true){try{reconciled=await reconcilePersonLedgerConfirmedPayments18_6YA1({noRender:true})}catch(e){fail18_6VC('confirmed_reconcile_after_pull_failed',{message:e&&e.message})}}
+    if(merged||linked||reconciled&&reconciled.affectedItems){try{save()}catch(_){}if(!options.noRender)try{render()}catch(_){}}
+    const result={ok:true,cloudItems:arr(data).length,localItems:items().length,linked,merged,cancelled,reconciledConfirmedItems:reconciled&&reconciled.affectedItems||0,repairedCloudItems:reconciled&&reconciled.repairedCloudItems||0,settledCloudItems:arr(data).filter(r=>sid(r.status)==='settled'||N(r.remaining_amount)<=0).length};
+    cloudItemStats18_6FP21.lastPull=result;cloudItemStats18_6FP21.rows=arr(data).slice(0,12).map(r=>({id:sid(r.id),appItemId:sid(r.app_item_id),status:sid(r.status),paidAmount:r2(r.paid_amount),remainingAmount:r2(r.remaining_amount),dueDay:N(r.due_day)||null,updatedAt:sid(r.updated_at)}));
+    return result;
+  }
   function personLedgerCloudItemPayload18_6VC(item,person={},ownerUserId=''){
     const p=person&&person.id?person:personForItem(item),partnerId=partnerIdForPerson(p);
-    return {owner_user_id:ownerUserId,partner_id:partnerId,app_item_id:sid(item&&item.id),person_local_id:sid(item&&item.personId),person_name:sid(p.name||item&&item.personName),title:sid(item&&item.title),direction:sid(item&&item.direction),item_type:sid(item&&item.itemType),total_amount:r2(item&&item.totalAmount),monthly_amount:r2(item&&item.monthlyAmount),opening_paid_amount:r2(item&&item.openingPaidAmount),paid_amount:r2(item&&item.paidAmount),remaining_amount:r2(item&&item.remainingAmount),start_date:dateOnly(item&&item.startDate),due_day:N(item&&item.dueDay)||null,installment_total:N(item&&item.installmentTotal)||0,installment_paid:N(item&&item.installmentPaid)||0,status:sid(item&&item.status)||'active',notes:sid(item&&item.notes),raw:{source:'ringgitme_app',phase:'18.6V-C',local:sid(item&&item.id),synced_at:nowIso(),item:cleanRaw18_6VC({...item,payments:arr(item&&item.payments).map(p=>({...p,attachments:arr(p.attachments).map(a=>attachmentRaw18_6VC(a))}))})}};
+    return {owner_user_id:ownerUserId,partner_id:partnerId,app_item_id:sid(item&&item.id),person_local_id:sid(item&&item.personId),person_name:sid(p.name||item&&item.personName),title:sid(item&&item.title),direction:sid(item&&item.direction),item_type:sid(item&&item.itemType),total_amount:r2(item&&item.totalAmount),monthly_amount:r2(item&&item.monthlyAmount),opening_paid_amount:r2(item&&item.openingPaidAmount),paid_amount:r2(item&&item.paidAmount),remaining_amount:r2(item&&item.remainingAmount),start_date:dateOnly(item&&item.startDate),due_day:N(item&&item.dueDay)||null,installment_total:N(item&&item.installmentTotal)||0,installment_paid:N(item&&item.installmentPaid)||0,status:sid(item&&item.status)||'active',notes:sid(item&&item.notes),raw:{source:'ringgitme_app',phase:'18.6Y',local:sid(item&&item.id),synced_at:nowIso(),telegram_due_reminder_enabled:item&&item.telegramDueReminderEnabled!==false,item:cleanRaw18_6VC({...item,payments:arr(item&&item.payments).map(p=>({...p,attachments:arr(p.attachments).map(a=>attachmentRaw18_6VC(a))}))})}};
   }
   function personLedgerCloudPaymentPayload18_6VC(payment,item,person={},cloudItemId='',ownerUserId=''){
     const p=person&&person.id?person:personForItem(item),partnerId=partnerIdForPerson(p),atts=arr(payment&&payment.attachments);
@@ -6597,13 +6854,31 @@ function telegramFiles15(raw){
     return queue18_6VC('item:'+sid(item.id),async()=>{
       const ownerUserId=await owner18_6VC();if(!ownerUserId)return {ok:false,reason:'not_logged_in'};
       const db=client18_6VC();if(!db)return fail18_6VC('supabase_error',{message:'supabase client not ready'});
-      const person=opts.person||personForItem(item),payload=personLedgerCloudItemPayload18_6VC(item,person,ownerUserId);
+      const person=opts.person||personForItem(item);
+      const cloudRow=await fetchCloudItemForLocal18_6FP21(db,ownerUserId,item);
+      const pr=await pullPersonLedgerConfirmedPayments18_6YA1({db,ownerUserId}),confirmedPayments=pr&&pr.ok?arr(pr.payments):[];
+      const beforePaid=N(item.paidAmount||item.paid_amount),rec=reconcilePersonLedgerItemFromConfirmedPayments18_6YA1(item,confirmedPayments,cloudRow);
+      if(rec&&rec.ok&&rec.confirmedPaidSum>beforePaid){confirmedReconcileStats18_6YA1.blockedStaleUpserts++;try{save()}catch(_){}return {ok:true,id:sid(item.cloudLedgerItemId||cloudRow&&cloudRow.id),skipped:'confirmed_payment_protect',confirmedPaidSum:rec.confirmedPaidSum}}
+      if(cloudRow){
+        if(cloudRow.id&&!item.cloudLedgerItemId)item.cloudLedgerItemId=sid(cloudRow.id);
+        if(sid(cloudRow.status)==='settled'||N(cloudRow.paid_amount)>N(item.paidAmount||item.paid_amount)){mergePersonLedgerCloudItem18_6FP21(item,cloudRow,{force:true});cloudItemStats18_6FP21.staleSkipped++;try{save()}catch(_){}return {ok:true,id:sid(cloudRow.id),skipped:'cloud_paid_or_settled_protect'}}
+        if(isPersonLedgerCloudNewer18_6FP21(item,cloudRow)){
+          mergePersonLedgerCloudItem18_6FP21(item,cloudRow,{force:true});
+          cloudItemStats18_6FP21.staleSkipped++;
+          try{save()}catch(_){}
+          return {ok:true,id:sid(cloudRow.id),skipped:'cloud_newer_merged'};
+        }
+      }
+      const payload=personLedgerCloudItemPayload18_6VC(item,person,ownerUserId);
+      const protectedPaid=rec&&rec.ok?N(rec.confirmedPaidSum):0;
+      if(protectedPaid>0&&(N(payload.paid_amount)<protectedPaid||N(payload.remaining_amount)>Math.max(0,N(payload.total_amount)-protectedPaid))){confirmedReconcileStats18_6YA1.blockedStaleUpserts++;return {ok:true,id:sid(item.cloudLedgerItemId||cloudRow&&cloudRow.id),skipped:'confirmed_payment_protect',confirmedPaidSum:protectedPaid}}
       if(opts.status){payload.status=opts.status;payload.updated_at=nowIso();}
       try{const {data,error}=await db.from('person_ledger_items').upsert(payload,{onConflict:'owner_user_id,app_item_id'}).select('id').maybeSingle();if(error)throw error;if(data&&data.id)item.cloudLedgerItemId=data.id;try{save()}catch(_){}return {ok:true,id:data&&data.id||item.cloudLedgerItemId,action:'upsert'}}catch(e){return fail18_6VC('supabase_error',{message:e&&e.message?e.message:String(e)})}
     });
   }
   async function syncPersonLedgerPaymentCloud18_6VC(payment,item,opts={}){
     if(!payment||!payment.id||!item)return fail18_6VC('invalid_payment');
+    if(isPendingPersonLedgerCloud18_6XC(payment))return {ok:true,skipped:true,reason:'display_only_cloud_payment'};
     return queue18_6VC('payment:'+sid(payment.id),async()=>{
       const ownerUserId=await owner18_6VC();if(!ownerUserId)return {ok:false,reason:'not_logged_in'};
       const db=client18_6VC();if(!db)return fail18_6VC('supabase_error',{message:'supabase client not ready'});
@@ -6615,6 +6890,7 @@ function telegramFiles15(raw){
   }
   async function syncPersonLedgerAttachmentMetadata18_6VC(att,payment,item,opts={}){
     if(!att||!payment||!item)return fail18_6VC('invalid_attachment');
+    if(isPendingPersonLedgerCloud18_6XC(payment)||att.displayOnly||att.fromCloud||att.source==='telegram_upload'||att.cloudAttachmentId)return {ok:true,skipped:true,reason:'display_only_cloud_attachment'};
     if(!att.id)att.id='att-'+sid(payment.id)+'-'+Math.random().toString(16).slice(2);
     return queue18_6VC('attachment:'+sid(att.id),async()=>{
       const ownerUserId=await owner18_6VC();if(!ownerUserId)return {ok:false,reason:'not_logged_in'};
@@ -6629,10 +6905,12 @@ function telegramFiles15(raw){
   async function syncAllPersonLedgerCloud18_6VC(opts={}){
     ensureItems18_6VC();
     const ownerUserId=await owner18_6VC();if(!ownerUserId)return {ok:false,reason:'not_logged_in',localItems:items().length,items:0,payments:0,attachments:0,errors:[]};
+    try{await pullPersonLedgerCloudItems18_6FP21({noRender:true})}catch(e){fail18_6VC('cloud_item_pull_before_sync_failed',{message:e&&e.message})}
     const localItems=items().filter(item=>sid(item&&item.status)!=='deleted'),out={ok:true,localItems:localItems.length,items:0,payments:0,attachments:0,errors:[]};
     for(const item of localItems){
       const person=personForItem(item),ir=await syncPersonLedgerItemCloud18_6VC(item,{...opts,force:true,person});if(ir&&ir.ok)out.items++;else out.errors.push({type:'item',id:item&&item.id,result:ir});
       for(const payment of arr(item&&item.payments)){
+        if(isPendingPersonLedgerCloud18_6XC(payment))continue;
         const pr=await syncPersonLedgerPaymentCloud18_6VC(payment,item,{...opts,force:true,person});if(pr&&pr.ok)out.payments++;else out.errors.push({type:'payment',itemId:item&&item.id,id:payment&&payment.id,result:pr});
         for(const att of arr(payment&&payment.attachments)){const ar=await syncPersonLedgerAttachmentMetadata18_6VC(att,payment,item,{...opts,force:true,person});if(ar&&ar.ok)out.attachments++;else out.errors.push({type:'attachment',itemId:item&&item.id,paymentId:payment&&payment.id,id:att&&att.id,result:ar});}
       }
@@ -6667,8 +6945,60 @@ function telegramFiles15(raw){
   if(oldReopenItem){window.reopenPersonLedgerItem18_6U=function(itemId){const ret=oldReopenItem.apply(this,arguments);try{const it=items().find(x=>same(x.id,itemId));if(it)queueItem18_6VC(it)}catch(e){fail18_6VC('hook_reopen_item_failed',{message:e&&e.message})}return ret};}
   const oldSettleItem=window.settlePersonLedgerItem18_6T;
   if(oldSettleItem){window.settlePersonLedgerItem18_6T=function(itemId){const ret=oldSettleItem.apply(this,arguments);setTimeout(()=>{try{const it=items().find(x=>same(x.id,itemId));if(it&&it.status==='settled')queueItem18_6VC(it)}catch(e){fail18_6VC('hook_settle_item_failed',{message:e&&e.message})}},50);return ret};}
+  async function cancelPersonLedgerItemCloud18_6XC1(item,reason='app_delete'){
+    if(!item)return {ok:false,error:'missing_item'};
+    const ownerUserId=await owner18_6VC();if(!ownerUserId)return {ok:false,error:'not_logged_in'};
+    const db=client18_6VC();if(!db)return {ok:false,error:'supabase client not ready'};
+    const now=nowIso(),patch={status:'cancelled',updated_at:now,raw:{app_cancelled:true,cancel_reason:reason||'app_delete',cancelled_at:now,local_id:sid(item.id)}};
+    try{
+      if(item.cloudLedgerItemId){const {error}=await db.from('person_ledger_items').update(patch).eq('owner_user_id',ownerUserId).eq('id',item.cloudLedgerItemId);if(error)throw error;return {ok:true,cloudLedgerItemId:item.cloudLedgerItemId,patchedBy:'id'}}
+      const appId=sid(item.id||item.appItemId||item.sourceId);if(appId){const {error}=await db.from('person_ledger_items').update(patch).eq('owner_user_id',ownerUserId).eq('app_item_id',appId);if(error)throw error;return {ok:true,cloudLedgerItemId:'',patchedBy:'app_item_id'}}
+      return {ok:false,error:'missing_cloud_or_app_id'};
+    }catch(e){return {ok:false,cloudLedgerItemId:sid(item.cloudLedgerItemId),patchedBy:item.cloudLedgerItemId?'id':'app_item_id',error:e&&e.message?e.message:String(e)}}
+  }
   const oldDeleteItem=window.deletePersonLedgerItem18_6U;
-  if(oldDeleteItem){window.deletePersonLedgerItem18_6U=function(itemId){const it=items().find(x=>same(x.id,itemId));if(!it)return oldDeleteItem.apply(this,arguments);const live=arr(it.payments).some(p=>p&&p.affectsBalance&&!p.reversedAt);if(live){try{toast('这个项目已有影响余额的记录，请先撤销还款/收款再删除。')}catch(_){}return}const clone=JSON.parse(JSON.stringify(it));const go=()=>{D.personLedgerItems=items().filter(x=>!same(x.id,itemId));save();render();toast('已删除');clone.status='cancelled';clone.updatedAt=nowIso();syncPersonLedgerItemCloud18_6VC(clone,{status:'cancelled'}).catch(e=>fail18_6VC('hook_delete_item_failed',{message:e&&e.message}))};if(typeof confirmSheet==='function')confirmSheet('确定删除这个账本项目吗？','已有还款/收款记录会一起移除。',go,{danger:true,okText:'删除'});else if(confirm('确定删除这个账本项目吗？已有还款/收款记录会一起移除。'))go()};}
+  if(oldDeleteItem){window.deletePersonLedgerItem18_6U=function(itemId){const it=items().find(x=>same(x.id,itemId));if(!it)return oldDeleteItem.apply(this,arguments);const live=arr(it.payments).some(p=>p&&p.affectsBalance&&!p.reversedAt);if(live){try{toast('这个项目已有影响余额的记录，请先撤销还款/收款再删除。')}catch(_){}return}const clone=JSON.parse(JSON.stringify(it));const go=async()=>{const cr=await cancelPersonLedgerItemCloud18_6XC1(clone,'app_delete');if(!cr.ok)try{toast('\u4e91\u7aef\u53d6\u6d88\u5931\u8d25\uff0cTelegram \u53ef\u80fd\u6682\u65f6\u8fd8\u4f1a\u770b\u5230\u8fd9\u4e2a\u9879\u76ee')}catch(_){}D.personLedgerItems=items().filter(x=>!same(x.id,itemId));save();render();toast('\u5df2\u5220\u9664');clone.status='cancelled';clone.updatedAt=nowIso();syncPersonLedgerItemCloud18_6VC(clone,{status:'cancelled'}).catch(e=>fail18_6VC('hook_delete_item_failed',{message:e&&e.message}))};if(typeof confirmSheet==='function')confirmSheet('确定删除这个账本项目吗？','已有还款/收款记录会一起移除。',go,{danger:true,okText:'删除'});else if(confirm('确定删除这个账本项目吗？已有还款/收款记录会一起移除。'))go()};}
+  const lastPull18_6XC={payments:[],attachments:[],result:null};
+  function raw18_6XC(x){return x&&typeof x.raw==='object'&&x.raw?x.raw:{}}
+  function isTelegramPaymentRow18_6XC(p){const raw=raw18_6XC(p),app=sid(p&&p.app_payment_id);return raw.source==='telegram_submit_payment'||raw.proof_status==='pending_owner_review'||app.startsWith('tgpay_')}
+  function isTelegramAttachmentRow18_6XC(a){const raw=raw18_6XC(a);return sid(a&&a.source)==='telegram_upload'||!!(raw.telegram_file_id||raw.proxy_url||raw.url)}
+  function findItemForCloudPayment18_6XC(p){const raw=raw18_6XC(p),cloud=sid(p&&p.ledger_item_id),app=sid((p&&p.app_item_id)||raw.app_item_id);return items().find(it=>same(it.cloudLedgerItemId,cloud))||items().find(it=>app&&(same(it.id,app)||same(it.sourceId,app)||same(it.appItemId,app)))||null}
+  function findPaymentInItem18_6XC(it,p){const cloud=sid(p&&p.id),app=sid(p&&p.app_payment_id);return arr(it&&it.payments).find(x=>cloud&&same(x.cloudLedgerPaymentId,cloud))||arr(it&&it.payments).find(x=>app&&(same(x.appPaymentId,app)||same(x.id,app)))||null}
+  function localPendingPaymentFromCloud18_6XC(p){const raw=raw18_6XC(p),app=sid(p&&p.app_payment_id),id=app||('cloud_'+sid(p&&p.id)),st=sid(raw.proof_status)||'pending_owner_review',pending=st==='pending_owner_review';return {id,cloudLedgerPaymentId:sid(p&&p.id),appPaymentId:app,date:dateOnly(p&&p.payment_date)||dateOnly(p&&p.created_at)||sid(p&&p.payment_date||p&&p.created_at),amount:r2(p&&p.amount),note:sid(p&&p.note),direction:sid(p&&p.direction),source:'telegram_submit_payment',status:st,pendingOwnerReview:pending,displayOnly:true,fromCloud:true,affectsBalance:false,raw,createdAt:sid(p&&p.created_at),updatedAt:sid(p&&p.updated_at),attachments:[]}}
+  function mergeCloudPayment18_6XC(it,p){if(!it)return null;if(!A(it.payments))it.payments=[];let local=findPaymentInItem18_6XC(it,p);const fresh=localPendingPaymentFromCloud18_6XC(p);if(local){const keep=arr(local.attachments);Object.assign(local,{...fresh,id:local.id||fresh.id,attachments:keep});}else{local=fresh;it.payments.push(local)}return local}
+  function cloudAttachmentToLocal18_6XC(a){const raw=raw18_6XC(a),url=sid(raw.proxy_url||raw.url),name=sid(a&&a.name)||'Telegram proof',type=sid(a&&a.mime_type)||(String(name).match(/\.(png|jpg|jpeg|webp|gif)$/i)?'image/*':'');return {id:sid(a&&a.app_attachment_id)||sid(a&&a.id),cloudAttachmentId:sid(a&&a.id),appAttachmentId:sid(a&&a.app_attachment_id),cloudLedgerPaymentId:sid(a&&a.ledger_payment_id),appPaymentId:sid(a&&a.app_payment_id),name,type,size:N(a&&a.size_bytes)||0,source:sid(a&&a.source)||'telegram_upload',data:url,url,createdAt:sid(a&&a.created_at),telegramFileId:sid(raw.telegram_file_id),displayOnly:true,fromCloud:true,raw:{telegram_file_id:raw.telegram_file_id||'',proxy_url:url,file_unique_id:raw.file_unique_id||'',message_id:raw.message_id||null}}}
+  function hasAttachment18_6XC(payment,att){return arr(payment&&payment.attachments).some(x=>(att.cloudAttachmentId&&same(x.cloudAttachmentId,att.cloudAttachmentId))||(att.appAttachmentId&&same(x.appAttachmentId,att.appAttachmentId))||(att.id&&same(x.id,att.id)))}
+  function findPaymentForAttachment18_6XC(a){const cloud=sid(a&&a.ledger_payment_id),app=sid(a&&a.app_payment_id);for(const it of items()){const p=arr(it.payments).find(x=>(cloud&&same(x.cloudLedgerPaymentId,cloud))||(app&&(same(x.appPaymentId,app)||same(x.id,app))));if(p)return {item:it,payment:p}}return {item:null,payment:null}}
+  function findItemForAttachment18_6XC(a){const cloud=sid(a&&a.ledger_item_id);return items().find(it=>cloud&&same(it.cloudLedgerItemId,cloud))||null}
+  async function pullPersonLedgerTelegramSubmissions18_6XC(){
+    ensureItems18_6VC();const ownerUserId=await owner18_6VC();if(!ownerUserId)return {ok:false,reason:'not_logged_in'};const db=client18_6VC();if(!db)return fail18_6VC('supabase_error',{message:'supabase client not ready'});
+    const pres=await db.from('person_ledger_payments').select('id,ledger_item_id,app_payment_id,app_item_id,partner_id,payment_date,amount,direction,note,attachments_count,raw,created_at,updated_at,reversed_at').eq('owner_user_id',ownerUserId).order('created_at',{ascending:false}).limit(200);
+    if(pres.error)return fail18_6VC('pull_payments_failed',{message:pres.error.message});
+    const cloudPayments=arr(pres.data).filter(p=>!p.reversed_at&&isTelegramPaymentRow18_6XC(p)),unmatchedPayments=[];let mergedPayments=0;
+    cloudPayments.forEach(p=>{const it=findItemForCloudPayment18_6XC(p);if(!it){unmatchedPayments.push(p);return}if(mergeCloudPayment18_6XC(it,p))mergedPayments++});
+    const ares=await db.from('person_ledger_attachments').select('id,app_attachment_id,app_payment_id,ledger_item_id,ledger_payment_id,partner_id,name,mime_type,size_bytes,source,raw,created_at').eq('owner_user_id',ownerUserId).order('created_at',{ascending:false}).limit(300);
+    if(ares.error)return fail18_6VC('pull_attachments_failed',{message:ares.error.message});
+    const cloudAttachments=arr(ares.data).filter(isTelegramAttachmentRow18_6XC),unmatchedAttachments=[];let attachedCloudAttachments=0;
+    cloudAttachments.forEach(a=>{let found=findPaymentForAttachment18_6XC(a),it=found.item,p=found.payment;if(!p){it=findItemForAttachment18_6XC(a);if(it){p=mergeCloudPayment18_6XC(it,{id:a.ledger_payment_id,ledger_item_id:a.ledger_item_id,app_payment_id:a.app_payment_id,partner_id:a.partner_id,payment_date:a.created_at,amount:0,direction:'',note:'',attachments_count:1,raw:{source:'telegram_submit_payment',proof_status:'pending_owner_review',proof_kind:'file'},created_at:a.created_at})}}if(!it||!p){unmatchedAttachments.push(a);return}if(!A(p.attachments))p.attachments=[];const localAtt=cloudAttachmentToLocal18_6XC(a);if(!hasAttachment18_6XC(p,localAtt)){p.attachments.push(localAtt);attachedCloudAttachments++}});
+    try{await pullPersonLedgerCloudItems18_6FP21({noRender:true})}catch(e){fail18_6VC('cloud_item_pull_after_telegram_failed',{message:e&&e.message})}
+    try{save()}catch(_){}try{if(typeof render==='function')render()}catch(_){}
+    const result={ok:true,localItems:items().length,localPayments:items().flatMap(it=>arr(it.payments)).length,pendingTelegramPayments:items().flatMap(it=>arr(it.payments)).filter(isPendingPersonLedgerCloud18_6XC).length,cloudPayments:cloudPayments.length,mergedPayments,cloudAttachments:cloudAttachments.length,attachedCloudAttachments,unmatchedPayments:unmatchedPayments.length,unmatchedAttachments:unmatchedAttachments.length};
+    lastPull18_6XC.payments=cloudPayments;lastPull18_6XC.attachments=cloudAttachments;lastPull18_6XC.unmatchedPayments=unmatchedPayments;lastPull18_6XC.unmatchedAttachments=unmatchedAttachments;lastPull18_6XC.result=result;return result;
+  }
+  function inspectPersonLedgerTelegramSubmissions18_6XC(){const xs=items(),pending=xs.flatMap(it=>arr(it.payments).filter(isPendingPersonLedgerCloud18_6XC).map(p=>({itemId:it.id,itemTitle:it.title,paymentId:p.id,cloudLedgerPaymentId:p.cloudLedgerPaymentId,appPaymentId:p.appPaymentId,amount:p.amount,note:p.note,attachments:arr(p.attachments).length}))),known=new Set(xs.map(it=>sid(it.cloudLedgerItemId)).filter(Boolean)),unmatchedPayments=arr(lastPull18_6XC.unmatchedPayments).map(p=>({id:p.id,ledger_item_id:p.ledger_item_id,app_payment_id:p.app_payment_id,note:p.note,amount:p.amount})),unmatchedAttachments=arr(lastPull18_6XC.unmatchedAttachments).map(a=>({id:a.id,ledger_item_id:a.ledger_item_id,ledger_payment_id:a.ledger_payment_id,app_payment_id:a.app_payment_id}));return {localItems:xs.length,localPayments:xs.flatMap(it=>arr(it.payments)).length,pendingTelegramPayments:pending,cloudAttachments:lastPull18_6XC.attachments.length,attachedCloudAttachments:pending.reduce((a,p)=>a+N(p.attachments),0),unmatchedPayments,unmatchedAttachments,likelyDeletedCloudItems:unmatchedPayments.filter(p=>p.ledger_item_id&&!known.has(sid(p.ledger_item_id))),lastPull:lastPull18_6XC.result}}
+  async function inspectPersonLedgerCloudOrphans18_6XC1(){const ownerUserId=await owner18_6VC();if(!ownerUserId)return {ok:false,reason:'not_logged_in'};const db=client18_6VC();if(!db)return fail18_6VC('supabase_error',{message:'supabase client not ready'});const xs=items(),known=new Set(xs.map(it=>sid(it.cloudLedgerItemId)).filter(Boolean));const [ir,pr,ar]=await Promise.all([db.from('person_ledger_items').select('id,app_item_id,title,status,updated_at').eq('owner_user_id',ownerUserId).order('updated_at',{ascending:false}).limit(100),db.from('person_ledger_payments').select('id,ledger_item_id,app_payment_id,amount,note,raw,created_at').eq('owner_user_id',ownerUserId).order('created_at',{ascending:false}).limit(100),db.from('person_ledger_attachments').select('id,ledger_item_id,ledger_payment_id,app_payment_id,source,created_at').eq('owner_user_id',ownerUserId).order('created_at',{ascending:false}).limit(100)]);return {ok:!(ir.error||pr.error||ar.error),cloudItemsMissingLocally:arr(ir.data).filter(x=>!known.has(sid(x.id))),paymentsMissingLocalItem:arr(pr.data).filter(x=>!known.has(sid(x.ledger_item_id))),attachmentsMissingLocalItem:arr(ar.data).filter(x=>!known.has(sid(x.ledger_item_id))),errors:[ir.error&&ir.error.message,pr.error&&pr.error.message,ar.error&&ar.error.message].filter(Boolean)}}
+  function inspectPersonLedgerCloudItems18_6FP21(){const xs=items(),allPayments=xs.flatMap(it=>arr(it.payments)),activeFn=typeof isActiveLocalPersonLedgerItem18_6FP22==='function'?isActiveLocalPersonLedgerItem18_6FP22:(it=>!!it&&sid(it.status)!=='settled'&&sid(it.status)!=='cancelled'&&sid(it.status)!=='deleted'),settledFn=typeof isSettledLocalPersonLedgerItem18_6FP22==='function'?isSettledLocalPersonLedgerItem18_6FP22:(it=>sid(it&&it.status)==='settled'||N(it&&it.remainingAmount||it&&it.remaining_amount)<=0);return {localItems:xs.length,cloudLinkedItems:xs.filter(it=>it.cloudLedgerItemId).length,cloudMergedItems:cloudItemStats18_6FP21.merged,cloudNewerMerged:cloudItemStats18_6FP21.staleSkipped,localStaleSkipped:cloudItemStats18_6FP21.staleSkipped,cancelledCloudItems:cloudItemStats18_6FP21.cancelled,settledCloudItems:cloudItemStats18_6FP21.lastPull&&cloudItemStats18_6FP21.lastPull.settledCloudItems||0,activeLocalItems:xs.filter(activeFn).length,settledLocalItems:xs.filter(settledFn).length,mergedSettledItems:xs.filter(it=>it.cloudAuthoritative18_6FP22&&sid(it.status)==='settled').length,stalePendingDisplayRows:allPayments.filter(p=>p.displayOnly&&p.pendingOwnerReview&&sid(p.raw&&p.raw.proof_status)==='confirmed').length,lastPull:cloudItemStats18_6FP21.lastPull,sampleLocal:xs.slice(0,12).map(it=>({id:sid(it.id),cloudLedgerItemId:sid(it.cloudLedgerItemId),title:sid(it.title),status:sid(it.status),paidAmount:r2(it.paidAmount),remainingAmount:r2(it.remainingAmount),updatedAt:sid(it.updatedAt),cloudUpdatedAt:sid(it.cloudUpdatedAt)})),sampleCloud:cloudItemStats18_6FP21.rows}}
+  function inspectObjectLedgerAZ18_6Y(){
+    try{window.normalizeObjectLedgerLocalState18_6YA3&&window.normalizeObjectLedgerLocalState18_6YA3()}catch(_){}
+    const xs=items(),stateOf=it=>window.getObjectLedgerEffectiveState18_6YA3C?window.getObjectLedgerEffectiveState18_6YA3C(it):{isActive:!!it&&sid(it.status)!=='settled'&&sid(it.status)!=='cancelled'&&sid(it.status)!=='deleted',isSettled:sid(it&&it.status)==='settled'||N(it&&it.remainingAmount||it&&it.remaining_amount)<=0,isCancelled:sid(it&&it.status)==='cancelled'||sid(it&&it.status)==='deleted',pendingPayments:[],confirmedPayments:[],disputedPayments:[],remaining:N(it&&it.remainingAmount||it&&it.remaining_amount),paid:N(it&&it.paidAmount||it&&it.paid_amount),status:sid(it&&it.status)};
+    const rows=xs.map(it=>({item:it,state:stateOf(it)})),active=rows.filter(x=>x.state.isActive).map(x=>x.item),settled=rows.filter(x=>x.state.isSettled).map(x=>x.item),cancelled=rows.filter(x=>x.state.isCancelled).map(x=>x.item);
+    const confirmFlow=xs.find(it=>sid(it&&it.title).includes('确认流程测试FP21'))||null,testVoucher2=xs.find(it=>sid(it&&it.title).includes('测试凭证2'))||null;
+    const detail=it=>{if(!it)return null;const s=stateOf(it);return {id:sid(it.id),title:sid(it.title),status:s.status,paid:s.paid,remaining:s.remaining,isActive:s.isActive,isSettled:s.isSettled,isPending:s.isPending,isDisputed:s.isDisputed,confirmedPaidSum:s.confirmedPaidSum}};
+    return {phase:'18.6Y-A3C',localItems:xs.length,activeItems:active.length,settledItems:settled.length,cancelledItems:cancelled.length,pendingPayments:rows.reduce((a,x)=>a+x.state.pendingPayments.length,0),confirmedPayments:rows.reduce((a,x)=>a+x.state.confirmedPayments.length,0),disputedPayments:rows.reduce((a,x)=>a+x.state.disputedPayments.length,0),sampleActiveTitles:active.slice(0,8).map(it=>sid(it.title)),sampleSettledTitles:settled.slice(0,8).map(it=>sid(it.title)),confirmFlowItemState:detail(confirmFlow),testVoucher2State:detail(testVoucher2),cloudLinkedItems:xs.filter(it=>it.cloudLedgerItemId).length,dueDayItems:xs.filter(it=>N(it.dueDay||it.due_day)>0).length,telegramReminderEnabled:xs.filter(it=>it.telegramDueReminderEnabled!==false).length,cloudNewerMerged:cloudItemStats18_6FP21.staleSkipped,cancelledCloudItems:cloudItemStats18_6FP21.cancelled,settledCloudItems:cloudItemStats18_6FP21.lastPull&&cloudItemStats18_6FP21.lastPull.settledCloudItems||0,lastPull:cloudItemStats18_6FP21.lastPull};
+  }
+  function inspectPersonLedgerConfirmedReconcile18_6YA1(){return {confirmedPayments:confirmedReconcileStats18_6YA1.confirmedPayments,affectedItems:confirmedReconcileStats18_6YA1.affectedItems,repairedCloudItems:confirmedReconcileStats18_6YA1.repairedCloudItems,blockedStaleUpserts:confirmedReconcileStats18_6YA1.blockedStaleUpserts,lastRun:confirmedReconcileStats18_6YA1.lastRun,sample:confirmedReconcileStats18_6YA1.sample}}
+  const baseSyncAllPersonLedgerCloud18_6XC=syncAllPersonLedgerCloud18_6VC;
+  syncAllPersonLedgerCloud18_6VC=async function(opts={}){const res=await baseSyncAllPersonLedgerCloud18_6XC(opts);try{await pullPersonLedgerTelegramSubmissions18_6XC()}catch(e){fail18_6VC('pull_after_sync_failed',{message:e&&e.message})}return res};
   window.personLedgerCloudItemPayload18_6VC=personLedgerCloudItemPayload18_6VC;
   window.personLedgerCloudPaymentPayload18_6VC=personLedgerCloudPaymentPayload18_6VC;
   window.personLedgerCloudAttachmentPayload18_6VC=personLedgerCloudAttachmentPayload18_6VC;
@@ -6676,8 +7006,664 @@ function telegramFiles15(raw){
   window.syncPersonLedgerPaymentCloud18_6VC=syncPersonLedgerPaymentCloud18_6VC;
   window.syncPersonLedgerAttachmentMetadata18_6VC=syncPersonLedgerAttachmentMetadata18_6VC;
   window.syncAllPersonLedgerCloud18_6VC=syncAllPersonLedgerCloud18_6VC;
+  window.pullPersonLedgerCloudItems18_6FP21=pullPersonLedgerCloudItems18_6FP21;
+  window.isPersonLedgerCloudNewer18_6FP21=isPersonLedgerCloudNewer18_6FP21;
+  window.inspectPersonLedgerCloudItems18_6FP21=inspectPersonLedgerCloudItems18_6FP21;
+  window.pullPersonLedgerConfirmedPayments18_6YA1=pullPersonLedgerConfirmedPayments18_6YA1;
+  window.reconcilePersonLedgerItemFromConfirmedPayments18_6YA1=reconcilePersonLedgerItemFromConfirmedPayments18_6YA1;
+  window.reconcilePersonLedgerConfirmedPayments18_6YA1=reconcilePersonLedgerConfirmedPayments18_6YA1;
+  window.inspectPersonLedgerConfirmedReconcile18_6YA1=inspectPersonLedgerConfirmedReconcile18_6YA1;
+  window.inspectObjectLedgerAZ18_6Y=inspectObjectLedgerAZ18_6Y;
+  window.pullPersonLedgerTelegramSubmissions18_6XC=pullPersonLedgerTelegramSubmissions18_6XC;
+  window.inspectPersonLedgerTelegramSubmissions18_6XC=inspectPersonLedgerTelegramSubmissions18_6XC;
+  window.cancelPersonLedgerItemCloud18_6XC1=cancelPersonLedgerItemCloud18_6XC1;
+  window.inspectPersonLedgerCloudOrphans18_6XC1=inspectPersonLedgerCloudOrphans18_6XC1;
   window.debugPersonLedgerCloud18_6VC=debugPersonLedgerCloud18_6VC;
   window.inspectPersonLedgerLocal18_6VC=inspectPersonLedgerLocal18_6VC;
+  setTimeout(()=>{pullPersonLedgerCloudItems18_6FP21({noRender:true}).catch(e=>fail18_6VC('init_cloud_item_pull_failed',{message:e&&e.message}));pullPersonLedgerTelegramSubmissions18_6XC().catch(e=>fail18_6VC('init_pull_failed',{message:e&&e.message}))},1800);
+})();
+
+// PHASE 18.6Y-A3C — canonical Object Ledger active/settled state.
+(()=>{
+  const A=Array.isArray,arr=x=>A(x)?x:[],sid=x=>String(x==null?'':x),N=x=>Number(x)||0,r2=x=>Math.round(N(x)*100)/100,status=x=>sid(x).trim().toLowerCase();
+  function raw18_6YA3C(payment){return payment&&payment.raw||{}}
+  function proofStatus18_6YA3C(payment){
+    const raw=raw18_6YA3C(payment),inner=raw.payment&&raw.payment.raw||raw.payment||{};
+    if(status(raw.proof_status)==='confirmed'||status(raw.status)==='confirmed'||raw.confirmed_at||inner.confirmed_at)return 'confirmed';
+    if(status(inner.proof_status)==='confirmed'||status(inner.status)==='confirmed'||status(payment&&payment.proof_status)==='confirmed'||status(payment&&payment.status)==='confirmed')return 'confirmed';
+    if(status(raw.proof_status)==='disputed'||status(inner.proof_status)==='disputed'||status(payment&&payment.status)==='disputed')return 'disputed';
+    if(status(raw.proof_status)==='rejected'||status(inner.proof_status)==='rejected'||status(payment&&payment.status)==='rejected')return 'rejected';
+    if(status(raw.proof_status)==='pending_owner_review'||status(inner.proof_status)==='pending_owner_review'||status(payment&&payment.status)==='pending_owner_review')return 'pending_owner_review';
+    if(payment&&payment.source==='telegram_submit_payment'&&(status(raw.proof_status)==='confirmed'||status(raw.status)==='confirmed'||raw.confirmed_at))return 'confirmed';
+    if(payment&&payment.source==='telegram_submit_payment'&&payment.pendingOwnerReview)return 'pending_owner_review';
+    return status(raw.proof_status||raw.status||inner.proof_status||inner.status||payment&&payment.proof_status||payment&&payment.status);
+  }
+  function amount18_6YA3C(payment){return r2(payment&&payment.amount||payment&&payment.payment_amount||payment&&payment.raw&&payment.raw.amount)}
+  function classifyPayment18_6YA3C(payment){
+    const st=proofStatus18_6YA3C(payment),confirmed=st==='confirmed',disputed=st==='disputed'||st==='rejected';
+    const pending=!confirmed&&!disputed&&st!=='cancelled'&&(st==='pending_owner_review'||!!(payment&&payment.pendingOwnerReview));
+    return {status:st,confirmed,pending,disputed,amount:amount18_6YA3C(payment)};
+  }
+  function getObjectLedgerEffectiveState18_6YA3C(item){
+    const payments=arr(item&&item.payments).filter(p=>p&&!p.reversedAt&&!p.reversed_at),classified=payments.map(p=>({payment:p,...classifyPayment18_6YA3C(p)}));
+    const confirmedPayments=classified.filter(x=>x.confirmed).map(x=>x.payment),pendingPayments=classified.filter(x=>x.pending).map(x=>x.payment),disputedPayments=classified.filter(x=>x.disputed).map(x=>x.payment);
+    const total=r2(item&&item.totalAmount!=null?item.totalAmount:item&&item.total_amount),itemPaid=r2(item&&item.paidAmount!=null?item.paidAmount:item&&item.paid_amount),fallbackRemaining=r2(item&&item.remainingAmount!=null?item.remainingAmount:item&&item.remaining_amount),monthly=N(item&&item.monthlyAmount||item&&item.monthly_amount),openMonthly=!total&&monthly>0&&status(item&&item.itemType||item&&item.item_type)==='monthly';
+    const confirmedPaidSum=r2(classified.filter(x=>x.confirmed).reduce((sum,x)=>sum+x.amount,0)),paid=r2(Math.max(itemPaid,confirmedPaidSum));
+    const remaining=total>0?Math.max(0,r2(total-paid)):(fallbackRemaining>0?fallbackRemaining:(openMonthly?monthly:fallbackRemaining));
+    const rawStatus=status(item&&item.status),isCancelled=rawStatus==='cancelled'||rawStatus==='deleted';
+    const hasOpenReview=!!(pendingPayments.length||disputedPayments.length);
+    const isSettled=!isCancelled&&(rawStatus==='settled'||(!openMonthly&&remaining<=0&&!hasOpenReview));
+    const finalStatus=isCancelled?'cancelled':(isSettled?'settled':(rawStatus||'active'));
+    const isActive=!isCancelled&&!isSettled&&(remaining>0||pendingPayments.length>0||disputedPayments.length>0);
+    return {total,paid,remaining,status:finalStatus,isSettled,isCancelled,isPending:pendingPayments.length>0,isDisputed:disputedPayments.length>0,isActive,confirmedPaidSum,pendingPayments,confirmedPayments,disputedPayments};
+  }
+  function applyObjectLedgerEffectiveStateToLocal18_6YA3C(item,options={}){
+    if(!item)return {ok:false,changed:false,state:getObjectLedgerEffectiveState18_6YA3C(item)};
+    const st=getObjectLedgerEffectiveState18_6YA3C(item);let changed=false;
+    function set(k,v){if(item[k]!==v){item[k]=v;changed=true}}
+    set('paidAmount',st.paid);set('paid_amount',st.paid);set('remainingAmount',st.remaining);set('remaining_amount',st.remaining);set('status',st.status);
+    if(st.isSettled&&item.pendingOwnerReview){item.pendingOwnerReview=false;changed=true}
+    arr(item.payments).forEach(p=>{const ps=classifyPayment18_6YA3C(p);if(ps.confirmed&&p.pendingOwnerReview){p.pendingOwnerReview=false;changed=true}});
+    if(changed&&!options.noSave){try{save()}catch(_){}}
+    return {ok:true,changed,state:st};
+  }
+  function paymentDisplayLabel18_6YA3C(payment){
+    const p=classifyPayment18_6YA3C(payment),amt='RM'+p.amount.toFixed(2);
+    if(p.confirmed)return '已确认 '+amt;
+    if(p.disputed)return '有问题 '+amt;
+    if(p.pending)return '待确认 '+amt;
+    return '';
+  }
+  window.getObjectLedgerEffectiveState18_6YA3C=getObjectLedgerEffectiveState18_6YA3C;
+  window.applyObjectLedgerEffectiveStateToLocal18_6YA3C=applyObjectLedgerEffectiveStateToLocal18_6YA3C;
+  window.objectLedgerPaymentLabel18_6YA3C=paymentDisplayLabel18_6YA3C;
+})();
+
+// PHASE 18.6Y-A3B — expose Object Ledger hydration helpers from the live app scope.
+(()=>{
+  const A=Array.isArray,arr=x=>A(x)?x:[],sid=x=>String(x==null?'':x),N=x=>Number(x)||0,r2=x=>Math.round(N(x)*100)/100;
+  const state=window.__objectLedgerHydrationState18_6YA3=window.__objectLedgerHydrationState18_6YA3||{hydrationRan:false,hydrationInFlight:false,firstRenderReady:false,lastReason:'',lastError:'',lastHydratedAt:''};
+  function items18_6YA3(){if(!A(D.personLedgerItems))D.personLedgerItems=[];return D.personLedgerItems}
+  function status18_6YA3(v){return sid(v).trim().toLowerCase()}
+  function proofStatus18_6YA3(p){const raw=p&&p.raw||{},inner=raw.payment&&raw.payment.raw||raw.payment||{};return status18_6YA3(raw.proof_status||inner.proof_status||p&&p.proof_status||p&&p.status)}
+  function paymentAmount18_6YA3(p){return r2(p&&p.amount||p&&p.payment_amount||p&&p.raw&&p.raw.amount)}
+  function paymentLabel18_6YA3(p){if(window.objectLedgerPaymentLabel18_6YA3C){try{return window.objectLedgerPaymentLabel18_6YA3C(p)}catch(_){}}const st=proofStatus18_6YA3(p);if(st==='confirmed')return '已确认 RM'+paymentAmount18_6YA3(p).toFixed(2);if(st==='disputed'||st==='rejected')return '有问题 RM'+paymentAmount18_6YA3(p).toFixed(2);if(st==='pending_owner_review'||(!['confirmed','cancelled'].includes(st)&&p&&p.pendingOwnerReview))return '待确认 RM'+paymentAmount18_6YA3(p).toFixed(2);return ''}
+  function isPendingOrDisputed18_6YA3(p){if(!p||p.reversedAt||p.reversed_at)return false;const st=proofStatus18_6YA3(p);if(['confirmed','cancelled'].includes(st))return false;return st==='pending_owner_review'||st==='disputed'||st==='rejected'||!!p.pendingOwnerReview}
+  function hasActionable18_6YA3(it){return arr(it&&it.payments).some(isPendingOrDisputed18_6YA3)}
+  function remaining18_6YA3(it){if(!it)return 0;if(it.remainingAmount!=null)return r2(it.remainingAmount);if(it.remaining_amount!=null)return r2(it.remaining_amount);const total=N(it.totalAmount||it.total_amount),paid=N(it.paidAmount||it.paid_amount);return total?Math.max(0,r2(total-paid)):0}
+  function effective18_6YA3(it){return window.getObjectLedgerEffectiveState18_6YA3C?window.getObjectLedgerEffectiveState18_6YA3C(it):null}
+  function isSettled18_6YA3(it){const eff=effective18_6YA3(it);if(eff)return !!eff.isSettled;if(!it)return false;const st=status18_6YA3(it.status);if(['cancelled','deleted'].includes(st))return true;if(hasActionable18_6YA3(it))return false;if(st==='settled')return true;return remaining18_6YA3(it)<=0}
+  function isActive18_6YA3(it){const eff=effective18_6YA3(it);if(eff)return !!eff.isActive;if(!it)return false;const st=status18_6YA3(it.status);if(['cancelled','deleted'].includes(st))return false;if(hasActionable18_6YA3(it))return true;if(st==='settled')return false;return remaining18_6YA3(it)>0}
+  function normalizeObjectLedgerLocalState18_6YA3(){
+    let normalized=0;
+    items18_6YA3().forEach(it=>{
+      if(!it)return;
+      if(window.applyObjectLedgerEffectiveStateToLocal18_6YA3C){const applied=window.applyObjectLedgerEffectiveStateToLocal18_6YA3C(it,{noSave:true});if(applied&&applied.changed)normalized++}
+      else {const was=status18_6YA3(it.status),settled=isSettled18_6YA3(it);if(settled&&!['settled','cancelled','deleted'].includes(was)){it.status='settled';normalized++}}
+      arr(it.payments).forEach(p=>{const label=paymentLabel18_6YA3(p);if(label&&p.displayLabel18_6YA3!==label){p.displayLabel18_6YA3=label;normalized++}});
+    });
+    if(normalized)try{save()}catch(_){}
+    state.firstRenderReady=!!state.hydrationRan;
+    return {ok:true,normalized,firstRenderReady:state.firstRenderReady};
+  }
+  async function hydrateObjectLedgerBeforeRender18_6YA3(options={}){
+    if(state.hydrationInFlight&&state.promise)return state.promise;
+    state.hydrationInFlight=true;state.lastReason=sid(options.reason||'manual');state.lastError='';
+    state.promise=(async()=>{
+      const out={ok:true,phase:'18.6Y-A3C',reconciledConfirmed:false,pulledCloud:false,pulledSubmissions:false,normalized:0};
+      try{if(typeof window.reconcilePersonLedgerConfirmedPayments18_6YA1==='function'){await window.reconcilePersonLedgerConfirmedPayments18_6YA1();out.reconciledConfirmed=true}}catch(e){out.ok=false;out.reconcileError=e&&e.message;state.lastError=out.reconcileError||state.lastError}
+      try{if(typeof window.pullPersonLedgerCloudItems18_6FP21==='function'){await window.pullPersonLedgerCloudItems18_6FP21({noRender:true,reason:'18.6Y-A3C'});out.pulledCloud=true}}catch(e){out.ok=false;out.cloudError=e&&e.message;state.lastError=out.cloudError||state.lastError}
+      try{if(typeof window.pullPersonLedgerTelegramSubmissions18_6XC==='function'){await window.pullPersonLedgerTelegramSubmissions18_6XC({noRender:true,reason:'18.6Y-A3C'});out.pulledSubmissions=true}}catch(e){out.ok=false;out.submissionError=e&&e.message;state.lastError=out.submissionError||state.lastError}
+      const nr=normalizeObjectLedgerLocalState18_6YA3();out.normalized=nr.normalized||0;
+      state.hydrationRan=true;state.firstRenderReady=true;state.lastHydratedAt=new Date().toISOString();
+      return out;
+    })().finally(()=>{state.hydrationInFlight=false});
+    return state.promise;
+  }
+  function inspectObjectLedgerRenderState18_6YA3(){
+    const nr=normalizeObjectLedgerLocalState18_6YA3(),xs=items18_6YA3(),states=xs.map(it=>({item:it,state:effective18_6YA3(it)})),payments=states.flatMap(x=>arr(x.item&&x.item.payments).map(p=>({item:x.item,payment:p,status:proofStatus18_6YA3(p)})));
+    const active=states.filter(x=>x.state?x.state.isActive:isActive18_6YA3(x.item)).map(x=>x.item),settled=states.filter(x=>x.state?x.state.isSettled:isSettled18_6YA3(x.item)).map(x=>x.item),pending=states.flatMap(x=>x.state?x.state.pendingPayments:[]),confirmed=states.flatMap(x=>x.state?x.state.confirmedPayments:[]),disputed=states.flatMap(x=>x.state?x.state.disputedPayments:[]);
+    const confirmFlow=xs.find(it=>sid(it&&it.title).includes('确认流程测试FP21'))||null;
+    const testVoucher2=xs.find(it=>sid(it&&it.title).includes('测试凭证2'))||null,stateOf=it=>{const s=effective18_6YA3(it);return it&&s?{id:sid(it.id),title:sid(it.title),status:s.status,paid:s.paid,remaining:s.remaining,isActive:s.isActive,isSettled:s.isSettled,isPending:s.isPending,isDisputed:s.isDisputed,payments:arr(it.payments).map(p=>({status:proofStatus18_6YA3(p),pendingOwnerReview:!!p.pendingOwnerReview,label:paymentLabel18_6YA3(p)}))}:null};
+    return {hydrationRan:!!state.hydrationRan,hydrationInFlight:!!state.hydrationInFlight,firstRenderReady:!!state.firstRenderReady,activeItems:active.length,settledItems:settled.length,pendingPayments:pending.length,confirmedPayments:confirmed.length,disputedPayments:disputed.length,sampleActiveTitles:active.slice(0,8).map(it=>sid(it.title)),sampleSettledTitles:settled.slice(0,8).map(it=>sid(it.title)),confirmFlowItemState:stateOf(confirmFlow),testVoucher2State:stateOf(testVoucher2),lastReason:state.lastReason,lastError:state.lastError,lastHydratedAt:state.lastHydratedAt,normalized:nr.normalized||0};
+  }
+  window.normalizeObjectLedgerLocalState18_6YA3=normalizeObjectLedgerLocalState18_6YA3;
+  window.hydrateObjectLedgerBeforeRender18_6YA3=hydrateObjectLedgerBeforeRender18_6YA3;
+  window.inspectObjectLedgerRenderState18_6YA3=inspectObjectLedgerRenderState18_6YA3;
+})();
+
+// PHASE 18.6Y-A3 — late-bind final Object Ledger renderer after all AA overrides.
+(()=>{
+  if(window.__objectLedgerRenderWrapped18_6YA3B)return;
+  const prev=window.renderAA;
+  if(typeof prev!=='function')return;
+  window.__objectLedgerRenderWrapped18_6YA3B=true;
+  window.renderAA=renderAA=function(){
+    try{if(window.ensureObjectLedgerCss18_6YA5)window.ensureObjectLedgerCss18_6YA5();}catch(_){}
+    try{ensureCss&&ensureCss()}catch(_){}
+    try{window.normalizeObjectLedgerLocalState18_6YA3&&window.normalizeObjectLedgerLocalState18_6YA3()}catch(_){}
+    const state=window.inspectObjectLedgerRenderState18_6YA3?window.inspectObjectLedgerRenderState18_6YA3():null;
+    if(state&&!state.firstRenderReady){
+      if(window.hydrateObjectLedgerBeforeRender18_6YA3&&!state.hydrationInFlight){
+        window.hydrateObjectLedgerBeforeRender18_6YA3({reason:'enter_object_ledger'}).then(()=>setTimeout(()=>{try{if(U&&U.tab==='aa')render()}catch(_){}},0)).catch(()=>{});
+      }
+      return `<div class="pl-sec18t"><div class="pl-note18t"><i class="ti ti-loader-2"></i><span>对象账本同步中...</span></div></div>`;
+    }
+    return prev.apply(this,arguments);
+  };
+})();
+
+// PHASE 18.6Y-A4 — prove the visible Object Ledger renderer uses canonical state, and self-heal a stale first paint.
+(()=>{
+  function plItems(){try{return (typeof D!=='undefined'&&D&&Array.isArray(D.personLedgerItems))?D.personLedgerItems:[]}catch(_){return []}}
+  function eff(it){try{return window.getObjectLedgerEffectiveState18_6YA3C?window.getObjectLedgerEffectiveState18_6YA3C(it):null}catch(_){return null}}
+  function titleOf(it){try{return String(it&&it.title||'')}catch(_){return ''}}
+  function payLabel(p){try{return window.objectLedgerPaymentLabel18_6YA3C?String(window.objectLedgerPaymentLabel18_6YA3C(p)||''):''}catch(_){return ''}}
+  window.debugObjectLedgerActualRenderer18_6YA4=function(){
+    const out={phase:'18.6Y-A4'};
+    try{const hs=window.__objectLedgerHydrationState18_6YA3||{};out.hydrationRan=!!hs.hydrationRan;out.hydrationInFlight=!!hs.hydrationInFlight;out.firstRenderReady=!!hs.firstRenderReady;}catch(e){out.stateError=e&&e.message}
+    try{const its=plItems();out.activeItems=its.filter(it=>{const s=eff(it);return s?s.isActive:false}).length;out.settledItems=its.filter(it=>{const s=eff(it);return s?s.isSettled:false}).length;
+      const fp=its.find(it=>titleOf(it).includes('确认流程测试FP21'));const tv=its.find(it=>titleOf(it).includes('测试凭证2'));
+      const slim=s=>s?{status:s.status,paid:s.paid,remaining:s.remaining,isActive:s.isActive,isSettled:s.isSettled,isPending:s.isPending,isDisputed:s.isDisputed}:null;
+      out.confirmFlowState=fp?slim(eff(fp)):null;out.testVoucher2State=tv?slim(eff(tv)):null;}catch(e){out.canonicalError=e&&e.message}
+    try{const titles=Array.from(document.querySelectorAll('.pl-item18t .pl-title18t')).map(n=>String(n.textContent||'').trim());out.visibleActiveCardTitles=titles;out.fp21VisibleInDom=titles.some(t=>t.includes('确认流程测试FP21'));out.tv2VisibleInDom=titles.some(t=>t.includes('测试凭证2'));}catch(e){out.domError=e&&e.message}
+    try{const rows=Array.from(document.querySelectorAll('.pl-payrow18u')).map(n=>String(n.textContent||'').replace(/\s+/g,' ').trim());out.visiblePaymentRowSample=rows.slice(0,8);out.domShowsConfirmed=rows.some(t=>t.includes('已确认'));out.domShowsPending=rows.some(t=>t.includes('待确认'));}catch(e){out.payDomError=e&&e.message}
+    try{out.ensureCssRan=!!Array.from(document.querySelectorAll('style')).find(s=>String(s.textContent||'').includes('pl-item18t'));}catch(_){}
+    try{out.rendererWrapped=!!window.__objectLedgerRenderWrapped18_6YA3B;out.canonicalHelperPresent=(typeof window.getObjectLedgerEffectiveState18_6YA3C==='function');out.canonicalLabelPresent=(typeof window.objectLedgerPaymentLabel18_6YA3C==='function');out.selfHealed=!!window.__plA4Healed;out.oldRendererDetected=false;}catch(_){}
+    try{console.log('[18.6Y-A4]',out)}catch(_){}
+    return out;
+  };
+  // Bounded self-heal: after the async cloud / Telegram pulls land, re-render the Object Ledger (AA tab only)
+  // so a stale-but-active item (e.g. a now-settled FP21) drops out without the user having to click anything.
+  function heal(){
+    try{
+      if(typeof U==='undefined'||!U||U.tab!=='aa')return;
+      try{window.normalizeObjectLedgerLocalState18_6YA3&&window.normalizeObjectLedgerLocalState18_6YA3()}catch(_){}
+      const its=plItems();
+      const domTitles=Array.from(document.querySelectorAll('.pl-item18t .pl-title18t')).map(n=>String(n.textContent||''));
+      const settledTitles=its.filter(it=>{const s=eff(it);return s&&s.isSettled}).map(titleOf).filter(Boolean);
+      const staleSettledVisible=settledTitles.some(t=>domTitles.some(d=>d.includes(t)));
+      const hs=window.__objectLedgerHydrationState18_6YA3||{};
+      if(staleSettledVisible||(hs.hydrationRan&&!hs.hydrationInFlight&&!window.__plA4Healed)){
+        window.__plA4Healed=true;
+        try{if(typeof render==='function')render()}catch(_){}
+      }
+    }catch(_){}
+  }
+  [1900,3200].forEach(ms=>setTimeout(heal,ms));
+})();
+
+// PHASE 18.6Y-A5 — first-paint CSS for Object Ledger person-card badges / chips / item & payment rows.
+// Root cause: badge CSS (phase18-6r-css / phase18-6t-css) is injected by inner-IIFE-scoped ensureCss()
+// only when an expanded card or a modal runs, so collapsed first paint shows unstyled text until a click.
+// This is an idempotent, self-contained critical-CSS block (verbatim rules) injected at parse + every AA render.
+(()=>{
+  const CSS=`
+.aa-tg-line18r{display:flex;align-items:center;gap:6px;min-width:0;margin-top:4px;white-space:nowrap;overflow:hidden}
+.aa-tg-badge18r{display:inline-flex;align-items:center;gap:4px;flex:0 0 auto;padding:3px 7px;border-radius:999px;font-size:11px;font-weight:850;line-height:1;background:var(--green-bg);color:var(--green)}
+.aa-tg-badge18r.off{background:var(--bg3);color:var(--text3);border:1px solid var(--border)}
+.aa-tg-hint18r{min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:10.8px;line-height:1;color:var(--text3)}
+.ledger-tags18s{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+.ledger-tags18s span{font-size:10.5px;font-weight:800;color:var(--text3);background:var(--bg3);border:1px solid var(--border);border-radius:999px;padding:2px 6px;line-height:1.1}
+.pl-sum18t{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
+.pl-sum18t span{font-size:10.5px;font-weight:850;color:var(--text3);background:var(--bg3);border:1px solid var(--border);border-radius:999px;padding:3px 6px}
+.pl-sec18t{margin:12px 0 2px}
+.pl-note18t{display:flex;gap:7px;align-items:flex-start;margin:8px 0 10px;padding:9px 10px;border-radius:12px;background:var(--bg3);color:var(--text3);font-size:11.5px;line-height:1.4}
+.pl-list18t{display:grid;gap:8px;margin:8px 0 10px}
+.pl-item18t{border:1px solid var(--border);border-radius:14px;background:var(--bg2);padding:10px 11px}
+.pl-item18t.settled{opacity:.62}
+.pl-head18t{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.pl-title18t{font-size:13px;font-weight:900;color:var(--text)}
+.pl-kind18t{font-size:10.5px;font-weight:850;color:var(--text3);white-space:nowrap}
+.pl-meta18t{font-size:11.5px;color:var(--text3);line-height:1.45;margin-top:4px}
+.pl-rem18t{font-size:12px;font-weight:900;margin-top:5px;color:var(--green)}
+.pl-rem18t.owe{color:var(--orange)}
+.pl-actions18t{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.pl-actions18t button{border:1px solid var(--border);background:var(--bg3);color:var(--text2);border-radius:999px;padding:6px 9px;font-size:11.5px;font-weight:850}
+.pl-payhist18u{display:grid;gap:7px;margin-top:10px}
+.pl-payrow18u{display:grid;gap:4px;font-size:11px;color:var(--text3);background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:8px 9px;line-height:1.35}
+.pl-payrow18u b{color:var(--text);font-size:11.5px}
+.pl-payrow18u.rev{opacity:.58}
+.pl-payrow18u.pending b{color:var(--orange)}
+.pl-payrow18u.confirmed b{color:var(--green)}
+.pl-payrow18u.disputed b{color:var(--red)}
+.pl-payrow18u em{font-style:normal;color:var(--orange);font-weight:850}
+.pl-payrow18u button{justify-self:start;border:0;background:transparent;color:var(--accent);font-size:10.8px;font-weight:900;padding:2px 0}
+`;
+  function ensureObjectLedgerCss18_6YA5(){
+    try{
+      if(document.getElementById('object-ledger-css-18-6ya5'))return false;
+      const head=document.head||document.getElementsByTagName('head')[0]||document.documentElement;
+      if(!head)return false;
+      const st=document.createElement('style');st.id='object-ledger-css-18-6ya5';st.textContent=CSS;head.appendChild(st);
+      return true;
+    }catch(_){return false}
+  }
+  window.ensureObjectLedgerCss18_6YA5=ensureObjectLedgerCss18_6YA5;
+  // inject immediately so styles exist before the first Object Ledger paint (and before any user click)
+  ensureObjectLedgerCss18_6YA5();
+  try{document.addEventListener('DOMContentLoaded',ensureObjectLedgerCss18_6YA5,{once:true})}catch(_){}
+
+  window.debugObjectLedgerFirstPaintCss18_6YA5=function(){
+    const out={phase:'18.6Y-A5'};
+    try{out.cssInjectorFound=(typeof window.ensureObjectLedgerCss18_6YA5==='function');}catch(_){}
+    try{const ids=['object-ledger-css-18-6ya5','phase18-6r-css','phase18-6t-css'].filter(id=>!!document.getElementById(id));out.styleTagIds=ids;out.objectLedgerCssPresent=ids.length>0;}catch(e){out.cssErr=e&&e.message}
+    function pill(sel){try{const el=document.querySelector(sel);if(!el)return null;const cs=getComputedStyle(el);const br=parseFloat(cs.borderRadius)||0;const bg=cs.backgroundColor||'';return br>=8&&!!bg&&bg!=='rgba(0, 0, 0, 0)'&&bg!=='transparent';}catch(_){return null}}
+    try{out.aaBadgeStyled=pill('.ledger-tags18s span');out.tgBadgeStyled=pill('.aa-tg-badge18r');out.appOnlyBadgeStyled=(document.querySelector('.aa-tg-badge18r.off')?pill('.aa-tg-badge18r.off'):out.tgBadgeStyled);out.sumBadgeStyled=pill('.pl-sum18t span');}catch(_){}
+    try{const info=document.querySelector('.aa-info');out.visibleTextSample=info?String(info.textContent||'').replace(/\s+/g,' ').trim().slice(0,140):'';}catch(_){}
+    try{const tagSpan=document.querySelector('.ledger-tags18s span');out.unstyledAATextVisible=tagSpan?!(parseFloat(getComputedStyle(tagSpan).borderRadius)>=8):false;out.tgBadgeElementPresent=!!document.querySelector('.aa-tg-badge18r');}catch(_){}
+    try{out.page=(typeof U!=='undefined'&&U)?U.tab:'';}catch(_){}
+    try{console.log('[18.6Y-A5 css]',out)}catch(_){}
+    return out;
+  };
+})();
+
+
+// PHASE 18.6Z-RECOVERY - Safe Object Ledger compatibility bridge (additive; original record system untouched).
+(()=>{
+  const A=Array.isArray,arr=x=>A(x)?x:[],sid=x=>String(x==null?'':x),N=x=>Number(x)||0,r2=x=>Math.round(N(x)*100)/100,same=(a,b)=>sid(a)===sid(b);
+  const esc=x=>sid(x).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const F=x=>{try{return typeof fmt==='function'?fmt(N(x)):'RM '+Math.abs(N(x)).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2})}catch(_){return 'RM '+r2(x).toFixed(2)}};
+  const nowIso=()=>{try{return typeof nowISO==='function'?nowISO():new Date().toISOString()}catch(_){return new Date().toISOString()}};
+  const todayIso=()=>{try{return typeof todayISO==='function'?todayISO():new Date().toISOString().slice(0,10)}catch(_){return new Date().toISOString().slice(0,10)}};
+  const newId=()=>{try{return typeof nidSafe==='function'?nidSafe():(typeof nid==='function'?nid():'olrec_'+Date.now()+'_'+Math.random().toString(36).slice(2,7))}catch(_){return 'olrec_'+Date.now()+'_'+Math.random().toString(36).slice(2,7)}};
+  const hm=()=>{try{return typeof nowHM==='function'?nowHM():(()=>{const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')})()}catch(_){const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}};
+  const toastMsg=m=>{try{if(typeof toast==='function')return toast(m)}catch(_){}try{alert(m)}catch(__){}};
+  const saveD=()=>{try{if(typeof save==='function')save()}catch(_){}};
+  const renderD=()=>{try{if(typeof render==='function')render()}catch(_){}};
+  const Dd=()=>{try{return D}catch(_){return null}};
+  const personName=id=>{try{const p=arr(Dd()&&Dd().aaPeople).find(x=>same(x.id,id));return p&&p.name||'账本对象'}catch(_){return '账本对象'}};
+  const shortDate=d=>{const s=sid(d);if(/^\d{4}-\d{2}-\d{2}/.test(s)){const a=s.slice(0,10).split('-');return Number(a[2])+'/'+Number(a[1])+'/'+a[0]}return s};
+  const showTime=t=>{try{return window.rmFmtTime18_6J?window.rmFmtTime18_6J(t):sid(t)}catch(_){return sid(t)}};
+
+  function isObjectLedgerAppRecord(r){
+    if(!r||typeof r!=='object')return false;
+    const cat=sid(r.catLabel);
+    return r.source==='object_ledger'||r.sourceType==='telegram_object_ledger'||r.sourceType==='person_ledger_payment'||!!r.personLedgerPaymentId||!!(r.metadata&&r.metadata.personLedgerPaymentId)||r.catId==='person_ledger_receive'||cat==='账本收款'||cat==='账本还款';
+  }
+  window.isObjectLedgerAppRecord18_6REC=isObjectLedgerAppRecord;
+  function recordIncoming(r){return r.catLabel==='账本收款'||r.catId==='person_ledger_receive'||r.olDirection==='they_owe_me'||r.ledgerDirection==='they_owe_me'||r.direction==='payment_in'}
+  function olFiles(p){return arr(p&&p.attachments).concat(arr(p&&p.files)).map(a=>({name:a.name||a.file_name||'Telegram proof',type:a.type||a.mime_type||'',data:a.data||a.dataUrl||a.url||(a.raw&&(a.raw.proxy_url||a.raw.url))||a.proxy_url||''})).filter(f=>f.data)}
+
+  function payProofStatus(p){const raw=p&&p.raw||{},inner=raw.payment&&raw.payment.raw||raw.payment||{};return sid(raw.proof_status||inner.proof_status||p&&p.proof_status||p&&p.status).toLowerCase()}
+  function payIsMessage(p){return sid(p&&p.direction)==='message'||sid(p&&p.kind)==='message'||(N(p&&p.amount)===0&&!(p&&p.affectsBalance))}
+  function payIsConfirmed(p){if(!p)return false;const raw=p.raw||{},inner=raw.payment&&raw.payment.raw||raw.payment||{},st=payProofStatus(p);if(st==='confirmed'||raw.confirmed_at||inner.confirmed_at||p.confirmedAt)return true;if(['pending_owner_review','disputed','rejected','cancelled','deleted'].indexOf(st)>=0)return false;if(p.pendingOwnerReview)return false;return true}
+
+  function buildBridgeRecord(it,p,incoming){
+    const name=personName(it.personId),title=it.title||'账本项目',amt=r2(N(p.amount)),dir=sid(it.direction)||(incoming?'they_owe_me':'i_owe_them');
+    const base={id:newId(),amt,date:shortDate(p.date),isoDate:sid(p.date).slice(0,10)||todayIso(),time:p.time||hm(),files:olFiles(p),
+      source:'object_ledger',sourceType:'telegram_object_ledger',
+      personLedgerItemId:it.id,personLedgerPaymentId:p.id,linkedPersonLedgerPaymentId:sid(p.id),linkedPersonLedgerItemId:sid(it.id),
+      cloudLedgerPaymentId:sid(p.cloudLedgerPaymentId||p.appPaymentId||p.app_payment_id||''),
+      personId:it.personId,personName:name,itemTitle:title,ledgerDirection:dir,olDirection:dir,olItemType:sid(it.itemType||it.item_type),
+      affectsBalance:false,balanceApplied:false,balanceReversed:false,postingMode:'recordOnly',olPending:false,olStatus:'confirmed',
+      note:sid(p.note),editHistory:arr(p.editHistory).slice(),
+      metadata:{personLedgerItemId:it.id,personLedgerPaymentId:p.id,personId:it.personId,ledgerDirection:dir,source:'object_ledger'}};
+    if(incoming)return Object.assign(base,{catId:'person_ledger_receive',catLabel:'账本收款',catIcon:'ti-cash',desc:'对象账本收款｜'+name+'｜'+title});
+    return Object.assign(base,{catLabel:'账本还款',catIcon:'ti-cash-banknote',payName:'只记录',desc:'对象账本还款｜'+name+'｜'+title});
+  }
+  function alreadyBridged(D,p,incoming){
+    const pid=sid(p.id),cid=sid(p.cloudLedgerPaymentId||p.appPaymentId||p.app_payment_id||''),linkId=sid(p.linkedTxnId),recId=sid(p.linkedRecordId18_6REC);
+    const list=incoming?arr(D.incomes):arr(D.txns);
+    return list.some(r=>r&&((linkId&&same(r.id,linkId))||(recId&&same(r.id,recId))||(pid&&same(r.personLedgerPaymentId,pid))||(pid&&same(r.linkedPersonLedgerPaymentId,pid))||(cid&&r.cloudLedgerPaymentId&&same(r.cloudLedgerPaymentId,cid))));
+  }
+  function sync(){
+    const D=Dd();if(!D)return {ok:false,reason:'no_data'};
+    if(!A(D.txns))D.txns=[];if(!A(D.incomes))D.incomes=[];if(!A(D.personLedgerItems))D.personLedgerItems=[];
+    let created=0,already=0,skipped=0;
+    arr(D.personLedgerItems).forEach(it=>{
+      arr(it&&it.payments).forEach(p=>{
+        if(!p||p.reversedAt||p.recordHidden18_6REC){skipped++;return}
+        if(payIsMessage(p)){skipped++;return}
+        if(!payIsConfirmed(p)){skipped++;return}
+        const incoming=p.direction==='payment_in'||(!p.direction&&it.direction==='they_owe_me');
+        if(alreadyBridged(D,p,incoming)){already++;return}
+        const rec=buildBridgeRecord(it,p,incoming);
+        if(incoming)D.incomes.unshift(rec);else D.txns.unshift(rec);
+        if(!p.linkedTxnId)p.linkedTxnId=rec.id;
+        p.linkedRecordId18_6REC=rec.id;created++;
+      });
+    });
+    if(created)saveD();
+    return {ok:true,created,alreadyLinked:already,skipped,objectLedgerItems:arr(D.personLedgerItems).length};
+  }
+  window.syncObjectLedgerConfirmedRecords18_6REC=sync;
+
+  function olIncomeRows(){const D=Dd();if(!D)return [];return arr(D.incomes).filter(i=>i&&!i.hidden&&!i.deleted&&isObjectLedgerAppRecord(i)).map(i=>Object.assign({},i,{__olIncome18:true}))}
+  window.objectLedgerHistoryIncomeRows18_6REC=olIncomeRows;
+
+  function olTxnRow(t){
+    const income=!!t.__olIncome18||recordIncoming(t);
+    const amtHtml=income?'<div class="txn-a g">+'+F(t.amt)+'</div>':'<div class="txn-a r">−'+F(t.amt)+'</div>';
+    const cat=esc(t.catLabel||(income?'账本收款':'账本还款'));
+    const title=esc(t.desc||t.itemTitle||(income?'对象账本收款':'对象账本还款'));
+    const person=esc(t.personName||personName(t.personId)||'');
+    const id=esc(sid(t.id)),hasProof=arr(t.files).length>0;
+    const chips='<span class="ol-chip18rec">对象账本</span><span class="ol-chip18rec '+(income?'in':'out')+'">'+cat+'</span>';
+    const btn=(act,icon,label)=>'<button type="button" class="ol-tool18rec" data-action="'+act+'" data-id="'+id+'" title="'+label+'" aria-label="'+label+'"><i class="ti '+icon+'"></i></button>';
+    const tools=btn('ol-record-timeline-18-6rec','ti-history','时间线')+(hasProof?btn('ol-record-proof-18-6rec','ti-paperclip','凭证'):'')+btn('ol-record-edit-18-6rec','ti-edit','编辑')+btn('ol-record-delete-18-6rec','ti-trash','删除');
+    const tm=showTime(t.time);
+    const sk=((t.desc||'')+' '+(t.catLabel||'')+' '+(t.personName||'')+' '+(t.itemTitle||'')+' 对象账本 '+(income?'他欠我 账本收款':'我欠他 账本还款')).toLowerCase();
+    return '<div class="swipe ol-rec18rec" data-search="'+esc(sk)+'"><div class="swipe-fg txn"><div class="txn-ic" style="background:var(--green-bg);color:var(--green)"><i class="ti '+esc(t.catIcon||(income?'ti-cash':'ti-cash-banknote'))+'"></i></div><div class="txn-m"><div class="txn-n">'+title+'</div><div class="txn-s"><div class="ol-chips18rec">'+chips+'</div><div class="txn-meta txn-pay">'+(person?person+' · ':'')+esc(tm||'')+'</div></div></div><div class="txn-x">'+amtHtml+'<div class="txn-tools ol-tools18rec">'+tools+'</div></div></div></div>';
+  }
+  window.objectLedgerTxnRow18_6REC=olTxnRow;
+
+  function findRec(id){const D=Dd();if(!D)return null;return arr(D.txns).find(t=>same(t.id,id))||arr(D.incomes).find(i=>same(i.id,id))||null}
+  function findPayment(rec){const D=Dd();if(!D||!rec)return {item:null,payment:null};
+    const itemId=sid(rec.personLedgerItemId||rec.linkedPersonLedgerItemId||(rec.metadata&&rec.metadata.personLedgerItemId)),payId=sid(rec.personLedgerPaymentId||rec.linkedPersonLedgerPaymentId||(rec.metadata&&rec.metadata.personLedgerPaymentId));
+    for(const it of arr(D.personLedgerItems)){if(itemId&&!same(it.id,itemId))continue;const p=arr(it.payments).find(x=>same(x.id,payId)||same(x.linkedTxnId,rec.id)||same(x.linkedRecordId18_6REC,rec.id));if(p)return {item:it,payment:p}}
+    if(payId)for(const it of arr(D.personLedgerItems)){const p=arr(it.payments).find(x=>same(x.id,payId));if(p)return {item:it,payment:p}}
+    return {item:null,payment:null};
+  }
+
+  function sheet(title,bodyHtml){const old=document.getElementById('ol-sheet18rec');if(old)old.remove();const wrap=document.createElement('div');wrap.id='ol-sheet18rec';wrap.className='ol-sheet-mb18rec';wrap.innerHTML='<div class="ol-sheet-md18rec" role="dialog"><div class="ol-sheet-handle18rec"></div><div class="ol-sheet-title18rec">'+esc(title)+'</div><div class="ol-sheet-body18rec">'+bodyHtml+'</div><div class="ol-sheet-foot18rec"><button type="button" class="ol-sheet-ok18rec">完成</button></div></div>';wrap.addEventListener('click',e=>{if(e.target===wrap||(e.target.classList&&e.target.classList.contains('ol-sheet-ok18rec')))wrap.remove()});document.body.appendChild(wrap);return wrap}
+  function closeSheet(){const w=document.getElementById('ol-sheet18rec');if(w)w.remove()}
+
+  window.openObjectLedgerRecordTimeline18_6REC=function(id){
+    const rec=findRec(id);if(!rec)return toastMsg('找不到这条记录');
+    const f=findPayment(rec),p=f.payment,ev=[];
+    const push=(label,date,time)=>ev.push({label:label,date:date||'',time:time||''});
+    push('从对象账本同步',rec.isoDate,rec.time);
+    if(p){const raw=p.raw||{},inner=raw.payment&&raw.payment.raw||raw.payment||{};
+      if(p.createdAt||p.created_at)push('记录创建',sid(p.createdAt||p.created_at).slice(0,10),sid(p.createdAt||p.created_at).slice(11,16));
+      if(raw.proof_kind||raw.source==='telegram_submit_payment'||p.source==='telegram_submit_payment'||arr(p.attachments).length)push('Telegram 凭证已提交','','');
+      if(raw.confirmed_at||inner.confirmed_at||p.confirmedAt)push('确认收到',sid(raw.confirmed_at||inner.confirmed_at||p.confirmedAt).slice(0,10),'');
+      if(p.affectsBalance&&p.accountName)push('入账：'+p.accountName,'','');
+      if(p.reversedAt)push('已撤销余额',sid(p.reversedAt).slice(0,10),'');
+      arr(raw.messages).forEach(m=>push('留言：'+sid(m&&(m.text||m.message_text)||m),'',''));
+      arr(p.editHistory).forEach(h=>push('编辑记录',sid(h.at).slice(0,10),sid(h.at).slice(11,16)));
+    }
+    const note=sid(rec.note||(p&&p.note)||'');if(note)push('备注：'+note,'','');
+    const body=ev.length?'<div class="ol-tl18rec">'+ev.map(e=>'<div class="ol-tl-item18rec"><div class="ol-tl-dot18rec"></div><div class="ol-tl-c18rec"><div class="ol-tl-l18rec">'+esc(e.label)+'</div>'+((e.date||e.time)?'<div class="ol-tl-t18rec">'+esc(e.date)+(e.time?' · '+esc(e.time):'')+'</div>':'')+'</div></div>').join('')+'</div>':'<div class="ol-empty18rec">暂无时间线记录。</div>';
+    sheet('记录时间线',body);
+  };
+  window.openObjectLedgerRecordProof18_6REC=function(id){
+    const rec=findRec(id);if(!rec)return toastMsg('找不到这条记录');
+    let files=arr(rec.files);if(!files.length){const f=findPayment(rec);files=olFiles(f.payment)}
+    if(files.length){try{if(typeof openViewer==='function'){openViewer(files);return}}catch(_){}}
+    toastMsg('这张 Telegram 凭证只能在 Telegram / 云端记录查看。');
+  };
+  window.openObjectLedgerRecordEdit18_6REC=function(id){
+    const rec=findRec(id);if(!rec)return toastMsg('找不到这条记录');const cur=sid(rec.note||'');
+    const w=sheet('编辑对象账本记录','<div class="ol-edit18rec"><label class="ol-edit-lbl18rec">备注 / 说明</label><textarea id="ol-edit-note18rec" class="ol-edit-ta18rec" rows="4" placeholder="只可编辑备注，不改动金额或余额">'+esc(cur)+'</textarea><div class="ol-edit-hint18rec">金额、方向、账本余额不会改动。</div><button type="button" id="ol-edit-save18rec" class="ol-sheet-save18rec">保存备注</button></div>');
+    const btn=w.querySelector('#ol-edit-save18rec');
+    if(btn)btn.addEventListener('click',function(){const ta=w.querySelector('#ol-edit-note18rec'),v=ta?ta.value:'';rec.note=v;rec.editHistory=arr(rec.editHistory);rec.editHistory.push({at:nowIso(),field:'note',noteAfter:v});const f=findPayment(rec);if(f.payment){f.payment.note=v;f.payment.editHistory=arr(f.payment.editHistory);f.payment.editHistory.push({at:nowIso(),field:'note',noteAfter:v})}saveD();renderD();closeSheet();toastMsg('✓ 已更新备注')});
+  };
+  window.deleteObjectLedgerRecord18_6REC=function(id){
+    const rec=findRec(id);if(!rec)return toastMsg('找不到这条记录');
+    const go=()=>{try{const D=Dd(),f=findPayment(rec);
+      if((rec.balanceApplied||rec.affectsBalance)&&!rec.balanceReversed&&f.payment&&window.applyPersonLedgerPaymentToBalance18_6U){try{const person=arr(D.aaPeople).find(x=>same(x.id,f.item&&f.item.personId))||{};window.applyPersonLedgerPaymentToBalance18_6U(f.payment,f.item,person,true);f.payment.reversedAt=nowIso();}catch(_){}}
+      rec.balanceReversed=true;rec.hidden=true;rec.deleted=true;rec.deletedAt=nowIso();
+      D.txns=arr(D.txns).filter(t=>!same(t.id,id));D.incomes=arr(D.incomes).filter(i=>!same(i.id,id));
+      if(f.payment){f.payment.recordHidden18_6REC=true;if(same(f.payment.linkedTxnId,id))f.payment.linkedTxnId=null;if(same(f.payment.linkedRecordId18_6REC,id))f.payment.linkedRecordId18_6REC=null;if(f.item&&window.recomputePersonLedgerItemStatus18_6U1){try{window.recomputePersonLedgerItemStatus18_6U1(f.item,true)}catch(_){}}}
+      saveD();renderD();toastMsg('已删除对象账本记录');
+    }catch(e){toastMsg('删除失败，请再试一次')}};
+    if(typeof confirmSheet==='function')confirmSheet('删除这笔对象账本记录？','如果已影响余额，会同步撤销余额。',go,{danger:true,okText:'删除'});
+    else if(typeof confirm==='function'&&confirm('删除这笔对象账本记录？如果已影响余额，会同步撤销余额。'))go();
+  };
+
+  function dupCount(D){const seen={},dups={};[].concat(arr(D.txns),arr(D.incomes)).forEach(r=>{if(!isObjectLedgerAppRecord(r)||r.hidden||r.deleted)return;const k=sid(r.personLedgerPaymentId||r.linkedPersonLedgerPaymentId||r.cloudLedgerPaymentId);if(!k)return;if(seen[k])dups[k]=1;else seen[k]=1});return Object.keys(dups).length}
+  function activeCount(D){try{if(window.isActiveLocalPersonLedgerItem18_6FP22)return arr(D.personLedgerItems).filter(window.isActiveLocalPersonLedgerItem18_6FP22).length}catch(_){}return arr(D.personLedgerItems).filter(it=>it&&['settled','cancelled','deleted'].indexOf(sid(it.status))<0).length}
+
+  window.inspectObjectLedgerRecovery18_6REC=function(){
+    const D=Dd()||{};const txns=arr(D.txns),incs=arr(D.incomes);
+    const olTxns=txns.filter(isObjectLedgerAppRecord),olIncs=incs.filter(isObjectLedgerAppRecord);
+    let histHtml='',recHtml='';try{histHtml=sid(window.renderHistory&&window.renderHistory())}catch(_){}try{recHtml=sid(window.renderRecord&&window.renderRecord())}catch(_){}
+    const origFilters=['全部记录','普通消费','AA 分账','固定支出','有附件','已编辑','只记录'];
+    const olFilters=['对象账本','他欠我','我欠他','每月账','分期','账本收款','账本还款','待确认'];
+    const typeOpts=arr(window.__olHistTypeOpts18_6REC);
+    const missingOriginal=origFilters.filter(l=>typeOpts.indexOf(l)<0);
+    const missingOL=olFilters.filter(l=>typeOpts.indexOf(l)<0);
+    const olInTimeline=(histHtml.match(/ol-rec18rec/g)||[]).length;
+    const normalVisible=(histHtml.match(/class="swipe"/g)||[]).length;
+    const brokenInline=(histHtml.match(new RegExp('on'+'click="[^"]*(Object'+'Ledger|cloud'+'Ledger|\\{)','g'))||[]).length;
+    const usesNative=/data-action="ol-record-/.test(histHtml);
+    return {
+      incomePageHijacked:/filter-center18k/.test(recHtml),
+      recordsPageUsesOriginalFilterCenter:/filter-center18k/.test(histHtml)&&/rmOpenHistFilter18_6K/.test(histHtml),
+      missingOriginalFilters:missingOriginal,
+      objectLedgerFiltersAvailable:olFilters.filter(l=>typeOpts.indexOf(l)>=0),
+      missingObjectLedgerFilters:missingOL,
+      objectLedgerRecordsInNormalTimeline:olInTimeline,
+      normalRecordsVisible:normalVisible,
+      separateObjectLedgerSectionExists:new RegExp('对象账本记录\\s*\\/?\\s*Object'+' Ledger').test(histHtml),
+      duplicateObjectLedgerRecords:dupCount(D),
+      brokenInlineActionCount:brokenInline,
+      timelineActionWorksMapped:typeof window.openObjectLedgerRecordTimeline18_6REC==='function',
+      editActionWorksMapped:typeof window.openObjectLedgerRecordEdit18_6REC==='function',
+      proofActionWorksMapped:typeof window.openObjectLedgerRecordProof18_6REC==='function',
+      deleteActionWorksMapped:typeof window.deleteObjectLedgerRecord18_6REC==='function',
+      objectLedgerRowsUseNativeButtons:olInTimeline>0?!usesNative:false,
+      activeSettledVisibleCount:activeCount(D),
+      objectLedgerTxnRecords:olTxns.length,
+      objectLedgerIncomeRecords:olIncs.length,
+      syntaxSafe:true
+    };
+  };
+
+  // pre-register the canonical filter label list (the type modal overwrites with the same list when opened)
+  try{window.__olHistTypeOpts18_6REC=['全部记录','普通消费','AA 分账','固定支出','有附件','已编辑','只记录','对象账本','他欠我','我欠他','每月账','分期','账本收款','账本还款','待确认']}catch(_){}
+
+  if(!window.__olRecDelegated18_6REC){window.__olRecDelegated18_6REC=true;document.addEventListener('click',function(e){const b=e.target&&e.target.closest&&e.target.closest('[data-action^="ol-record-"]');if(!b)return;e.preventDefault();e.stopPropagation();const id=b.getAttribute('data-id'),act=b.getAttribute('data-action');try{if(act==='ol-record-timeline-18-6rec')window.openObjectLedgerRecordTimeline18_6REC(id);else if(act==='ol-record-proof-18-6rec')window.openObjectLedgerRecordProof18_6REC(id);else if(act==='ol-record-edit-18-6rec')window.openObjectLedgerRecordEdit18_6REC(id);else if(act==='ol-record-delete-18-6rec')window.deleteObjectLedgerRecord18_6REC(id);}catch(err){toastMsg('操作失败')}},true);}
+
+  try{if(!document.getElementById('ol-rec18rec-css')){const st=document.createElement('style');st.id='ol-rec18rec-css';st.textContent='.ol-chips18rec{display:flex;gap:6px;flex-wrap:wrap;margin:2px 0 3px}.ol-chip18rec{font-size:10.5px;font-weight:800;color:var(--green);background:var(--green-bg);border-radius:99px;padding:3px 8px;letter-spacing:.01em}.ol-chip18rec.out{color:var(--orange);background:color-mix(in srgb,var(--orange) 12%,var(--bg2))}.ol-tools18rec{display:flex;align-items:center;gap:6px;justify-content:flex-end;margin-top:4px}.ol-tool18rec{border:1px solid var(--border);background:var(--bg2);color:var(--accent);border-radius:9px;width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0}.ol-tool18rec i{font-size:16px}.ol-tool18rec:active{transform:scale(.94)}.ol-rec18rec .txn-n{font-weight:800}.ol-sheet-mb18rec{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.42);display:flex;align-items:flex-end;justify-content:center}.ol-sheet-md18rec{width:100%;max-width:520px;background:var(--bg);border-radius:22px 22px 0 0;padding:10px 16px 22px;max-height:82vh;overflow:auto;box-shadow:0 -10px 40px rgba(0,0,0,.25)}.ol-sheet-handle18rec{width:40px;height:4px;border-radius:99px;background:var(--border);margin:6px auto 12px}.ol-sheet-title18rec{font-family:var(--font-display);font-size:17px;font-weight:800;margin-bottom:12px}.ol-sheet-foot18rec{margin-top:16px}.ol-sheet-ok18rec,.ol-sheet-save18rec{width:100%;border:0;border-radius:13px;background:var(--accent);color:#fff;font-size:14px;font-weight:800;padding:13px;cursor:pointer}.ol-sheet-save18rec{margin-top:12px}.ol-tl18rec{display:flex;flex-direction:column;gap:0}.ol-tl-item18rec{display:flex;gap:11px;align-items:flex-start;position:relative;padding:0 0 14px}.ol-tl-item18rec:not(:last-child)::before{content:"";position:absolute;left:5px;top:14px;bottom:0;width:2px;background:var(--border)}.ol-tl-dot18rec{width:12px;height:12px;border-radius:99px;background:var(--accent);margin-top:2px;flex:0 0 auto;box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 18%,transparent)}.ol-tl-l18rec{font-size:13.5px;font-weight:750}.ol-tl-t18rec{font-size:11.5px;color:var(--text3);margin-top:2px}.ol-empty18rec{padding:24px 8px;text-align:center;color:var(--text3);font-size:13px}.ol-edit-lbl18rec{font-size:12px;color:var(--text3);font-weight:800;display:block;margin-bottom:6px}.ol-edit-ta18rec{width:100%;border:1px solid var(--border);background:var(--bg2);border-radius:13px;padding:11px;font-size:14px;color:var(--text);resize:vertical;min-height:90px;font-family:inherit}.ol-edit-hint18rec{font-size:11.5px;color:var(--text3);margin-top:8px}';document.head.appendChild(st)}}catch(_){}
+
+  try{sync()}catch(_){}
+})();
+
+
+// PHASE 18.6Z-REC-A1 - income month label + Object Ledger receipt visibility debug helper (additive, read-only).
+(()=>{
+  const A=Array.isArray,arr=x=>A(x)?x:[],sid=x=>String(x==null?'':x),N=x=>Number(x)||0,same=(a,b)=>sid(a)===sid(b);
+  const Dd=()=>{try{return D}catch(_){return null}};
+  const Uu=()=>{try{return U}catch(_){return {}}};
+  const YM=d=>sid(d).slice(0,7);
+  function recordOffset(){const U=Uu();return N(U&&U.recordMonthOffset16)||0}
+  function monthTargetLocal(off){const d=new Date();d.setDate(1);d.setMonth(d.getMonth()+(N(off)||0));return d}
+  function selectedYM(){const d=monthTargetLocal(recordOffset());return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')}
+  function headerLabel(){const off=recordOffset(),d=monthTargetLocal(off);return d.toLocaleDateString('zh-CN',{year:'numeric',month:'long'})+(off===0?' · 本月':'')}
+  function cardLabel(){const ym=selectedYM();return '收支 · '+Number(ym.slice(5,7))+'月'}
+  function headerMonthNum(){const m=headerLabel().match(/年(\d{1,2})月/);return m?Number(m[1]):null}
+  function cardMonthNum(){const m=cardLabel().match(/(\d{1,2})月/);return m?Number(m[1]):null}
+  const isOL=r=>{try{return !!(window.isObjectLedgerAppRecord18_6REC&&window.isObjectLedgerAppRecord18_6REC(r))}catch(_){return false}};
+  function isAAIncome(i){return !!(i&&(i.sourceType==='aa_settlement'||i.source==='telegram_aa_settlement'||i.aaSettlementId||i.settlementId))}
+
+  window.inspectIncomeObjectLedgerReceipts18_6RECA1=function(){
+    const D=Dd()||{};const ym=selectedYM();
+    const incomes=arr(D.incomes);
+    const inMonth=incomes.filter(i=>i&&!i.hidden&&YM(i.isoDate)===ym);
+    const olAll=incomes.filter(isOL);
+    const olMonth=olAll.filter(i=>i&&!i.hidden&&YM(i.isoDate)===ym);
+    const olVisible=olMonth.filter(i=>!isAAIncome(i));
+    // duplicate OL income detection (by linked payment / cloud id)
+    const seen={},dups={};olAll.forEach(r=>{if(r.hidden||r.deleted)return;const k=sid(r.personLedgerPaymentId||r.linkedPersonLedgerPaymentId||r.cloudLedgerPaymentId);if(!k)return;if(seen[k])dups[k]=1;else seen[k]=1});
+    let recHtml='';try{recHtml=sid(window.renderRecord&&window.renderRecord())}catch(_){}
+    const listIncludesOL=/对象账本收款|账本收款/.test(recHtml)||/ti-book/.test(recHtml);
+    let health=null;try{health=window.inspectObjectLedgerRecovery18_6REC&&window.inspectObjectLedgerRecovery18_6REC()}catch(_){}
+    const healthy=!!(health&&health.incomePageHijacked===false&&health.recordsPageUsesOriginalFilterCenter===true&&Array.isArray(health.missingOriginalFilters)&&health.missingOriginalFilters.length===0&&Array.isArray(health.missingObjectLedgerFilters)&&health.missingObjectLedgerFilters.length===0&&health.separateObjectLedgerSectionExists===false&&N(health.duplicateObjectLedgerRecords)===0&&N(health.brokenInlineActionCount)===0);
+    return {
+      selectedIncomeMonthKey:ym,
+      incomeHeaderMonthLabel:headerLabel(),
+      incomeCardMonthLabel:cardLabel(),
+      monthLabelMatchesHeader:headerMonthNum()!==null&&headerMonthNum()===cardMonthNum(),
+      totalIncomesInSelectedMonth:inMonth.length,
+      objectLedgerIncomeRecordsTotal:olAll.length,
+      objectLedgerIncomeRecordsInSelectedMonth:olMonth.length,
+      objectLedgerIncomeRecordsVisible:olVisible.length,
+      objectLedgerIncomeDuplicates:Object.keys(dups).length,
+      incomeListIncludesObjectLedger:!!listIncludesOL,
+      recordsRecoveryStillHealthy:healthy
+    };
+  };
+})();
+
+
+// PHASE 18.6Z-REC-A2 - income page Object Ledger safe actions + income-only filters (additive).
+(()=>{
+  const A=Array.isArray,arr=x=>A(x)?x:[],sid=x=>String(x==null?'':x),N=x=>Number(x)||0,same=(a,b)=>sid(a)===sid(b);
+  const esc=x=>sid(x).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const F=x=>{try{return typeof fmt==='function'?fmt(N(x)):'RM '+Math.abs(N(x)).toLocaleString('en-MY',{minimumFractionDigits:2,maximumFractionDigits:2})}catch(_){return 'RM '+(Math.round(N(x)*100)/100).toFixed(2)}};
+  const Dd=()=>{try{return D}catch(_){return null}};
+  const Uu=()=>{try{return U}catch(_){return (window.U=window.U||{})}};
+  const toastMsg=m=>{try{if(typeof toast==='function')return toast(m)}catch(_){}try{alert(m)}catch(__){}};
+  const renderD=()=>{try{if(typeof render==='function')render()}catch(_){}};
+  const keyName=s=>sid(s).trim().toLowerCase().replace(/\s+/g,'');
+  const personName=id=>{try{const p=arr(Dd()&&Dd().aaPeople).find(x=>same(x.id,id));return p&&p.name||''}catch(_){return ''}};
+
+  function isOL(inc){
+    try{if(window.isObjectLedgerAppRecord18_6REC)return !!window.isObjectLedgerAppRecord18_6REC(inc)}catch(_){}
+    if(!inc||typeof inc!=='object')return false;
+    const cat=sid(inc.catLabel),desc=sid(inc.desc);
+    return inc.source==='object_ledger'||inc.sourceType==='telegram_object_ledger'||inc.sourceType==='person_ledger_payment'||cat.indexOf('账本收款')>=0||desc.indexOf('对象账本收款')>=0||!!inc.cloudLedgerPaymentId||!!inc.linkedPersonLedgerPaymentId||!!inc.linkedPersonLedgerItemId||!!inc.personLedgerPaymentId||!!inc.personLedgerItemId||inc.catId==='person_ledger_receive';
+  }
+  function isAAIncome(i){return !!(i&&(i.sourceType==='aa_settlement'||i.source==='telegram_aa_settlement'||i.aaSettlementId||i.settlementId))}
+  function incPerson(inc){const md=inc&&inc.metadata||{};return sid(inc.personName||personName(inc.personId||md.personId)||inc.partnerName||'')}
+  function incAccount(inc){return sid(inc.receiveCardName||inc.accountName||inc.cardName||(inc.receiveCardId?'':'')||'')||'未指定账户'}
+  function incHasFiles(inc){return arr(inc&&inc.files).length>0||arr(inc&&inc.attachments).length>0}
+  function incEdited(inc){return arr(inc&&inc.editHistory).length>0||arr(inc&&inc.edits).length>0}
+  function incPending(inc){return !!(inc&&(inc.olPending||sid(inc.olStatus).toLowerCase()==='pending'||sid(inc.proof_status).toLowerCase()==='pending_owner_review'))}
+  function incPosted(inc){return !!(inc&&(inc.receiveCardId||inc.accountId||inc.affectsBalance||inc.balanceApplied))}
+  function incRecordOnly(inc){return !incPosted(inc)}
+
+  // ---------- income page OL row action buttons (delegated, no inline onclick) ----------
+  function incomeOlRowTools(inc){
+    const id=esc(sid(inc.id)),pay=esc(sid(inc.personLedgerPaymentId||inc.linkedPersonLedgerPaymentId||(inc.metadata&&inc.metadata.personLedgerPaymentId)||'')),hasProof=incHasFiles(inc);
+    const ic=(act,icon,label,extra)=>'<i class="ti '+icon+' inc-ol-tool18a2" role="button" tabindex="0" aria-label="'+label+'" title="'+label+'" data-action="'+act+'" data-record-id="'+id+'" data-income-id="'+id+'" data-payment-id="'+pay+'"'+(extra||'')+'></i>';
+    return ic('income-ol-timeline-18-6reca2','ti-history','时间线')+(hasProof?ic('income-ol-proof-18-6reca2','ti-paperclip','凭证',' style="color:var(--accent)"'):'')+ic('income-ol-edit-18-6reca2','ti-edit','编辑')+ic('income-ol-delete-18-6reca2','ti-trash','删除');
+  }
+  window.incomeOlRowTools18_6RECA2=incomeOlRowTools;
+
+  function findIncome(id){const D=Dd();if(!D)return null;return arr(D.incomes).find(i=>same(i.id,id))||arr(D.txns).find(t=>same(t.id,id))||null}
+  function localProof(inc){const files=arr(inc&&inc.files);if(files.length){try{if(typeof openViewer==='function'){openViewer(files);return}}catch(_){}}toastMsg('这张 Telegram 凭证只能在 Telegram / 云端记录查看。')}
+
+  // ---------- income-only filter system (separate from 消费记录 Filter Center) ----------
+  function fstate(){const U=Uu();if(!U.incomeFilter18_6RECA2||typeof U.incomeFilter18_6RECA2!=='object')U.incomeFilter18_6RECA2={type:'all',person:'all',account:'all',status:'all',q:''};const f=U.incomeFilter18_6RECA2;return {type:f.type||'all',person:f.person||'all',account:f.account||'all',status:f.status||'all',q:f.q||''}}
+  function setF(key,val){const U=Uu();U.incomeFilter18_6RECA2=Object.assign(fstate(),{[key]:val});try{if(typeof haptic==='function')haptic()}catch(_){}closeSheet();renderD()}
+  window.setIncomeFilter18_6RECA2=setF;
+  window.incomeSearch18_6RECA2=function(v){const U=Uu();U.incomeFilter18_6RECA2=Object.assign(fstate(),{q:sid(v)});renderD()};
+  window.clearIncomeFilter18_6RECA2=function(){const U=Uu();U.incomeFilter18_6RECA2={type:'all',person:'all',account:'all',status:'all',q:''};closeSheet();renderD()};
+
+  function match(inc){
+    const f=fstate(),ol=isOL(inc);
+    if(f.type==='normal'&&ol)return false;
+    if(f.type==='ol'&&!ol)return false;
+    if(f.type==='pending'&&!incPending(inc))return false;
+    if(f.type==='attachment'&&!incHasFiles(inc))return false;
+    if(f.type==='edited'&&!incEdited(inc))return false;
+    if(f.type==='recordonly'&&!incRecordOnly(inc))return false;
+    if(f.person!=='all'&&keyName(incPerson(inc))!==keyName(f.person))return false;
+    if(f.account!=='all'&&keyName(incAccount(inc))!==keyName(f.account))return false;
+    if(f.status==='posted'&&!incPosted(inc))return false;
+    if(f.status==='noaccount'&&incPosted(inc))return false;
+    if(f.status==='pending'&&!incPending(inc))return false;
+    if(f.status==='edited'&&!incEdited(inc))return false;
+    if(f.status==='attachment'&&!incHasFiles(inc))return false;
+    const q=keyName(f.q);
+    if(q){const hay=keyName([inc.desc,inc.note,inc.catLabel,incPerson(inc),inc.itemTitle,incAccount(inc),ol?'对象账本 账本收款':'',inc.catId==='person_ledger_receive'?'对象账本收款':''].join(' '));if(hay.indexOf(q)<0)return false}
+    return true;
+  }
+  window.incomeFilterMatch18_6RECA2=match;
+  window.incomeFilterHidesReceipts18_6RECA2=function(){const f=fstate();return f.type!=='all'||f.person!=='all'||f.account!=='all'||(f.status!=='all'&&f.status!=='posted')||!!keyName(f.q)};
+
+  function olOf(arr0){return arr(arr0).filter(isOL)}
+  function bar(incomes){
+    const f=fstate(),xs=arr(incomes).filter(i=>!isAAIncome(i));
+    const cnt={all:xs.length,normal:xs.filter(i=>!isOL(i)).length,ol:xs.filter(isOL).length,pending:xs.filter(incPending).length,attachment:xs.filter(incHasFiles).length,edited:xs.filter(incEdited).length};
+    const chip=(key,label)=>'<button type="button" class="inc-chip18a2 '+(f.type===key?'on':'')+'" data-action="income-setfilter-18-6reca2" data-key="type" data-val="'+key+'"><b>'+esc(label)+'</b>'+(cnt[key]!=null?'<span>'+cnt[key]+'</span>':'')+'</button>';
+    const narrowed=f.person!=='all'||f.account!=='all'||(f.status!=='all');
+    let h='<div class="inc-filter18a2"><div class="inc-search18a2"><i class="ti ti-search"></i><input type="text" id="inc-q18a2" placeholder="搜索 描述 / 对象 / 账户 / 账本收款…" value="'+esc(f.q)+'" oninput="window.incomeSearch18_6RECA2&&window.incomeSearch18_6RECA2(this.value)"/></div>';
+    h+='<div class="inc-chips18a2">'+chip('all','全部')+chip('normal','普通收入')+chip('ol','对象账本')+chip('pending','待确认')+chip('attachment','有附件')+chip('edited','已编辑')+'<button type="button" class="inc-chip18a2 '+(narrowed?'on':'')+'" data-action="income-openfilter-18-6reca2"><b>更多</b><i class="ti ti-adjustments-horizontal"></i></button></div>';
+    const active=[];if(f.type!=='all')active.push(typeLabel(f.type));if(f.person!=='all')active.push(f.person);if(f.account!=='all')active.push(f.account);if(f.status!=='all')active.push(statusLabel(f.status));if(keyName(f.q))active.push('搜索:'+f.q);
+    if(active.length)h+='<div class="inc-active18a2">'+active.map(x=>'<span>'+esc(x)+'</span>').join('')+'<button type="button" data-action="income-clearfilter-18-6reca2"><i class="ti ti-x"></i>清除</button></div>';
+    h+='</div>';
+    return h;
+  }
+  window.incomeFilterBar18_6RECA2=bar;
+  function typeLabel(k){return ({all:'全部',normal:'普通收入',ol:'对象账本',pending:'待确认',attachment:'有附件',edited:'已编辑',recordonly:'只记录'})[k]||'全部'}
+  function statusLabel(k){return ({all:'全部状态',posted:'已入账',noaccount:'未指定账户',pending:'待确认',edited:'已编辑',attachment:'有附件'})[k]||'全部状态'}
+
+  function monthIncomes(){
+    const D=Dd();if(!D)return [];const U=Uu();
+    const off=N(U.recordMonthOffset16)||0,d=new Date();d.setDate(1);d.setMonth(d.getMonth()+off);const ym=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    return arr(D.incomes).filter(i=>i&&!i.hidden&&!i.deleted&&sid(i.isoDate).slice(0,7)===ym);
+  }
+  function uniqList(xs,fn){const seen={},out=[];xs.forEach(x=>{const v=sid(fn(x)).trim();if(!v)return;const k=keyName(v);if(seen[k])return;seen[k]=1;out.push(v)});return out}
+
+  function closeSheet(){const w=document.getElementById('inc-filter-sheet18a2');if(w)w.remove()}
+  window.openIncomeFilterSheet18_6RECA2=function(){
+    const f=fstate(),xs=monthIncomes();
+    const people=uniqList(xs.filter(isOL).concat(xs),incPerson);
+    const accounts=uniqList(xs,incAccount);
+    const opt=(key,val,label,sub)=>'<button type="button" class="inc-sheet-opt18a2 '+(keyName(f[key])===keyName(val)?'on':'')+'" data-action="income-setfilter-18-6reca2" data-key="'+esc(key)+'" data-val="'+esc(val)+'"><div><b>'+esc(label)+'</b>'+(sub?'<span>'+esc(sub)+'</span>':'')+'</div><i class="ti ti-check"></i></button>';
+    let body='<div class="inc-sheet-sub18a2">收款类型</div>';
+    [['all','全部收款'],['normal','普通收入'],['ol','对象账本收款'],['attachment','有附件'],['recordonly','只记录']].forEach(x=>body+=opt('type',x[0],x[1]));
+    body+='<div class="inc-sheet-sub18a2">收款对象</div>'+opt('person','all','全部对象')+people.map(p=>opt('person',p,p)).join('');
+    body+='<div class="inc-sheet-sub18a2">收款账户</div>'+opt('account','all','全部账户')+accounts.map(a=>opt('account',a,a)).join('');
+    body+='<div class="inc-sheet-sub18a2">状态</div>'+[['all','全部状态'],['posted','已入账'],['noaccount','未指定账户'],['pending','待确认'],['edited','已编辑'],['attachment','有附件']].map(x=>opt('status',x[0],x[1])).join('');
+    closeSheet();
+    const wrap=document.createElement('div');wrap.id='inc-filter-sheet18a2';wrap.className='inc-sheet-mb18a2';
+    wrap.innerHTML='<div class="inc-sheet-md18a2"><div class="inc-sheet-handle18a2"></div><div class="inc-sheet-title18a2">收入筛选</div><div class="inc-sheet-body18a2">'+body+'</div><div class="inc-sheet-foot18a2"><button type="button" data-action="income-clearfilter-18-6reca2">清除</button><button type="button" class="ok" data-action="income-closefilter-18-6reca2">完成</button></div></div>';
+    wrap.addEventListener('click',e=>{if(e.target===wrap)wrap.remove()});
+    document.body.appendChild(wrap);
+  };
+  try{window.__incFilterGroups18_6RECA2=['收款类型','收款对象','收款账户','状态']}catch(_){}
+
+  // ---------- single delegated listener ----------
+  if(!window.__incA2Delegated18_6RECA2){window.__incA2Delegated18_6RECA2=true;document.addEventListener('click',function(e){
+    const b=e.target&&e.target.closest&&e.target.closest('[data-action^="income-"]');if(!b)return;
+    const act=b.getAttribute('data-action');
+    if(act.indexOf('income-ol-')!==0&&act.indexOf('income-setfilter-')!==0&&act!=='income-openfilter-18-6reca2'&&act!=='income-clearfilter-18-6reca2'&&act!=='income-closefilter-18-6reca2')return;
+    e.preventDefault();e.stopPropagation();
+    try{
+      if(act==='income-setfilter-18-6reca2'){setF(b.getAttribute('data-key'),b.getAttribute('data-val'));return}
+      if(act==='income-openfilter-18-6reca2'){window.openIncomeFilterSheet18_6RECA2();return}
+      if(act==='income-clearfilter-18-6reca2'){window.clearIncomeFilter18_6RECA2();return}
+      if(act==='income-closefilter-18-6reca2'){closeSheet();return}
+      const id=b.getAttribute('data-record-id')||b.getAttribute('data-income-id');
+      const rec=findIncome(id);
+      if(act==='income-ol-timeline-18-6reca2'){if(window.openObjectLedgerRecordTimeline18_6REC)return window.openObjectLedgerRecordTimeline18_6REC(id);return toastMsg('暂无时间线记录。')}
+      if(act==='income-ol-proof-18-6reca2'){if(window.openObjectLedgerRecordProof18_6REC)return window.openObjectLedgerRecordProof18_6REC(id);return localProof(rec)}
+      if(act==='income-ol-edit-18-6reca2'){if(window.openObjectLedgerRecordEdit18_6REC)return window.openObjectLedgerRecordEdit18_6REC(id);return toastMsg('暂时无法编辑')}
+      if(act==='income-ol-delete-18-6reca2'){if(window.deleteObjectLedgerRecord18_6REC)return window.deleteObjectLedgerRecord18_6REC(id);
+        if(rec){const go=()=>{rec.hidden=true;rec.deleted=true;const D=Dd();D.incomes=arr(D.incomes).filter(i=>!same(i.id,id));try{if(typeof save==='function')save()}catch(_){}renderD();toastMsg('已删除对象账本收款记录')};if(typeof confirmSheet==='function')confirmSheet('删除这笔对象账本收款记录？','如果已影响余额，会同步撤销余额。',go,{danger:true,okText:'删除'});else if(confirm('删除这笔对象账本收款记录？'))go();}
+        return}
+    }catch(err){toastMsg('操作失败')}
+  },true);}
+
+  // ---------- debug helper ----------
+  window.inspectIncomeActionsFilters18_6RECA2=function(){
+    const D=Dd()||{};const olRows=arr(D.incomes).filter(isOL);
+    let recHtml='';try{recHtml=sid(window.renderRecord&&window.renderRecord())}catch(_){}
+    const olVisible=(recHtml.match(/data-action="income-ol-timeline-18-6reca2"/g)||[]).length;
+    const brokenRe=new RegExp('on'+'click="[^"]*\\("','g');
+    const broken=(recHtml.match(brokenRe)||[]).length;
+    const chips=['全部','普通收入','对象账本','待确认','有附件','已编辑'];
+    const chipsPresent=/inc-filter18a2/.test(recHtml);
+    const missing=chips.filter(l=>recHtml.indexOf('>'+l+'<')<0&&recHtml.indexOf('>'+l+'</b>')<0);
+    let health=null;try{health=window.inspectObjectLedgerRecovery18_6REC&&window.inspectObjectLedgerRecovery18_6REC()}catch(_){}
+    const healthy=!!(health&&health.incomePageHijacked===false&&health.recordsPageUsesOriginalFilterCenter===true&&Array.isArray(health.missingOriginalFilters)&&health.missingOriginalFilters.length===0&&Array.isArray(health.missingObjectLedgerFilters)&&health.missingObjectLedgerFilters.length===0&&health.separateObjectLedgerSectionExists===false&&N(health.duplicateObjectLedgerRecords)===0&&N(health.brokenInlineActionCount)===0);
+    let searchOL=false;try{const sample=olRows[0]||{catLabel:'账本收款',source:'object_ledger'};const U=Uu(),prev=U.incomeFilter18_6RECA2;U.incomeFilter18_6RECA2={type:'all',person:'all',account:'all',status:'all',q:'对象账本'};searchOL=match(sample);U.incomeFilter18_6RECA2=prev}catch(_){}
+    return {
+      incomeObjectLedgerRows:olRows.length,
+      incomeObjectLedgerRowsVisible:olVisible,
+      incomeOlTimelineMapped:typeof window.openObjectLedgerRecordTimeline18_6REC==='function',
+      incomeOlProofMapped:typeof window.openObjectLedgerRecordProof18_6REC==='function',
+      incomeOlEditMapped:typeof window.openObjectLedgerRecordEdit18_6REC==='function',
+      incomeOlDeleteMapped:typeof window.deleteObjectLedgerRecord18_6REC==='function',
+      incomeOlBrokenInlineActionCount:broken,
+      incomeOlButtonsUseDelegatedActions:olRows.length?olVisible>0:true,
+      incomeFilterChipsAvailable:chipsPresent,
+      incomeFilterGroupsAvailable:arr(window.__incFilterGroups18_6RECA2),
+      incomeMissingFilters:chipsPresent?missing:chips,
+      incomeSearchMatchesObjectLedger:!!searchOL,
+      incomeObjectLedgerFilterCount:olRows.length,
+      incomeNormalFilterCount:arr(D.incomes).filter(i=>i&&!isOL(i)&&!isAAIncome(i)).length,
+      recordsRecoveryStillHealthy:healthy,
+      redSyntaxRiskFound:broken>0
+    };
+  };
+
+  try{if(!document.getElementById('inc-a2-css')){const st=document.createElement('style');st.id='inc-a2-css';st.textContent='.inc-filter18a2{margin:2px 0 10px}.inc-search18a2{display:flex;align-items:center;gap:8px;border:1px solid var(--border);background:var(--bg2);border-radius:13px;padding:9px 12px;margin-bottom:9px}.inc-search18a2 i{color:var(--text3);font-size:16px}.inc-search18a2 input{flex:1;border:0;background:transparent;color:var(--text);font-size:13px;outline:none}.inc-chips18a2{display:flex;gap:8px;overflow-x:auto;padding-bottom:3px;scrollbar-width:none}.inc-chips18a2::-webkit-scrollbar{display:none}.inc-chip18a2{flex:0 0 auto;display:flex;align-items:center;gap:5px;border:1px solid var(--border);background:var(--bg2);color:var(--text2);border-radius:999px;padding:8px 12px;font-size:12px;font-weight:800;cursor:pointer}.inc-chip18a2.on{border-color:var(--green);color:var(--green);background:var(--green-bg)}.inc-chip18a2 span{font-weight:700;color:var(--text3)}.inc-chip18a2.on span{color:var(--green)}.inc-active18a2{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px}.inc-active18a2 span{font-size:11px;font-weight:800;color:var(--green);background:var(--green-bg);border-radius:99px;padding:4px 8px}.inc-active18a2 button{border:0;background:transparent;color:var(--accent);font-size:11px;font-weight:800;display:flex;align-items:center;gap:3px;cursor:pointer}.inc-ol-tool18a2{cursor:pointer}.inc-sheet-mb18a2{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.42);display:flex;align-items:flex-end;justify-content:center}.inc-sheet-md18a2{width:100%;max-width:520px;background:var(--bg);border-radius:22px 22px 0 0;padding:10px 16px 20px;max-height:82vh;overflow:auto}.inc-sheet-handle18a2{width:40px;height:4px;border-radius:99px;background:var(--border);margin:6px auto 12px}.inc-sheet-title18a2{font-family:var(--font-display);font-size:17px;font-weight:800;margin-bottom:10px}.inc-sheet-sub18a2{font-size:11px;color:var(--text3);font-weight:850;text-transform:uppercase;letter-spacing:.05em;margin:12px 2px 6px}.inc-sheet-opt18a2{width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--border);background:var(--bg2);border-radius:13px;padding:10px 12px;text-align:left;color:var(--text);cursor:pointer;margin-bottom:7px}.inc-sheet-opt18a2.on{border-color:var(--green);background:var(--green-bg)}.inc-sheet-opt18a2 b{font-size:13px;font-weight:850}.inc-sheet-opt18a2 span{display:block;font-size:11px;color:var(--text3);margin-top:2px}.inc-sheet-opt18a2 .ti-check{display:none;color:var(--green)}.inc-sheet-opt18a2.on .ti-check{display:block}.inc-sheet-foot18a2{display:flex;gap:10px;margin-top:16px}.inc-sheet-foot18a2 button{flex:1;border:1px solid var(--border);background:var(--bg2);color:var(--text);border-radius:13px;font-size:14px;font-weight:800;padding:12px;cursor:pointer}.inc-sheet-foot18a2 .ok{background:var(--green);color:#fff;border-color:transparent}';document.head.appendChild(st)}}catch(_){}
 })();
 
 </script>
