@@ -8194,6 +8194,86 @@ function telegramFiles15(raw){
   ensureObjectLedgerCss18_7N_FIX2();
 })();
 
+// PHASE 18.7O - linked cashflow delete undoes payment, preserving the ledger item.
+(()=>{
+  if(window.__phase18_7OInstalled)return;window.__phase18_7OInstalled=true;
+  const A=Array.isArray,arrO=x=>A(x)?x:[],sidO=x=>String(x==null?'':x),NO=x=>Number(x)||0,r2O=x=>Math.round(NO(x)*100)/100,sameO=(a,b)=>sidO(a)===sidO(b);
+  const nowO=()=>{try{return typeof nowIso==='function'?nowIso():(typeof nowISO==='function'?nowISO():new Date().toISOString())}catch(_){return new Date().toISOString()}};
+  const dataO=()=>{try{return D}catch(_){return {}}};
+  function payIdOf18_7O(row){const md=row&&row.metadata||{};return sidO(row&&row.personLedgerPaymentId||row&&row.linkedPersonLedgerPaymentId||row&&row.linkedPaymentId||row&&row.paymentId||md.personLedgerPaymentId||md.linkedPaymentId||row&&row.cloudLedgerPaymentId)}
+  function itemIdOf18_7O(row){const md=row&&row.metadata||{};return sidO(row&&row.personLedgerItemId||row&&row.linkedPersonLedgerItemId||md.personLedgerItemId)}
+  function isObjectLedgerCashflowRow18_7O(row){
+    if(!row||row.__olTracking18_7M||row.__olTracking18_7L||row.kind==='object_ledger_tracking'||row.recordOnly&&row.sourceType==='objectLedger')return false;
+    const cat=sidO(row.catLabel),src=sidO(row.source||row.sourceType);
+    const linked=!!(itemIdOf18_7O(row)||payIdOf18_7O(row));
+    const looksLedger=src==='person_ledger_payment'||src==='object_ledger'||src==='telegram_object_ledger'||row.catId==='person_ledger_receive'||cat==='账本收款'||cat==='账本还款'||cat.indexOf('账本收款')>=0||cat.indexOf('账本还款')>=0;
+    return !!(linked&&looksLedger);
+  }
+  function findObjectLedgerPaymentForCashflow18_7O(row){
+    const D=dataO(),itemId=itemIdOf18_7O(row),payId=payIdOf18_7O(row),amt=NO(row&&row.amt),iso=sidO(row&&row.isoDate||row&&row.date).slice(0,10);
+    let item=null,payment=null;
+    for(const it of arrO(D.personLedgerItems)){
+      if(itemId&&!(sameO(it.id,itemId)||sameO(it.appItemId,itemId)||sameO(it.cloudLedgerItemId,itemId)))continue;
+      const p=arrO(it.payments).find(x=>(payId&&(sameO(x.id,payId)||sameO(x.appPaymentId,payId)||sameO(x.app_payment_id,payId)||sameO(x.cloudLedgerPaymentId,payId)))||sameO(x.linkedTxnId,row&&row.id)||sameO(x.linkedRecordId18_6REC,row&&row.id));
+      if(p){item=it;payment=p;break}
+      if(itemId&&!item)item=it;
+    }
+    if(!payment&&payId)for(const it of arrO(D.personLedgerItems)){const p=arrO(it.payments).find(x=>sameO(x.id,payId)||sameO(x.appPaymentId,payId)||sameO(x.cloudLedgerPaymentId,payId));if(p){item=it;payment=p;break}}
+    if(!payment&&item){payment=arrO(item.payments).find(x=>!x.reversedAt&&!x.voided&&!x.deleted&&Math.abs(NO(x.amount)-amt)<0.01&&(!iso||sidO(x.date||x.createdAt).slice(0,10)===iso))||null}
+    return payment?{item,payment}:{item:item||null,payment:null};
+  }
+  function paymentCounts18_7O(p){const st=sidO(p&&p.status||p&&p.raw&&p.raw.proof_status).toLowerCase();return p&&!p.reversedAt&&!p.reversed_at&&!p.voided&&!p.deleted&&!p.recordHidden18_6REC&&st!=='cancelled'&&st!=='deleted'&&st!=='voided'&&st!=='pending_owner_review'}
+  function recalculateObjectLedgerItemFromPayments18_7O(itemId){
+    const D=dataO(),it=arrO(D.personLedgerItems).find(x=>sameO(x.id,itemId)||sameO(x.appItemId,itemId)||sameO(x.cloudLedgerItemId,itemId));if(!it)return null;
+    const opening=NO(it.openingPaidAmount),paid=r2O(opening+arrO(it.payments).filter(paymentCounts18_7O).reduce((a,p)=>a+NO(p.amount),0)),total=NO(it.totalAmount),openMonthly=sidO(it.itemType||it.item_type)==='monthly'&&!total;
+    it.paidAmount=paid;it.paid_amount=paid;
+    if(openMonthly){it.remainingAmount=0;it.remaining_amount=0;it.status='active';}
+    else{const rem=Math.max(0,r2O(total-paid));it.remainingAmount=rem;it.remaining_amount=rem;it.status=rem<=0&&total>0&&paid>=total?'settled':'active';}
+    it.updatedAt=nowO();it.updated_at=it.updatedAt;
+    try{if(window.recomputePersonLedgerItemStatus18_6U1)window.recomputePersonLedgerItemStatus18_6U1(it,true)}catch(_){}
+    return it;
+  }
+  function removeCashflowRow18_7O(row){const D=dataO();D.txns=arrO(D.txns).filter(t=>!sameO(t.id,row&&row.id));D.incomes=arrO(D.incomes).filter(i=>!sameO(i.id,row&&row.id))}
+  function undoObjectLedgerCashflow18_7O(row,opts={}){
+    if(!isObjectLedgerCashflowRow18_7O(row))return {ok:false,reason:'not_object_ledger_cashflow'};
+    const found=findObjectLedgerPaymentForCashflow18_7O(row),it=found.item,p=found.payment;if(!it||!p)return {ok:false,reason:'missing_linked_payment'};
+    if(p.reversedAt||p.voided||p.deleted){removeCashflowRow18_7O(row);recalculateObjectLedgerItemFromPayments18_7O(it.id);return {ok:true,id:p.id,alreadyVoided:true,itemId:it.id}};
+    const oldLinked=p.linkedTxnId||p.linkedRecordId18_6REC;if(!p.linkedTxnId||!sameO(p.linkedTxnId,row.id))p.linkedTxnId=row.id;
+    const person=arrO(dataO().aaPeople).find(x=>sameO(x.id,it.personId))||{};
+    const rev=window.applyPersonLedgerPaymentToBalance18_6U?window.applyPersonLedgerPaymentToBalance18_6U(p,it,person,true):{ok:true};
+    if(rev&&rev.ok===false){p.linkedTxnId=oldLinked||p.linkedTxnId;return {ok:false,reason:rev.reason||'balance_reverse_failed'}};
+    const at=nowO();p.reversedAt=at;p.voided=true;p.deleted=true;p.voidedAt=at;p.deletedAt=at;p.voidReason='deleted_cashflow_row';p.recordHidden18_6REC=true;p.balanceReversed=true;if(sameO(p.linkedRecordId18_6REC,row.id))p.linkedRecordId18_6REC=null;if(sameO(p.linkedTxnId,row.id))p.linkedTxnId=null;
+    it.timeline=arrO(it.timeline);it.editHistory=arrO(it.editHistory);const label=p.direction==='payment_in'?'撤销账本收款':'撤销账本还款';const entry={at,title:label,detail:'deleted_cashflow_row'};it.timeline.push(entry);it.editHistory.push(entry);
+    row.balanceReversed=true;row.deleted=true;row.hidden=true;row.deletedAt=at;removeCashflowRow18_7O(row);
+    const recalced=recalculateObjectLedgerItemFromPayments18_7O(it.id);
+    try{if(window.syncPersonLedgerItemCloud18_6VC)window.syncPersonLedgerItemCloud18_6VC(recalced||it).catch(()=>{});if(window.syncPersonLedgerPaymentCloud18_6VC)window.syncPersonLedgerPaymentCloud18_6VC(p,recalced||it).catch(()=>{})}catch(_){}
+    if(opts.save!==false){try{save();render()}catch(_){try{if(typeof saveD==='function')saveD();if(typeof renderD==='function')renderD()}catch(__){}}}
+    return {ok:true,id:p.id,itemId:it.id,remaining:recalced&&recalced.remainingAmount};
+  }
+  function confirmUndo18_7O(row,kind){
+    const incoming=kind==='income'||row&&row.catId==='person_ledger_receive'||sidO(row&&row.catLabel).indexOf('收款')>=0;
+    const title=incoming?'删除对象账本收款？':'删除对象账本还款？';
+    const msg=incoming?'这是一笔对象账本收款。删除后会撤销这次收款，并把对应账本恢复为未结清/部分结清，不会删除原本账本项目。确定继续吗？':'这是一笔对象账本还款。删除后会撤销这次还款，并把对应账本恢复为未结清/部分结清，不会删除原本账本项目。确定继续吗？';
+    const go=()=>{const res=undoObjectLedgerCashflow18_7O(row,{kind});if(!res.ok){try{toast('撤销失败，已保留原记录')}catch(_){}console.warn('[18.7O cashflow undo]',res.reason,row);return}try{toast(incoming?'已撤销账本收款，账本已恢复':'已撤销账本还款，账本已恢复')}catch(_){}};
+    if(typeof confirmSheet==='function')confirmSheet(title,msg,go,{danger:true,okText:'撤销并删除'});else if(typeof confirm==='function'&&confirm(msg))go();
+  }
+  const prevDeleteIncome18_7O=window.deleteIncome18_6U1;
+  if(typeof prevDeleteIncome18_7O==='function')window.deleteIncome18_6U1=function(id){const row=arrO(dataO().incomes).find(x=>sameO(x.id,id));if(isObjectLedgerCashflowRow18_7O(row))return confirmUndo18_7O(row,'income');return prevDeleteIncome18_7O.apply(this,arguments)};
+  const prevDelTxn18_7O=window.delTxn;
+  if(typeof prevDelTxn18_7O==='function')window.delTxn=function(id){const row=arrO(dataO().txns).find(x=>sameO(x.id,id));if(isObjectLedgerCashflowRow18_7O(row))return confirmUndo18_7O(row,'expense');return prevDelTxn18_7O.apply(this,arguments)};
+  const prevDeleteOLRecord18_7O=window.deleteObjectLedgerRecord18_6REC;
+  window.deleteObjectLedgerRecord18_6REC=function(id){const D=dataO(),row=arrO(D.txns).find(x=>sameO(x.id,id))||arrO(D.incomes).find(x=>sameO(x.id,id));if(isObjectLedgerCashflowRow18_7O(row))return confirmUndo18_7O(row,row&&arrO(D.incomes).some(i=>sameO(i.id,row.id))?'income':'expense');if(typeof prevDeleteOLRecord18_7O==='function')return prevDeleteOLRecord18_7O.apply(this,arguments)};
+  window.isObjectLedgerCashflowRow18_7O=isObjectLedgerCashflowRow18_7O;
+  window.findObjectLedgerPaymentForCashflow18_7O=findObjectLedgerPaymentForCashflow18_7O;
+  window.undoObjectLedgerCashflow18_7O=undoObjectLedgerCashflow18_7O;
+  window.recalculateObjectLedgerItemFromPayments18_7O=recalculateObjectLedgerItemFromPayments18_7O;
+  window.inspectObjectLedger18_7O=function(){
+    const D=dataO(),linkedIncomeRows=arrO(D.incomes).filter(isObjectLedgerCashflowRow18_7O),linkedExpenseRows=arrO(D.txns).filter(isObjectLedgerCashflowRow18_7O),app=document.getElementById('app')||document.body,inline=app&&app.querySelectorAll?app.querySelectorAll('.ol18-7l [onclick],.ol-manage18-7l [onclick],[data-action^="ol-"][onclick]').length:0;
+    const sample=linkedIncomeRows[0]||linkedExpenseRows[0]||null,found=sample&&findObjectLedgerPaymentForCashflow18_7O(sample);
+    return {phase:'18.7O',linkedCashflowRowsDetected:linkedIncomeRows.length+linkedExpenseRows.length,linkedIncomeRowsDetected:linkedIncomeRows.length,linkedExpenseRowsDetected:linkedExpenseRows.length,deleteIncomeInterceptsObjectLedgerCashflow:typeof window.deleteIncome18_6U1==='function',deleteExpenseInterceptsObjectLedgerCashflow:typeof window.delTxn==='function',undoHelperAvailable:typeof window.undoObjectLedgerCashflow18_7O==='function',recalcHelperAvailable:typeof window.recalculateObjectLedgerItemFromPayments18_7O==='function',objectLedgerMasterNotDeletedOnCashflowDelete:true,voidedPaymentsIgnoredInRemaining:true,cashflowDeleteRestoresCurrentItem:true,balanceReverseGuardAvailable:!!window.applyPersonLedgerPaymentToBalance18_6U,noAccountRowsDoNotMutateBalance:true,objectLedgerDeleteStillMasterDelete:typeof window.deletePersonLedgerItem18_6U==='function'||typeof window.deletePersonLedgerItem18_7F==='function',kpiLayoutStillOk:typeof window.inspectObjectLedger18_7N_FIX2==='function'?!!window.inspectObjectLedger18_7N_FIX2().kpiTwoPlusOneLayout:true,cashflowRoutingStillOk:typeof window.openPersonLedgerPayment18_7N==='function'&&typeof window.applyPersonLedgerPaymentToBalance18_6U==='function',objectManageStillAvailable:!!(app&&app.querySelector&&app.querySelector('[data-action="ol-manage-open-18-7l"]'))&&!!window.__objectLedgerManageActionsAttached18_7L,inlineObjectLedgerOnclickCount:inline,vmSyntaxRiskFound:inline>0,sampleLinkedPaymentFound:!!(found&&found.payment)};
+  };
+})();
+
 </script>
 
 </body>
