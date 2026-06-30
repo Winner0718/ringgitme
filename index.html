@@ -4905,14 +4905,77 @@ function telegramFiles15(raw){
   window.delAATxn18_5B=window.delAATxn;
   if(!window.delAATxn14)window.delAATxn14=window.delAATxn;
 
+  // PHASE 18.8ZA-FIX - homepage AA tile uses Object Ledger net.
+  function finalizeHomepageTileObjectLedgerNet18_8ZA_FIX(receivable,payable,source){
+    const r=round(receivable),p=round(payable),net=round(r-p),direction=net>0?'receivable':(net<0?'payable':'neutral');
+    const out={phase:'18.8ZA-FIX',receivable:r,payable:p,net,label:net>0?'净待收':(net<0?'净待还':'已抵平'),amount:round(Math.abs(net)),direction,source:source||'fallback'};
+    window.__homepageTileObjectLedgerNet18_8ZA_FIX=out;
+    return out;
+  }
+  function getHomepageTileObjectLedgerNet18_8ZA_FIX(){
+    try{
+      if(typeof window.inspectObjectLedger18_7L==='function'){
+        const s=window.inspectObjectLedger18_7L();
+        if(s&&Object.prototype.hasOwnProperty.call(s,'kpiReceivableCalculated')&&Object.prototype.hasOwnProperty.call(s,'kpiPayableCalculated')){
+          return finalizeHomepageTileObjectLedgerNet18_8ZA_FIX(s.kpiReceivableCalculated,s.kpiPayableCalculated,'inspectObjectLedger18_7L');
+        }
+      }
+    }catch(_){ }
+    try{
+      if(typeof window.calculateAllPeopleNetLedger18_7G==='function'){
+        const s=window.calculateAllPeopleNetLedger18_7G();
+        if(s&&Object.prototype.hasOwnProperty.call(s,'totalGrossReceivable')&&Object.prototype.hasOwnProperty.call(s,'totalGrossPayable')){
+          return finalizeHomepageTileObjectLedgerNet18_8ZA_FIX(s.totalGrossReceivable,s.totalGrossPayable,'calculateAllPeopleNetLedger18_7G');
+        }
+      }
+    }catch(_){ }
+    let receivable=0,payable=0;
+    try{
+      arr(D.personLedgerItems).forEach(it=>{
+        if(!it)return;
+        const raw=it.raw&&typeof it.raw==='object'?it.raw:{};
+        if(it.hidden||it.hidden18_7F||raw.hidden||raw.deleted)return;
+        const status=id(it.status||raw.status).toLowerCase();
+        if(['settled','closed','paid','cancelled','canceled','deleted'].includes(status))return;
+        let remaining=0,dir=it.direction==='i_owe_them'?'i_owe_them':'they_owe_me';
+        if(typeof window.getObjectLedgerItemState18_7K==='function'){
+          const state=window.getObjectLedgerItemState18_7K(it);
+          if(!state||!state.isCurrentVisible)return;
+          remaining=N(state.remaining||state.monthly||0);
+          dir=state.direction==='i_owe_them'?'i_owe_them':'they_owe_me';
+        }else{
+          remaining=N(it.remainingAmount!=null?it.remainingAmount:it.remaining_amount);
+        }
+        if(!(remaining>0))return;
+        if(dir==='i_owe_them')payable=round(payable+remaining);else receivable=round(receivable+remaining);
+      });
+    }catch(_){ }
+    return finalizeHomepageTileObjectLedgerNet18_8ZA_FIX(receivable,payable,'personLedgerItemsFallback');
+  }
+  function readHomepageMoney18_8ZA_FIX(txt){const m=id(txt).replace(/,/g,'').match(/-?\d+(?:\.\d+)?/);return m?N(m[0]):0}
+  function inspectHomepageAATile18_8ZA_FIX(){
+    const net=getHomepageTileObjectLedgerNet18_8ZA_FIX();
+    const card=document.querySelector('[data-home-ol-net18-8za-fix="1"]');
+    const label=id(card&&card.querySelector('.sl')&&card.querySelector('.sl').textContent).trim();
+    const amountText=id(card&&card.querySelector('.sv')&&card.querySelector('.sv').textContent).trim();
+    const amount=readHomepageMoney18_8ZA_FIX(amountText),oldGross=typeof getAAReceivableTotal==='function'?N(getAAReceivableTotal()):arr(D.aaReceivables).reduce((a,r)=>a+Math.max(0,N(r.owedAmount)-N(r.settledAmount)),0);
+    return {phase:'18.8ZA-FIX',receivable:net.receivable,payable:net.payable,net:net.net,label:net.label,amount:net.amount,direction:net.direction,source:net.source,homepageTileFound:!!card,homepageTileLabelDisplayed:label,homepageTileAmountDisplayed:amountText,homepageTileMatchesObjectLedgerNet:!!card&&label===net.label&&Math.abs(amount-net.amount)<0.01,homepageTileStillHasAA:/AA/.test(label),oldHomepageAaGrossSourceFound:true,oldHomepageAaGrossAmount:round(oldGross),oldGrossStillUsedForHomepageTile:!!card&&/AA/.test(label)&&Math.abs(amount-round(oldGross))<0.01};
+  }
+  window.getHomepageTileObjectLedgerNet18_8ZA_FIX=getHomepageTileObjectLedgerNet18_8ZA_FIX;
+  window.inspectHomepageAATile18_8ZA_FIX=inspectHomepageAATile18_8ZA_FIX;
+
   const oldRenderHome18_5B=window.renderHome||renderHome;
   window.renderHome=function(){
     let h=id(oldRenderHome18_5B());
     const aa=typeof getAAReceivableTotal==='function'?N(getAAReceivableTotal()):arr(D.aaReceivables).reduce((a,r)=>a+Math.max(0,N(r.owedAmount)-N(r.settledAmount)),0);
     const cash=typeof getCashNow==='function'?N(getCashNow()):0;
+    const olNet18_8ZA=typeof window.getHomepageTileObjectLedgerNet18_8ZA_FIX==='function'?window.getHomepageTileObjectLedgerNet18_8ZA_FIX():finalizeHomepageTileObjectLedgerNet18_8ZA_FIX(0,0,'missingHelper');
+    const olColor18_8ZA=olNet18_8ZA.direction==='payable'?'#dc2626':(olNet18_8ZA.direction==='neutral'?'#64748b':'#0a8a54');
+    const olAmountClass18_8ZA=olNet18_8ZA.direction==='payable'?'r':(olNet18_8ZA.direction==='neutral'?'':'g');
+    const olTextColor18_8ZA=olNet18_8ZA.direction==='payable'?'var(--red)':(olNet18_8ZA.direction==='neutral'?'var(--text3)':'var(--green)');
     h=h.replace(/月固定 Fixed Monthly/g,'我的月固定 My Fixed');
     h=h.replace(/<div class="sec">最近记录[\s\S]*?<\/div><\/div>\s*$/,'');
-    const aaCards=`<div class="sc" style="--scc:var(--green)"><div class="sc-top"><div class="sc-ic" style="background:#0a8a541a;color:#0a8a54"><i class="ti ti-users"></i></div><div class="sl" style="margin:0">AA 待收</div></div><div class="sv g">${F(aa)}</div></div><div class="sc" style="--scc:var(--blue)"><div class="sc-top"><div class="sc-ic" style="background:#0a84ff1a;color:#0a84ff"><i class="ti ti-cash-banknote"></i></div><div class="sl" style="margin:0">收回后 Cash</div></div><div class="sv b">${F(cash+aa)}</div></div>`;
+    const aaCards=`<div class="sc" data-home-ol-net18-8za-fix="1" style="--scc:${olColor18_8ZA}"><div class="sc-top"><div class="sc-ic" style="background:${olColor18_8ZA}1a;color:${olColor18_8ZA}"><i class="ti ti-users"></i></div><div class="sl" style="margin:0">${esc(olNet18_8ZA.label)}</div></div><div class="sv ${olAmountClass18_8ZA}" style="color:${olTextColor18_8ZA}">${F(olNet18_8ZA.amount)}</div></div><div class="sc" style="--scc:var(--blue)"><div class="sc-top"><div class="sc-ic" style="background:#0a84ff1a;color:#0a84ff"><i class="ti ti-cash-banknote"></i></div><div class="sl" style="margin:0">收回后 Cash</div></div><div class="sv b">${F(cash+aa)}</div></div>`;
     if(!h.includes('AA 待收</div></div><div class="sv g">')){
       const marker='<div class="sec">储蓄目标';
       const m=h.indexOf(marker);
