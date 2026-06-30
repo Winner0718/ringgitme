@@ -8146,6 +8146,32 @@ function telegramFiles15(raw){
   ensureObjectLedgerCss18_7N();
 })();
 
+// PHASE 18.7N-FIX - force Object Ledger KPI 2+1 layout and cashflow verification.
+(()=>{
+  if(window.__phase18_7NFixInstalled)return;window.__phase18_7NFixInstalled=true;
+  const arrFix=x=>Array.isArray(x)?x:[],sidFix=x=>String(x==null?'':x);
+  function ensureObjectLedgerCss18_7N_FIX(){
+    let st=document.getElementById('phase18-7n-fix-css');
+    if(!st){st=document.createElement('style');st.id='phase18-7n-fix-css';document.head.appendChild(st)}
+    st.textContent='.ol18-7l .ol-kpis18-7l{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important;width:100%!important;max-width:100%!important;box-sizing:border-box!important;overflow-x:hidden!important;align-items:stretch!important}.ol18-7l .ol-kpi18-7l{min-width:0!important;width:100%!important;box-sizing:border-box!important;overflow:visible!important}.ol18-7l .ol-kpi18-7l.net{grid-column:1/-1!important;width:100%!important;min-width:0!important}.ol18-7l .ol-kpi18-7l b{font-size:clamp(16px,4.2vw,22px)!important;line-height:1.08!important;white-space:nowrap!important;overflow:visible!important;text-overflow:clip!important;letter-spacing:-.4px!important;max-width:none!important}.ol18-7l .ol-kpi18-7l span{white-space:normal!important;overflow:visible!important;text-overflow:clip!important}';
+  }
+  const prevRenderAA18_7N_FIX=window.renderAA;
+  function renderAA18_7N_FIX(){const out=typeof prevRenderAA18_7N_FIX==='function'?prevRenderAA18_7N_FIX.apply(this,arguments):'';ensureObjectLedgerCss18_7N_FIX();window.__objectLedgerRenderer18_7N_FIXActive=true;return out}
+  window.renderAA18_7N_FIX=renderAA18_7N_FIX;try{window.renderAA=renderAA=renderAA18_7N_FIX}catch(_){window.renderAA=renderAA18_7N_FIX}
+  function actualLedgerRows18_7N_FIX(list){return arrFix(list).filter(r=>r&&(r.sourceType==='person_ledger_payment'||r.source==='person_ledger_payment'||r.personLedgerPaymentId||r.linkedPersonLedgerPaymentId||r.metadata&&r.metadata.personLedgerPaymentId))}
+  function paymentRowsAreActual18_7N_FIX(rows){return rows.every(r=>r&&(r.personLedgerPaymentId||r.linkedPersonLedgerPaymentId||r.metadata&&r.metadata.personLedgerPaymentId))}
+  function zeroObjectLedgerRows18_7N_FIX(fn){try{return typeof fn==='function'&&fn().length===0}catch(_){return false}}
+  window.__objectLedgerSettleUsesSheet18_7N_FIX=true;
+  window.inspectObjectLedger18_7N_FIX=function(){
+    ensureObjectLedgerCss18_7N_FIX();
+    const data=window.D||D||{},app=document.getElementById('app')||document.body,kpis=app&&app.querySelector&&app.querySelector('.ol18-7l .ol-kpis18-7l'),net=app&&app.querySelector&&app.querySelector('.ol18-7l .ol-kpi18-7l.net'),kpiVals=app&&app.querySelectorAll?[...app.querySelectorAll('.ol18-7l .ol-kpi18-7l b')]:[],kpiText=kpiVals.map(x=>sidFix(x.textContent).trim()),cs=kpis?getComputedStyle(kpis):null,ns=net?getComputedStyle(net):null,cols=cs?sidFix(cs.gridTemplateColumns).split(/\s+/).filter(Boolean):[],txRows=actualLedgerRows18_7N_FIX(data.txns),incRows=actualLedgerRows18_7N_FIX(data.incomes),inline=app&&app.querySelectorAll?app.querySelectorAll('.ol18-7l [onclick],.ol-manage18-7l [onclick],[data-action^="ol-"][onclick]').length:0;
+    const noIncomeBare=zeroObjectLedgerRows18_7N_FIX(window.objectLedgerIncomeRows18_7M)&&zeroObjectLedgerRows18_7N_FIX(window.objectLedgerIncomeRows18_7N);
+    const noExpenseBare=zeroObjectLedgerRows18_7N_FIX(window.objectLedgerExpenseRows18_7M)&&zeroObjectLedgerRows18_7N_FIX(window.objectLedgerExpenseRows18_7N);
+    return {phase:'18.7N-FIX',base18_7NLoaded:typeof window.inspectObjectLedger18_7N==='function',kpiTwoPlusOneLayout:!kpis||(cs&&cs.display==='grid'&&cols.length===2),kpiNetCardFullWidth:!net||(ns&&ns.gridColumnStart==='1'&&(ns.gridColumnEnd==='-1'||sidFix(ns.gridColumnEnd).includes('span'))),kpiNoEllipsis:!kpiText.some(t=>t.includes('...')||t.includes('…')),kpiNoHorizontalOverflow:!kpis||kpis.scrollWidth<=kpis.clientWidth+1,kpiTextValues:kpiText,unpaidReceivablesHiddenFromIncome:noIncomeBare,unpaidPayablesHiddenFromExpense:noExpenseBare,incomeObjectLedgerShowsOnlyActualReceipts:paymentRowsAreActual18_7N_FIX(incRows),expenseObjectLedgerShowsOnlyActualRepayments:paymentRowsAreActual18_7N_FIX(txRows),receivableSettlementHasAccountSelector:typeof window.openPersonLedgerPayment18_7N==='function',payableSettlementHasAccountSelector:typeof window.openPersonLedgerPayment18_7N==='function',settleDoesNotSilentlyCloseWithoutSheet:!!window.__objectLedgerSettleUsesSheet18_7N_FIX,noBareDebtInIncomeTotals:noIncomeBare,noBareDebtInExpenseTotals:noExpenseBare,objectManageStillAvailable:!!(app&&app.querySelector&&app.querySelector('[data-action="ol-manage-open-18-7l"]'))&&!!window.__objectLedgerManageActionsAttached18_7L,inlineObjectLedgerOnclickCount:inline,vmSyntaxRiskFound:inline>0};
+  };
+  ensureObjectLedgerCss18_7N_FIX();
+})();
+
 </script>
 
 </body>
