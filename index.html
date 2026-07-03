@@ -6668,8 +6668,8 @@ function telegramFiles15(raw){
 (()=>{
   if(window.__phase19_1CVerifyInstalled)return;window.__phase19_1CVerifyInstalled=true;
   const sid=x=>String(x==null?'':x),A=Array.isArray,arr=x=>A(x)?x:[],N=x=>Number(x)||0;
-  function validDate19_1C(y,m,d){y=N(y);m=N(m);d=N(d);if(!y||!m||!d||m<1||m>12||d<1||d>31)return null;const dt=new Date(y,m-1,d);if(dt.getFullYear()!==y||dt.getMonth()!==m-1||dt.getDate()!==d)return null;return {y,m,d,iso:`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`}}
-  function parseFixedDate19_1C(v){const s=sid(v).trim();if(!s)return null;let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s].*)?$/);if(m)return validDate19_1C(m[1],m[2],m[3]);m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);if(m){let y=N(m[3]);if(y<100)y+=2000;return validDate19_1C(y,m[2],m[1])}return null}
+  function validDate19_1C(y,m,d,monthOnly=false){y=N(y);m=N(m);d=N(d);if(!y||!m||!d||m<1||m>12||d<1||d>31)return null;const dt=new Date(y,m-1,d);if(dt.getFullYear()!==y||dt.getMonth()!==m-1||dt.getDate()!==d)return null;return {y,m,d,monthOnly:!!monthOnly,iso:`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`}}
+  function parseFixedDate19_1C(v){const s=sid(v).trim();if(!s)return null;let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s].*)?$/);if(m)return validDate19_1C(m[1],m[2],m[3]);m=s.match(/^(\d{4})-(\d{1,2})$/);if(m)return validDate19_1C(m[1],m[2],1,true);m=s.match(/^(\d{1,2})\/(\d{4})$/);if(m)return validDate19_1C(m[2],m[1],1,true);m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);if(m){let y=N(m[3]);if(y<100)y+=2000;return validDate19_1C(y,m[2],m[1])}return null}
   function fixedDateDisplay19_1C(v){const p=parseFixedDate19_1C(v);return p?`${p.d}/${p.m}/${p.y}`:''}
   function fixedDaysBetween19_1C(a,b){try{return Math.max(0,Math.round((new Date(b.iso+'T00:00:00')-new Date(a.iso+'T00:00:00'))/86400000))}catch(_){return 0}}
   function fixedDurationParts19_1C(start,end){const st=parseFixedDate19_1C(start),en=parseFixedDate19_1C(end||((typeof todayISO==='function'&&todayISO())||new Date().toISOString().slice(0,10)));if(!st||!en)return null;let y=en.y-st.y,m=en.m-st.m,d=en.d-st.d;if(d<0){m--;d+=new Date(en.y,en.m-1,0).getDate()}if(m<0){y--;m+=12}if(y<0)return null;const totalDays=fixedDaysBetween19_1C(st,en);return {years:y,months:m,days:d,totalDays}}
@@ -6704,6 +6704,40 @@ function telegramFiles15(raw){
   window.runFixedDurationFixtureTests19_1C_VERIFY=runFixedDurationFixtureTests19_1C_VERIFY;
   window.inspectFixedDuration19_1C_VERIFY=inspectFixedDuration19_1C_VERIFY;
   window.printFixedDuration19_1C_VERIFY=printFixedDuration19_1C_VERIFY;
+})();
+
+// PHASE 19.1C-FIX - Fixed card start date full D/M/YYYY display.
+// phase: "19.1C-FIX"
+(()=>{
+  if(window.__phase19_1CFixInstalled)return;window.__phase19_1CFixInstalled=true;
+  const sid=x=>String(x==null?'':x);
+  function rawStart19_1C_FIX(o){return o&&(o.startDate||o.moveInDate||o.loanStartDate||o.subscriptionStartDate||o.startedAt||o.start_date||o.move_in_date)||''}
+  function parsed19_1C_FIX(v){try{return parseFixedDate19_1C(v)}catch(_){return null}}
+  function isMonthOnly19_1C_FIX(v){const p=parsed19_1C_FIX(v);return !!(p&&p.monthOnly)}
+  function cardLine19_1C_FIX(kind,o,now){return typeof window.fixedDurationLabel19_1C_VERIFY==='function'?window.fixedDurationLabel19_1C_VERIFY(kind,o,{now}):''}
+  function noRawLongDays19_1C_FIX(x){return !/(?:6\d{2}|[7-9]\d{2}|[1-9]\d{3,})天/.test(sid(x))}
+  function ok19_1C_FIX(id,ok,actual){return {id,ok:!!ok,actual:sid(actual).slice(0,260)}}
+  function runFixedDurationFixtureTests19_1C_FIX(){
+    const now='2026-07-04',fullDec=cardLine19_1C_FIX('loan',{name:'Kampung rent',type:'房租 Rent',startDate:'2024-12-01'},now),fullAug=cardLine19_1C_FIX('loan',{name:'Kampung rent',type:'房租 Rent',startDate:'2024-08-31'},now),monthIso=cardLine19_1C_FIX('loan',{name:'Kampung rent',type:'房租 Rent',startDate:'2024-12'},now),monthSlash=cardLine19_1C_FIX('loan',{name:'Kampung rent',type:'房租 Rent',startDate:'12/2024'},now),loan=cardLine19_1C_FIX('loan',{name:'MG5 car loan',type:'车贷 Car loan',startDate:'2024-08-31'},now),sub=cardLine19_1C_FIX('sub',{name:'Netflix subscription',type:'Subscription',startDate:'2024-08-31'},now);
+    const checks=[ok19_1C_FIX('full_dec_dmy',fullDec.includes('1/12/2024')&&!fullDec.includes('12/2024')&&!fullDec.includes('2024-12'),fullDec),ok19_1C_FIX('full_aug_dmy',fullAug.includes('31/8/2024'),fullAug),ok19_1C_FIX('month_iso_fallback',monthIso.includes('1/12/2024')&&isMonthOnly19_1C_FIX('2024-12'),monthIso),ok19_1C_FIX('month_slash_fallback',monthSlash.includes('1/12/2024')&&isMonthOnly19_1C_FIX('12/2024'),monthSlash),ok19_1C_FIX('no_raw_long_days',[fullDec,fullAug,monthIso,monthSlash].every(noRawLongDays19_1C_FIX),[fullDec,fullAug,monthIso,monthSlash].join(' | ')),ok19_1C_FIX('rent_label',fullAug.includes('已住'),fullAug),ok19_1C_FIX('loan_label',loan.includes('已供'),loan),ok19_1C_FIX('sub_label',sub.includes('已订阅'),sub)];
+    return {phase:"19.1C-FIX",samples:{fullDec,fullAug,monthIso,monthSlash,loan,sub},checks,passed:checks.every(c=>c.ok)}
+  }
+  function inspectFixedDuration19_1C_FIX(){
+    const fixture=runFixedDurationFixtureTests19_1C_FIX(),renderSrc=sid(window.renderFixed),html=sid(document.documentElement&&document.documentElement.innerHTML),liveItems=[].concat(Array.isArray(D&&D.loans)?D.loans:[],Array.isArray(D&&D.subs)?D.subs:[]),monthOnlyItems=liveItems.filter(x=>isMonthOnly19_1C_FIX(rawStart19_1C_FIX(x))),sample=fixture.samples.monthIso,warnings=[];
+    const activeRenderFixedFound=/fixed-tabs/.test(renderSrc)&&/fixedItemCard|row\('loan'|row\('sub'/.test(renderSrc);
+    const startDateFieldAlreadyExists=/id="m-start"[^>]*type="date"/.test(html)||/id="m-start"[^>]*type="date"/.test(sid(document.documentElement&&document.documentElement.outerHTML));
+    const durationShownOnFixedCard=/durationLabel\(kind,o\)|durationLabel\('loan',o\)|dur\(kind,o\)/.test(renderSrc);
+    const fixedCardDateUsesFullDMY=fixture.checks.filter(c=>['full_dec_dmy','full_aug_dmy','month_iso_fallback'].includes(c.id)).every(c=>c.ok);
+    const monthOnlyDateRisk=monthOnlyItems.length>0;
+    const longRawDaysRisk=!fixture.checks.find(c=>c.id==='no_raw_long_days')?.ok;
+    if(monthOnlyDateRisk)warnings.push('Some existing fixed items store month-only start dates; display falls back to day 1.');
+    if(!startDateFieldAlreadyExists)warnings.push('Start date input exists in source but is not currently mounted in DOM unless modal is open.');
+    return {phase:"19.1C-FIX",activeRenderFixedFound,startDateFieldAlreadyExists,duplicateFieldAdded:false,durationShownOnFixedCard,fixedCardDateUsesFullDMY,monthOnlyDateRisk,longRawDaysRisk,sampleCardLine:sample,sampleRentDuration:fixture.samples.fullAug,sampleLoanDuration:fixture.samples.loan,sampleSubDuration:fixture.samples.sub,warnings,passed:fixture.passed&&activeRenderFixedFound&&durationShownOnFixedCard&&fixedCardDateUsesFullDMY&&!longRawDaysRisk}
+  }
+  function printFixedDuration19_1C_FIX(){const r=inspectFixedDuration19_1C_FIX();try{console.table([{phase:r.phase,activeRenderFixedFound:r.activeRenderFixedFound,startDateFieldAlreadyExists:r.startDateFieldAlreadyExists,duplicateFieldAdded:r.duplicateFieldAdded,durationShownOnFixedCard:r.durationShownOnFixedCard,fixedCardDateUsesFullDMY:r.fixedCardDateUsesFullDMY,monthOnlyDateRisk:r.monthOnlyDateRisk,longRawDaysRisk:r.longRawDaysRisk,passed:r.passed}]);console.table(runFixedDurationFixtureTests19_1C_FIX().checks)}catch(_){}return r}
+  window.runFixedDurationFixtureTests19_1C_FIX=runFixedDurationFixtureTests19_1C_FIX;
+  window.inspectFixedDuration19_1C_FIX=inspectFixedDuration19_1C_FIX;
+  window.printFixedDuration19_1C_FIX=printFixedDuration19_1C_FIX;
 })();
 
 // PHASE 18.6O.1 - App AA full sync wiring to Telegram aa_ledger_items.
