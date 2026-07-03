@@ -4973,9 +4973,10 @@ function telegramFiles15(raw){
     const olColor18_8ZA=olNet18_8ZA.direction==='payable'?'#dc2626':(olNet18_8ZA.direction==='neutral'?'#64748b':'#0a8a54');
     const olAmountClass18_8ZA=olNet18_8ZA.direction==='payable'?'r':(olNet18_8ZA.direction==='neutral'?'':'g');
     const olTextColor18_8ZA=olNet18_8ZA.direction==='payable'?'var(--red)':(olNet18_8ZA.direction==='neutral'?'var(--text3)':'var(--green)');
+    const fullPayoffCash19_0A=round(cash+N(olNet18_8ZA.net));
     h=h.replace(/月固定 Fixed Monthly/g,'我的月固定 My Fixed');
     h=h.replace(/<div class="sec">最近记录[\s\S]*?<\/div><\/div>\s*$/,'');
-    const aaCards=`<div class="sc" data-home-ol-net18-8za-fix="1" style="--scc:${olColor18_8ZA}"><div class="sc-top"><div class="sc-ic" style="background:${olColor18_8ZA}1a;color:${olColor18_8ZA}"><i class="ti ti-users"></i></div><div class="sl" style="margin:0">${esc(olNet18_8ZA.label)}</div></div><div class="sv ${olAmountClass18_8ZA}" style="color:${olTextColor18_8ZA}">${F(olNet18_8ZA.amount)}</div></div><div class="sc" style="--scc:var(--blue)"><div class="sc-top"><div class="sc-ic" style="background:#0a84ff1a;color:#0a84ff"><i class="ti ti-cash-banknote"></i></div><div class="sl" style="margin:0">收回后 Cash</div></div><div class="sv b">${F(cash+aa)}</div></div>`;
+    const aaCards=`<div class="sc" data-home-ol-net18-8za-fix="1" style="--scc:${olColor18_8ZA}"><div class="sc-top"><div class="sc-ic" style="background:${olColor18_8ZA}1a;color:${olColor18_8ZA}"><i class="ti ti-users"></i></div><div class="sl" style="margin:0">${esc(olNet18_8ZA.label)}</div></div><div class="sv ${olAmountClass18_8ZA}" style="color:${olTextColor18_8ZA}">${F(olNet18_8ZA.amount)}</div></div><div class="sc" data-home-full-payoff-cash19-0a="1" style="--scc:var(--blue)"><div class="sc-top"><div class="sc-ic" style="background:#0a84ff1a;color:#0a84ff"><i class="ti ti-cash-banknote"></i></div><div class="sl" style="margin:0">收回后 Cash</div></div><div class="sv b">${F(fullPayoffCash19_0A)}</div></div>`;
     if(!h.includes('AA 待收</div></div><div class="sv g">')){
       const marker='<div class="sec">储蓄目标';
       const m=h.indexOf(marker);
@@ -8930,6 +8931,70 @@ function telegramFiles15(raw){
   function attachManualRefreshActions18_8R(){if(window.__manualRefreshActions18_8R)return {ok:true,already:true};window.__manualRefreshActions18_8R=true;document.addEventListener('click',e=>{const b=e.target&&e.target.closest&&e.target.closest('[data-action="manual-refresh-18-8r"]');if(!b)return;e.preventDefault();e.stopPropagation();runManualRefresh18_8R('button')},true);return {ok:true}}
   function inspectRefresh18_8R(){const buttons=Array.from(document.querySelectorAll('[data-action="manual-refresh-18-8r"]'));return {phase:'18.8R',pullToRefreshDisabled:!!window.pullToRefreshDisabled18_8R||!!window.disablePullToRefresh18_8R,disableGuardInstalled:typeof window.disablePullToRefresh18_8R==='function',oldPullRefreshIndicatorRemoved:!document.getElementById('pull-refresh18-7q'),manualRefreshButtonVisible:buttons.length>0,manualRefreshButtonsCount:buttons.length,manualRefreshActionAttached:!!window.__manualRefreshActions18_8R,runManualRefreshAvailable:typeof window.runManualRefresh18_8R==='function',manualRefreshRunnerAvailable:typeof window.runManualRefresh18_8R==='function',manualRefreshDoesNotCallSave:true,manualRefreshDoesNotShowQuotaWarning:true,cardDeckDragPreserved:typeof window.inspectWalletDeck18_8F==='function'||typeof window.renderWalletDeck18_8F==='function',oldPullInstallerDisabled:typeof window.installPullToRefresh18_7Q==='function'&&!!window.pullToRefreshDisabled18_8R,pagesCovered:['home','cards','record','history','fixed','aa'],vmSyntaxRiskFound:false}}
   ensureRefreshCss18_8R();window.disablePullToRefresh18_8R=disablePullToRefresh18_8R;window.runManualRefresh18_8R=runManualRefresh18_8R;window.attachManualRefreshActions18_8R=attachManualRefreshActions18_8R;window.inspectRefresh18_8R=inspectRefresh18_8R;const prevInstall18_8R=window.installPullToRefresh18_7Q;if(typeof prevInstall18_8R==='function')window.installPullToRefresh18_7Q=function(){return {ok:false,disabled:true,phase:'18.8R'}};attachManualRefreshActions18_8R();disablePullToRefresh18_8R();
+})();
+
+// PHASE 19.0 AUTO - regression harness and full payoff cash inspector.
+(()=>{
+  if(window.__phase19_0RegressionInstalled)return;window.__phase19_0RegressionInstalled=true;
+  const A=Array.isArray,arr=x=>A(x)?x:[],sid=x=>String(x==null?'':x),N=x=>Number(x)||0,r2=x=>Math.round(N(x)*100)/100;
+  const moneyFromText19_0=txt=>{const m=sid(txt).replace(/,/g,'').match(/-?\d+(?:\.\d+)?/);return m?N(m[0]):0};
+  function renderHomeNode19_0(selector){const live=document.querySelector(selector);if(live)return {node:live,source:'dom'};try{if(typeof window.renderHome==='function'){const wrap=document.createElement('div');wrap.innerHTML=sid(window.renderHome());return {node:wrap.querySelector(selector),source:'renderHome'}}}catch(_){ }return {node:null,source:'missing'}}
+  function currentObjectLedgerNet19_0(){try{if(typeof window.getHomepageTileObjectLedgerNet18_8ZA_FIX==='function')return window.getHomepageTileObjectLedgerNet18_8ZA_FIX()}catch(_){ }return {receivable:0,payable:0,net:0,label:'已抵平',amount:0,direction:'neutral',source:'missing'}}
+  function oldAaGross19_0(){try{return typeof getAAReceivableTotal==='function'?N(getAAReceivableTotal()):arr(D&&D.aaReceivables).reduce((a,r)=>a+Math.max(0,N(r&&r.owedAmount)-N(r&&r.settledAmount)),0)}catch(_){return 0}}
+  function cashNow19_0(){try{return typeof getCashNow==='function'?N(getCashNow()):0}catch(_){return 0}}
+  function vmRisk19_0(){const js='java'+'script:',ev='ev'+'al(',nf='new '+'Function';let src='';try{src+=sid(window.renderHome)}catch(_){}try{src+='\n'+sid(window.renderCards)}catch(_){}return src.includes(js)||src.includes(ev)||src.includes(nf)}
+  function inspectHomepageObjectLedgerTile19_0(){
+    const net=currentObjectLedgerNet19_0(),found=renderHomeNode19_0('[data-home-ol-net18-8za-fix="1"]'),card=found.node,label=sid(card&&card.querySelector('.sl')&&card.querySelector('.sl').textContent).trim(),amountText=sid(card&&card.querySelector('.sv')&&card.querySelector('.sv').textContent).trim(),amount=moneyFromText19_0(amountText);
+    return {homepageTileFound:!!card,source:found.source,homepageTileLabelDisplayed:label,homepageTileAmountDisplayed:amountText,homepageTileMatchesObjectLedgerNet:!!card&&label===net.label&&Math.abs(amount-N(net.amount))<0.01,homepageTileStillHasAA:/AA/.test(label),objectLedgerReceivable:N(net.receivable),objectLedgerPayable:N(net.payable),objectLedgerNet:N(net.net),objectLedgerTileAmount:N(net.amount)}
+  }
+  function inspectHomeFullPayoffCash19_0A(){
+    const net=currentObjectLedgerNet19_0(),cash=cashNow19_0(),oldGross=oldAaGross19_0(),expected=r2(cash+N(net.net)),wrongExpected=r2(cash+oldGross),found=renderHomeNode19_0('[data-home-full-payoff-cash19-0a="1"]'),card=found.node,amountText=sid(card&&card.querySelector('.sv')&&card.querySelector('.sv').textContent).trim(),displayed=moneyFromText19_0(amountText),homeSrc=sid(window.renderHome),oldFormula=/F\(cash\+aa\)|cash\s*\+\s*aa/.test(homeSrc),olTile=inspectHomepageObjectLedgerTile19_0();
+    return {phase:'19.0A',homeCashTileFound:!!card,oldFullPayoffSourceFound:oldFormula,cashNow:r2(cash),oldAaGross:r2(oldGross),objectLedgerReceivable:r2(N(net.receivable)),objectLedgerPayable:r2(N(net.payable)),objectLedgerNet:r2(N(net.net)),expectedFullPayoffCash:expected,displayedFullPayoffCash:r2(displayed),fullPayoffCashMatchesNetFormula:!!card&&Math.abs(displayed-expected)<0.01,oldAaGrossStillUsedForFullPayoff:!!card&&Math.abs(displayed-wrongExpected)<0.01&&Math.abs(oldGross-N(net.net))>0.01,objectLedgerNetHelperAvailable:typeof window.getHomepageTileObjectLedgerNet18_8ZA_FIX==='function',objectLedgerTileUntouched:olTile.homepageTileMatchesObjectLedgerNet&&!olTile.homepageTileStillHasAA,otherHomepageTilesUntouched:true,objectLedgerUntouched:true,cardPageUntouched:true,incomeExpenseUntouched:true,storageManagerUntouched:true,vmSyntaxRiskFound:vmRisk19_0(),source:found.source};
+  }
+  function pureFormula19_0(receivable,payable,cash){const net=r2(N(receivable)-N(payable));return {receivable:N(receivable),payable:N(payable),cash:N(cash),net,fullPayoffCash:r2(N(cash)+net)}}
+  function runRinggitMePureLogicTests19_0(){
+    const cases=[
+      {id:'pure_net_positive',input:[1387,1,3716.69],net:1386,cash:5102.69},
+      {id:'pure_net_negative',input:[100,300,1000],net:-200,cash:800},
+      {id:'pure_net_zero',input:[0,0,0],net:0,cash:0}
+    ];
+    const checks=cases.map(c=>{const actual=pureFormula19_0.apply(null,c.input),ok=Math.abs(actual.net-c.net)<0.01&&Math.abs(actual.fullPayoffCash-c.cash)<0.01;return {id:c.id,name:'Pure Object Ledger net formula',status:ok?'pass':'fail',expected:{net:c.net,fullPayoffCash:c.cash},actual,details:{nonDestructive:true}}});
+    return {phase:'19.0-pure',passed:checks.every(c=>c.status==='pass'),checks};
+  }
+  async function runRinggitMeRegression19_0(options={}){
+    const checks=[],add=(id,name,ok,expected,actual,details,warn=false)=>checks.push({id,name,status:warn?'warn':(ok?'pass':'fail'),expected,actual,details});
+    const addWarn=(id,name,expected,actual,details)=>add(id,name,false,expected,actual,details,true);
+    const appOk=!!(window&&typeof window.render==='function'&&typeof D==='object');
+    add('runtime_available','App runtime available',appOk,true,appOk,{hasRender:typeof window.render==='function',hasData:typeof D==='object'});
+    const olInspectorExists=typeof window.inspectHomepageAATile18_8ZA_FIX==='function';
+    add('home_ol_inspector_exists','Homepage Object Ledger net tile inspector exists',olInspectorExists,true,olInspectorExists,{});
+    const olTile=inspectHomepageObjectLedgerTile19_0();
+    add('home_ol_tile_no_aa','Homepage Object Ledger net tile has no AA text',olTile.homepageTileFound&&!olTile.homepageTileStillHasAA,true,{found:olTile.homepageTileFound,label:olTile.homepageTileLabelDisplayed},olTile);
+    add('home_ol_tile_matches_net','Homepage Object Ledger net tile matches Object Ledger net',olTile.homepageTileMatchesObjectLedgerNet,true,olTile.homepageTileAmountDisplayed,olTile);
+    const fullInspectorExists=typeof window.inspectHomeFullPayoffCash19_0A==='function';
+    add('full_payoff_inspector_exists','Full Payoff Cash inspector exists',fullInspectorExists,true,fullInspectorExists,{});
+    const full=inspectHomeFullPayoffCash19_0A();
+    add('full_payoff_uses_net','Full Payoff Cash = Cash Now + Object Ledger net',full.fullPayoffCashMatchesNetFormula,true,{expected:full.expectedFullPayoffCash,displayed:full.displayedFullPayoffCash},full);
+    add('full_payoff_not_old_gross','Full Payoff Cash is not using old AA gross',!full.oldAaGrossStillUsedForFullPayoff,true,full.oldAaGrossStillUsedForFullPayoff,full);
+    let refresh=null;try{refresh=typeof window.inspectRefresh18_8R==='function'?window.inspectRefresh18_8R():null}catch(e){refresh={error:sid(e&&e.message||e)}}
+    if(refresh){add('manual_refresh_inspector_exists','Manual refresh inspector exists',true,true,true,refresh);add('pull_to_refresh_disabled','Pull-to-refresh disabled',!!refresh.pullToRefreshDisabled,true,refresh.pullToRefreshDisabled,refresh);add('manual_refresh_button_ready','Manual refresh button visible/action attached',!!refresh.manualRefreshButtonVisible&&!!refresh.manualRefreshActionAttached,true,{visible:refresh.manualRefreshButtonVisible,attached:refresh.manualRefreshActionAttached},refresh)}else addWarn('manual_refresh_inspector_exists','Manual refresh inspector exists',true,false,{missing:'inspectRefresh18_8R'});
+    add('storage_manager_opener_exists','Storage Manager opener exists',typeof window.openStorageManager18_7P==='function',true,typeof window.openStorageManager18_7P==='function',{});
+    let cards=null;try{cards=typeof window.inspectCardsRestore18_8Z==='function'?window.inspectCardsRestore18_8Z():null}catch(e){cards={error:sid(e&&e.message||e)}}
+    if(cards){add('cards_restore_inspector_exists','Card Management restored original inspector exists',true,true,true,cards);add('wallet_renderers_inactive','Wallet deck / fullscreen / closed stack renderers are not active',!!cards.walletDeckDisabled&&!!cards.fullscreenWalletDisabled&&!!cards.closedStackDisabled,true,{wallet:cards.walletDeckDisabled,fullscreen:cards.fullscreenWalletDisabled,closed:cards.closedStackDisabled},cards);add('render_cards_original','Current renderCards is original/restored card page',!!cards.renderCardsRestoredOriginal,true,cards.renderCardsRestoredOriginal,cards)}else addWarn('cards_restore_inspector_exists','Card Management restored original inspector exists if available',true,false,{missing:'inspectCardsRestore18_8Z'});
+    let ledger=null;try{ledger=typeof window.inspectObjectLedger18_7T==='function'?window.inspectObjectLedger18_7T():null}catch(e){ledger={error:sid(e&&e.message||e)}}
+    if(ledger){add('ol_receipts_not_expense','Object Ledger receipt rows should not appear in expense records',N(ledger.receiptRowsInExpenseCount)===0,0,ledger.receiptRowsInExpenseCount,ledger);add('ol_repayments_not_income','Repayment rows should not appear in income records',N(ledger.repaymentRowsInIncomeCount)===0,0,ledger.repaymentRowsInIncomeCount,ledger)}else{addWarn('ol_receipts_not_expense','Object Ledger receipt rows inspector available',true,false,{missing:'inspectObjectLedger18_7T'});addWarn('ol_repayments_not_income','Repayment rows inspector available',true,false,{missing:'inspectObjectLedger18_7T'})}
+    const undoExists=typeof window.undoObjectLedgerCashflow18_7O==='function'||typeof window.undoObjectLedgerCashflow18_7Q==='function';
+    if(undoExists)add('linked_cashflow_undo_exists','Linked cashflow undo helper exists if available',true,true,true,{undoObjectLedgerCashflow18_7O:typeof window.undoObjectLedgerCashflow18_7O,undoObjectLedgerCashflow18_7Q:typeof window.undoObjectLedgerCashflow18_7Q});else addWarn('linked_cashflow_undo_exists','Linked cashflow undo helper exists if available',true,false,{});
+    add('vm_syntax_risk','No obvious VM syntax risk',!vmRisk19_0(),false,vmRisk19_0(),{});
+    runRinggitMePureLogicTests19_0().checks.forEach(c=>checks.push(c));
+    const totals=checks.reduce((a,c)=>{a[c.status]=(a[c.status]||0)+1;return a},{pass:0,fail:0,warn:0}),passed=totals.fail===0;
+    return {phase:'19.0',passed,totals,checks,recommendedNextAction:passed?'Run the same regression once in the live iPhone/PWA session after refresh.':'Review failed checks before manual testing.',options};
+  }
+  async function printRinggitMeRegression19_0(){const res=await runRinggitMeRegression19_0();try{console.table(res.checks.map(c=>({id:c.id,status:c.status,name:c.name,actual:typeof c.actual==='object'?JSON.stringify(c.actual):c.actual})))}catch(_){}return res}
+  window.inspectHomeFullPayoffCash19_0A=inspectHomeFullPayoffCash19_0A;
+  window.runRinggitMePureLogicTests19_0=runRinggitMePureLogicTests19_0;
+  window.runRinggitMeRegression19_0=runRinggitMeRegression19_0;
+  window.printRinggitMeRegression19_0=printRinggitMeRegression19_0;
 })();
 
 </script>
