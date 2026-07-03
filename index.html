@@ -1313,7 +1313,7 @@ function formatEditValue19_1B(value,type){
 function editSameValue19_1B(a,b,type){if(blankEditValue19_1B(a)&&blankEditValue19_1B(b))return true;if(type==='money'){const an=editMoneyNumber19_1B(a),bn=editMoneyNumber19_1B(b);return an!=null&&bn!=null?Math.round(an*100)===Math.round(bn*100):String(a||'').trim()===String(b||'').trim()}return String(a==null?'':a).trim()===String(b==null?'':b).trim();}
 function editFieldKind19_1B(label){
   const l=String(label||'').toLowerCase();
-  if(/amount|amt|total|monthly|\u91d1\u989d|\u91d1\u984d|\u603b\u989d|\u7e3d\u984d|\u6bcf\u6708/.test(l))return 'amount';
+  if(/amount|amt|\brm\b|total|monthly|\u91d1\u989d|\u91d1\u984d|\u603b\u989d|\u7e3d\u984d|\u6bcf\u6708/.test(l))return 'amount';
   if(/desc|description|note|memo|title|name|\u63cf\u8ff0|\u5099\u6ce8|\u5907\u6ce8|\u5167\u5bb9|\u5185\u5bb9|\u540d\u79f0|\u540d\u7a31/.test(l))return 'description';
   return 'other';
 }
@@ -1326,10 +1326,11 @@ function editDateTime19_1B(item){
 }
 function normalizeEditHistoryItem19_1B(item){
   item=item||{};const out={at:editAt19_1B(item),amountBefore:null,amountAfter:null,descBefore:null,descAfter:null,fields:[],hasAmountChange:false,hasDescriptionChange:false,hasAnyChange:false};
-  const directAmountBefore=item.amountBefore??item.beforeAmount??item.old_amount??item.oldAmount??item.amount_before??item.amount_old;
-  const directAmountAfter=item.amountAfter??item.afterAmount??item.new_amount??item.newAmount??item.amount_after??item.amount_new;
-  const directDescBefore=item.descBefore??item.beforeDesc??item.old_desc??item.oldDesc??item.descriptionBefore??item.noteBefore??item.titleBefore;
-  const directDescAfter=item.descAfter??item.afterDesc??item.new_desc??item.newDesc??item.descriptionAfter??item.noteAfter??item.titleAfter;
+  const beforeObj=item.before&&typeof item.before==='object'?item.before:null,afterObj=item.after&&typeof item.after==='object'?item.after:null;
+  const directAmountBefore=item.amountBefore??item.beforeAmount??item.old_amount??item.oldAmount??item.old_amt??item.amount_before??item.amount_old??(beforeObj&&(beforeObj.amount??beforeObj.amt??beforeObj.totalAmount??beforeObj.total));
+  const directAmountAfter=item.amountAfter??item.afterAmount??item.new_amount??item.newAmount??item.new_amt??item.amount_after??item.amount_new??(afterObj&&(afterObj.amount??afterObj.amt??afterObj.totalAmount??afterObj.total));
+  const directDescBefore=item.descBefore??item.beforeDesc??item.old_desc??item.oldDesc??item.old_description??item.oldDescription??item.descriptionBefore??item.beforeDescription??item.noteBefore??item.titleBefore??(beforeObj&&(beforeObj.description??beforeObj.desc??beforeObj.note??beforeObj.memo??beforeObj.title??beforeObj.name));
+  const directDescAfter=item.descAfter??item.afterDesc??item.new_desc??item.newDesc??item.new_description??item.newDescription??item.descriptionAfter??item.afterDescription??item.noteAfter??item.titleAfter??(afterObj&&(afterObj.description??afterObj.desc??afterObj.note??afterObj.memo??afterObj.title??afterObj.name));
   if(!blankEditValue19_1B(directAmountBefore)||!blankEditValue19_1B(directAmountAfter)){out.amountBefore=directAmountBefore;out.amountAfter=directAmountAfter;out.hasAmountChange=!editSameValue19_1B(directAmountBefore,directAmountAfter,'money');}
   if(!blankEditValue19_1B(directDescBefore)||!blankEditValue19_1B(directDescAfter)){out.descBefore=directDescBefore;out.descAfter=directDescAfter;out.hasDescriptionChange=!editSameValue19_1B(directDescBefore,directDescAfter,'text');}
   const fields=Array.isArray(item.fields)?item.fields:[];
@@ -3994,7 +3995,21 @@ initSupa();
 
   function receiptSection14(){const rows=allReceipts14();if(!rows.length)return'';const total=rows.reduce((a,r)=>a+round(r.amount),0);let h=`<div class="sec">收到还款 <span class="sec-a">AA Repayments · ${fmt(total)}</span></div><div class="card">`;rows.slice(0,30).forEach(r=>{const inner=`<div class="txn"><div class="txn-ic" style="background:var(--green-bg);color:var(--green)"><i class="ti ti-users"></i></div><div class="txn-m"><div class="txn-n">${esc(r.partnerName||'AA Partner')} 还款</div><div class="txn-s"><div class="txn-meta">AA 收款 · ${esc(r.cardName||'未指定入账位置')}</div><div class="txn-meta txn-date">${esc(r.date||'')}${r.time?' · '+esc(r.time):''}</div></div></div><div class="txn-x"><div class="txn-a g">+${fmt(round(r.amount))}</div><div class="txn-tools"><i class="ti ti-history" onclick="event.stopPropagation();openAAReceiptAudit14('${esc(r.settlementId)}')"></i><i class="ti ti-edit" onclick="event.stopPropagation();openAAReceiptEdit14('${esc(r.settlementId)}')"></i></div></div></div>`;h+=`<div class="swipe"><div class="txn-swipe-del" onclick="delAAReceipt14('${esc(r.settlementId)}')"><i class="ti ti-trash"></i></div><div class="swipe-fg">${inner}</div></div>`;});return h+'</div>';}
   function telegramAttachmentSection14(){const rows=arr(D.telegramAttachments).filter(x=>!x.hidden);if(!rows.length)return'';let h=`<div class="sec">Telegram 附件 <span class="sec-a">${rows.length} 个</span></div><div class="card">`;rows.slice(0,12).forEach(a=>{h+=`<div class="txn"><div class="txn-ic" style="background:var(--blue-bg);color:var(--blue)"><i class="ti ${a.kind==='photo'?'ti-photo':'ti-paperclip'}"></i></div><div class="txn-m"><div class="txn-n">${esc(a.caption||a.file_name||'Telegram 附件')}</div><div class="txn-s"><div class="txn-meta">${esc(a.kind==='photo'?'照片':'文件')} · Telegram</div><div class="txn-meta txn-date">${esc(a.date||'')}${a.time?' · '+esc(a.time):''}</div></div></div></div>`;});return h+'</div>';}
-  function txnAuditEvents14(t){if(!t)return[];const aa=aaInfo14(t),raw=(aa&&aa.row&&aa.row.raw)||t.raw||{};const ev=[{icon:'ti-receipt',title:'消费记录',meta:`${t.isoDate||t.date||''}${t.time?' · '+t.time:''} · ${t.payName||'未指定付款方式'}`}];if(aa)ev.push({icon:'ti-users',title:`AA · ${aa.person}`,meta:`总额 ${fmt(aa.total)} · 对方 ${fmt(aa.owed)} · 已还 ${fmt(aa.settled)} · 剩 ${fmt(aa.due)}`});arr(raw.edit_history).forEach(e=>ev.push({icon:'ti-edit',title:'编辑记录',meta:`${e.time||''} · ${round(e.old_amount)!==round(e.new_amount)?fmt(e.old_amount)+' → '+fmt(e.new_amount):'内容/分类/付款已改'}`}));if(raw.app_edited&&!arr(raw.edit_history).length)ev.push({icon:'ti-edit',title:'编辑记录',meta:'App 已编辑'});if(aa){allReceipts14().filter(r=>!aa.personId||same(r.partnerId,aa.personId)||String(r.partnerName||'').includes(aa.person)).slice(0,5).forEach(r=>ev.push({icon:'ti-cash',title:'收到还款',meta:`${r.date||''}${r.time?' · '+r.time:''} · ${fmt(r.amount)}${r.cardName?' → '+r.cardName:''}`}));}return ev;}
+  function txnAuditEvents14(t){
+    if(!t)return[];
+    const aa=aaInfo14(t),txRaw=t&&t.raw&&typeof t.raw==='object'?t.raw:{},aaRaw=aa&&aa.row&&aa.row.raw&&typeof aa.row.raw==='object'?aa.row.raw:{};
+    const raw=(arr(txRaw.edit_history_j).length||arr(txRaw.edit_history).length)?txRaw:aaRaw;
+    const renderEdit=h=>typeof renderEditTimelineEntry19_1B==='function'?renderEditTimelineEntry19_1B(h,{plain:true}):`${h&&h.time||''}\n${round(h&&h.old_amount)!==round(h&&h.new_amount)?'\u91d1\u989d\uff1a'+fmt(h&&h.old_amount)+' \u2192 '+fmt(h&&h.new_amount):'\u5185\u5bb9\uff1a\u5df2\u66f4\u65b0'}`;
+    const ev=[{icon:'ti-receipt',title:'消费记录',meta:`${t.isoDate||t.date||''}${t.time?' · '+t.time:''} · ${t.payName||'未指定付款方式'}`}];
+    if(aa)ev.push({icon:'ti-users',title:`AA · ${aa.person}`,meta:`总额 ${fmt(aa.total)} · 对方 ${fmt(aa.owed)} · 已还 ${fmt(aa.settled)} · 剩 ${fmt(aa.due)}`});
+    const rich=arr(raw.edit_history_j);
+    rich.forEach(e=>ev.push({icon:'ti-edit',title:'编辑记录',meta:renderEdit(e)}));
+    if(!rich.length)arr(raw.edit_history).forEach(e=>ev.push({icon:'ti-edit',title:'编辑记录',meta:renderEdit(e)}));
+    if(raw.app_edited&&!rich.length&&!arr(raw.edit_history).length)ev.push({icon:'ti-edit',title:'编辑记录',meta:'App 已编辑'});
+    if(aa){allReceipts14().filter(r=>!aa.personId||same(r.partnerId,aa.personId)||String(r.partnerName||'').includes(aa.person)).slice(0,5).forEach(r=>ev.push({icon:'ti-cash',title:'收到还款',meta:`${r.date||''}${r.time?' · '+r.time:''} · ${fmt(r.amount)}${r.cardName?' → '+r.cardName:''}`}));}
+    return ev;
+  }
+  try{window.__activeTxnAuditEvents14_19_1B_FIX2=txnAuditEvents14}catch(_){}
 
   window.renderHistory=renderHistory=function(){
     const all=arr(D.txns); if(!all.length)return`<div class="empty" style="margin-top:50px"><div class="empty-ic"><i class="ti ti-calendar"></i></div><div class="et">还没有消费记录</div><div class="es">去「记账」开始记第一笔</div></div>`;
@@ -9260,6 +9275,51 @@ function telegramFiles15(raw){
   window.inspectEditTimeline19_1B=inspectEditTimeline19_1B;
   window.runEditTimelineFixtureTests19_1B=runEditTimelineFixtureTests19_1B;
   window.printEditTimeline19_1B=printEditTimeline19_1B;
+})();
+
+// PHASE 19.1B-FIX2 - Real active edit timeline amount + description old-to-new.
+// phase: "19.1B-FIX2"
+(()=>{
+  if(window.__phase19_1B_FIX2Installed)return;window.__phase19_1B_FIX2Installed=true;
+  const sid=x=>String(x==null?'':x),A=Array.isArray,arr=x=>A(x)?x:[];
+  const compactPattern19_1B_FIX2='12:27 AM \u00b7 RM 22.00 \u2192 RM 24.00';
+  try{if(!document.getElementById('phase19-1b-fix2-css')){const st=document.createElement('style');st.id='phase19-1b-fix2-css';st.textContent='.tl-meta{white-space:pre-line}.tl-meta .rm-edit-entry19_1B{white-space:normal}';document.head.appendChild(st)}}catch(_){}
+  function fnSrc19_1B_FIX2(name){try{const f=window[name]||(typeof globalThis!=='undefined'?globalThis[name]:null);return typeof f==='function'?sid(f):''}catch(_){return ''}}
+  function pageSrc19_1B_FIX2(){try{return sid(document.documentElement&&document.documentElement.innerHTML)}catch(_){return ''}}
+  function renderText19_1B_FIX2(item){try{return typeof renderEditTimelineEntry19_1B==='function'?renderEditTimelineEntry19_1B(item,{plain:true}):''}catch(e){return 'ERROR: '+sid(e&&e.message||e)}}
+  function testRow19_1B_FIX2(id,name,ok,actual){return {id,name,ok:!!ok,actual:sid(actual).slice(0,320)}}
+  function runEditTimelineRealisticExpenseTest19_1B_FIX2(){
+    const fixture={type:'edit',at:'2026-06-28T00:27:00+08:00',fields:[{label:'\u91d1\u989d',before:22,after:24},{label:'\u63cf\u8ff0',before:'\u9a6c\u6765\u9910',after:'\u9a6c\u6765\u9910 lunch'}]};
+    const alternate={old_amount:22,new_amount:24,old_desc:'\u9a6c\u6765\u9910',new_desc:'\u9a6c\u6765\u9910 lunch',updated_at:'2026-06-28T00:27:00+08:00'};
+    const realisticText=renderText19_1B_FIX2(fixture),alternateText=renderText19_1B_FIX2(alternate);
+    const expectedDate='28/6/2026 12:27 AM',amountLine='\u91d1\u989d\uff1aRM 22.00 \u2192 RM 24.00',descLine='\u63cf\u8ff0\uff1a\u9a6c\u6765\u9910 \u2192 \u9a6c\u6765\u9910 lunch';
+    const checks=[
+      testRow19_1B_FIX2('realistic_full_datetime','Realistic edit has full date/time',realisticText.includes(expectedDate),realisticText),
+      testRow19_1B_FIX2('realistic_amount_label','Realistic edit has amount label',realisticText.includes(amountLine),realisticText),
+      testRow19_1B_FIX2('realistic_description_label','Realistic edit has description label',realisticText.includes(descLine),realisticText),
+      testRow19_1B_FIX2('realistic_no_compact','Realistic edit removed compact amount-only pattern',!realisticText.includes(compactPattern19_1B_FIX2),realisticText),
+      testRow19_1B_FIX2('alternate_full_datetime','Alternate shape has full date/time',alternateText.includes(expectedDate),alternateText),
+      testRow19_1B_FIX2('alternate_amount_label','Alternate shape has amount label',alternateText.includes(amountLine),alternateText),
+      testRow19_1B_FIX2('alternate_description_label','Alternate shape has description label',alternateText.includes(descLine),alternateText),
+      testRow19_1B_FIX2('alternate_no_compact','Alternate shape removed compact amount-only pattern',!alternateText.includes(compactPattern19_1B_FIX2),alternateText)
+    ];
+    return {phase:"19.1B-FIX2",realisticText,alternateText,checks,realisticExpenseFixturePassed:checks.slice(0,4).every(c=>c.ok),alternateShapeFixturePassed:checks.slice(4).every(c=>c.ok),passed:checks.every(c=>c.ok)};
+  }
+  function inspectEditTimeline19_1B_FIX2(){
+    const fixture=runEditTimelineRealisticExpenseTest19_1B_FIX2(),src=pageSrc19_1B_FIX2(),activeSrc=fnSrc19_1B_FIX2('__activeTxnAuditEvents14_19_1B_FIX2'),warnings=[];
+    const activeExpenseTimelineRendererFound=/U\.modal===['"]txnAudit14['"]/.test(src)&&/openTxnAudit14/.test(src)&&/function txnAuditEvents14/.test(src);
+    const activeExpenseEditHandlerFound=/window\.saveSpend=saveSpend=function|function saveSpend/.test(src);
+    const descriptionCaptureFound=/old_desc/.test(src)&&/new_desc/.test(src)&&/edit_history/.test(src);
+    const activeRenderersStillUsingSharedFormatter=activeSrc.includes('renderEditTimelineEntry19_1B');
+    if(!activeSrc)warnings.push('Active txnAuditEvents14 debug source was not exposed.');
+    if(!descriptionCaptureFound)warnings.push('Could not prove old_desc/new_desc capture from page source.');
+    if(!activeRenderersStillUsingSharedFormatter)warnings.push('Active txnAuditEvents14 source does not show shared formatter usage.');
+    return {phase:"19.1B-FIX2",activeExpenseTimelineRendererFound,activeExpenseEditHandlerFound,descriptionCaptureFound,descriptionCapturePatched:false,expenseTimelineFullDateTime:fixture.checks.find(c=>c.id==='realistic_full_datetime')?.ok||false,amountLineHasLabel:fixture.checks.find(c=>c.id==='realistic_amount_label')?.ok||false,descriptionLineHasLabel:fixture.checks.find(c=>c.id==='realistic_description_label')?.ok||false,compactAmountOnlyPatternRemoved:fixture.checks.filter(c=>/no_compact/.test(c.id)).every(c=>c.ok),realisticExpenseFixturePassed:fixture.realisticExpenseFixturePassed,alternateShapeFixturePassed:fixture.alternateShapeFixturePassed,activeRenderersStillUsingSharedFormatter,warnings,passed:fixture.passed&&activeExpenseTimelineRendererFound&&activeExpenseEditHandlerFound&&descriptionCaptureFound&&activeRenderersStillUsingSharedFormatter};
+  }
+  function printEditTimeline19_1B_FIX2(){const r=inspectEditTimeline19_1B_FIX2();try{console.table([{phase:r.phase,activeExpenseTimelineRendererFound:r.activeExpenseTimelineRendererFound,activeExpenseEditHandlerFound:r.activeExpenseEditHandlerFound,descriptionCaptureFound:r.descriptionCaptureFound,descriptionCapturePatched:r.descriptionCapturePatched,expenseTimelineFullDateTime:r.expenseTimelineFullDateTime,amountLineHasLabel:r.amountLineHasLabel,descriptionLineHasLabel:r.descriptionLineHasLabel,compactAmountOnlyPatternRemoved:r.compactAmountOnlyPatternRemoved,realisticExpenseFixturePassed:r.realisticExpenseFixturePassed,alternateShapeFixturePassed:r.alternateShapeFixturePassed,activeRenderersStillUsingSharedFormatter:r.activeRenderersStillUsingSharedFormatter,passed:r.passed}]);console.table(runEditTimelineRealisticExpenseTest19_1B_FIX2().checks)}catch(_){}return r}
+  window.runEditTimelineRealisticExpenseTest19_1B_FIX2=runEditTimelineRealisticExpenseTest19_1B_FIX2;
+  window.inspectEditTimeline19_1B_FIX2=inspectEditTimeline19_1B_FIX2;
+  window.printEditTimeline19_1B_FIX2=printEditTimeline19_1B_FIX2;
 })();
 
 </script>
