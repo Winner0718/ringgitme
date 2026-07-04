@@ -9696,7 +9696,7 @@ function ensureRecordsMemoryCss20_5A(){try{if(document.getElementById('records-m
 function fileUrl20_5A(file){if(!file)return'';if(typeof file==='string')return file;if(typeof file==='object')return file.dataUrl||file.dataURL||file.url||file.src||file.preview||file.thumbnail||'';return''}
 function fileName20_5A(file){if(!file)return'';if(typeof file==='string')return file;if(typeof file==='object')return file.name||file.filename||file.type||fileUrl20_5A(file);return''}
 function isImageFile20_5A(file){const u=String(fileUrl20_5A(file)||''),n=String(fileName20_5A(file)||'');return /^data:image\//i.test(u)||/^blob:/i.test(u)||/^https?:\/\//i.test(u)&&/\.(png|jpe?g|webp|gif|avif)(\?|#|$)/i.test(u)||/\bimage\//i.test(n)||/\.(png|jpe?g|webp|gif|avif)$/i.test(n)}
-function iconForRecordGroup20_5A(group){return ({food:'ti-tools-kitchen-2',transport:'ti-car',shopping:'ti-shopping-bag',bills:'ti-receipt',health:'ti-heartbeat',fun:'ti-device-gamepad-2',family:'ti-users',others:'ti-dots'})[group]||'ti-dots'}
+function iconForRecordGroup20_5A(group){return ({food:'ti-tools-kitchen-2',transport:'ti-car',shopping:'ti-shopping-bag',bills:'ti-receipt',health:'ti-heartbeat',fun:'ti-device-gamepad-2',family:'ti-users',others:'ti-note'})[group]||'ti-receipt'}
 function getRecordVisual20_5A(t,type){
   const cover=typeof txnCoverFile==='function'?txnCoverFile(t):(((t&&t.files)||[])[Number(t&&t.coverIdx)||0]||((t&&t.files)||[])[0]);
   const hasFiles=Array.isArray(t&&t.files)&&t.files.length>0;
@@ -9720,6 +9720,16 @@ window.inspectRecordsMemory20_5A=function(){
   const avatars=document.querySelectorAll('.record-avatar20_5A').length;
   const dotIcons=Array.from(document.querySelectorAll('*')).filter(el=>(el.textContent||'').trim()==='...').length;
   return {phase:'20.5A',helpersExist:typeof getRecordVisual20_5A==='function'&&typeof renderRecordAvatar20_5A==='function',avatarsInDom:avatars,dotOnlyIconsVisible:dotIcons,noInternalCopyVisible:!badCopy,quickRecordInspectorExists:typeof window.inspectQuickRecordPolish20_4B==='function',arch20StillExists:typeof window.inspectArch20_0==='function',passed:typeof getRecordVisual20_5A==='function'&&typeof renderRecordAvatar20_5A==='function'&&!badCopy};
+};
+function ensureRecordsPolishCss20_5B(){try{if(document.getElementById('records-polish20-5b-css'))return;const st=document.createElement('style');st.id='records-polish20-5b-css';st.textContent='.record-row20_5A{align-items:center;padding:10px 0}.record-row20_5A .txn-n{font-weight:750;font-size:14.5px;line-height:1.28}.record-row20_5A .txn-s{margin-top:4px;line-height:1.34}.record-row20_5A .txn-meta{-webkit-line-clamp:1}.record-row20_5A .txn-a{font-size:15.5px;font-weight:850}.record-row20_5A .txn-x{gap:4px;max-width:39%}.record-row20_5A .txn-tools{display:flex;align-items:center;justify-content:flex-end;gap:1px}.record-row20_5A .txn-tools i{font-size:15px;opacity:.58;padding:2px;color:var(--text3)}.record-row20_5A .txn-tools i:active{opacity:1}.record-avatar20_5A--others{background:linear-gradient(145deg,color-mix(in srgb,var(--accent) 9%,var(--bg2)),var(--bg2));color:var(--text2)}.ins-wrap .sec{margin-top:6px;margin-bottom:7px}.ins-wrap>.card,.ins-wrap .card{padding:12px 14px;border-radius:16px;background:linear-gradient(180deg,var(--bg2),color-mix(in srgb,var(--bg3) 46%,var(--bg2)))}.ins-wrap .ins-head{align-items:center;margin-bottom:8px}.ins-wrap .ins-total{font-size:22px;letter-spacing:-.25px}.ins-wrap .ins-cnt{font-size:11px;font-weight:750;color:var(--text3)}.ins-wrap .ins-mini{margin:8px 0 0;gap:7px}.ins-wrap .ins-mi{padding:7px 9px;border-radius:10px;background:color-mix(in srgb,var(--bg3) 72%,var(--bg2))}.ins-wrap .ins-mil{font-size:10px}.ins-wrap .ins-miv{font-size:12.5px}@media(max-width:390px){.record-row20_5A .txn-x{max-width:36%}.record-row20_5A .txn-tools i{font-size:14px}}';document.head.appendChild(st)}catch(_){}}
+try{ensureRecordsPolishCss20_5B()}catch(_){}
+window.inspectRecordsPolish20_5B=function(){
+  const bodyText=document.body?(document.body.textContent||''):'';
+  const badCopy=/Phase\s*20|debug|developer|runtime|inspector|implementation/i.test(bodyText);
+  const avatars=Array.from(document.querySelectorAll('.record-avatar20_5A'));
+  const avatarText=avatars.map(a=>(a.textContent||'').trim()).filter(Boolean);
+  const dotAvatars=avatarText.filter(t=>t==='...'||t==='•••'||t==='…');
+  return {phase:'20.5B',avatarsInDom:avatars.length,dotAvatars,noDotAvatarText:dotAvatars.length===0,recordMemoryInspectorExists:typeof window.inspectRecordsMemory20_5A==='function',quickRecordInspectorExists:typeof window.inspectQuickRecordPolish20_4B==='function',noInternalCopyVisible:!badCopy,passed:typeof window.renderRecordAvatar20_5A==='function'&&dotAvatars.length===0&&!badCopy};
 };
 
 </script>
