@@ -745,6 +745,14 @@ input,textarea,select{-webkit-user-select:text;user-select:text}
 .real-asset.card-art{width:100%;aspect-ratio:1.586/1;height:auto;border-radius:12px;background:transparent;border:0}
 .real-asset.card-art .real-asset-fallback{background:var(--bg3);border:1px solid var(--border);border-radius:12px}
 .real-asset.card-art .real-asset-fallback i{font-size:26px}.real-asset.card-art .real-asset-fallback small{font-size:11px;max-width:180px}
+.brand-badge20_2A{width:100%;height:100%;display:flex;align-items:center;justify-content:center;border-radius:inherit;background:linear-gradient(135deg,#f8fafc,#e2e8f0);color:#334155;font-weight:850;letter-spacing:.02em;line-height:1;border:1px solid rgba(15,23,42,.08);box-shadow:inset 0 1px 0 rgba(255,255,255,.55);user-select:none}
+.brand-badge20_2A.sm{font-size:10px}.brand-badge20_2A.md{font-size:11px}.brand-badge20_2A.lg{font-size:12px}
+.brand-badge20_2A.tone-gold{background:linear-gradient(135deg,#fde68a,#f59e0b);color:#3f2a05}
+.brand-badge20_2A.tone-red{background:linear-gradient(135deg,#fecaca,#dc2626);color:#fff}
+.brand-badge20_2A.tone-blue{background:linear-gradient(135deg,#bfdbfe,#2563eb);color:#fff}
+.brand-badge20_2A.tone-green{background:linear-gradient(135deg,#bbf7d0,#16a34a);color:#073b20}
+.brand-badge20_2A.tone-purple{background:linear-gradient(135deg,#ddd6fe,#7c3aed);color:#fff}
+.brand-badge20_2A.tone-orange{background:linear-gradient(135deg,#fed7aa,#ea580c);color:#3b1605}
 .cc-mode{display:grid;grid-template-columns:1fr 1fr;gap:7px;background:var(--bg3);padding:4px;border-radius:13px;margin-bottom:14px}
 .cc-mode button{border:0;background:transparent;color:var(--text3);border-radius:10px;padding:10px 8px;font-size:12.5px;font-weight:700;cursor:pointer}
 .cc-mode button.on{background:var(--bg2);color:var(--accent);box-shadow:var(--shadow)}
@@ -1132,6 +1140,22 @@ const REAL_ASSETS={
     'ocbc-365':'assets/cards/ocbc-365.png','ocbc-titanium':'assets/cards/ocbc-titanium.png','ocbc-voyage':'assets/cards/ocbc-premier-voyage.png'
   }
 };
+const BRAND_VISUALS_20_2A={
+  maybank:{name:'Maybank',short:'MBB',type:'bank',tone:'gold'},cimb:{name:'CIMB',short:'CIMB',type:'bank',tone:'red'},public:{name:'Public Bank',short:'PBB',type:'bank',tone:'red'},publicbank:{name:'Public Bank',short:'PBB',type:'bank',tone:'red'},rhb:{name:'RHB',short:'RHB',type:'bank',tone:'blue'},hlb:{name:'Hong Leong Bank',short:'HLB',type:'bank',tone:'blue'},hongleongbank:{name:'Hong Leong Bank',short:'HLB',type:'bank',tone:'blue'},ambank:{name:'AmBank',short:'AMB',type:'bank',tone:'orange'},bsn:{name:'BSN',short:'BSN',type:'bank',tone:'blue'},islamicbk:{name:'Bank Islam',short:'BIMB',type:'bank',tone:'green'},bankislam:{name:'Bank Islam',short:'BIMB',type:'bank',tone:'green'},bankrakyat:{name:'Bank Rakyat',short:'BR',type:'bank',tone:'green'},ocbc:{name:'OCBC',short:'OCBC',type:'bank',tone:'red'},affin:{name:'Affin Bank',short:'AFF',type:'bank',tone:'blue'},affinbank:{name:'Affin Bank',short:'AFF',type:'bank',tone:'blue'},uob:{name:'UOB',short:'UOB',type:'bank',tone:'blue'},hsbc:{name:'HSBC',short:'HSBC',type:'bank',tone:'red'},aeon:{name:'AEON',short:'AEON',type:'bank',tone:'purple'},
+  tng:{name:'Touch n Go',short:'TnG',type:'ewallet',tone:'blue'},tngewallet:{name:'Touch n Go',short:'TnG',type:'ewallet',tone:'blue'},grabpay:{name:'GrabPay',short:'Grab',type:'ewallet',tone:'green'},boost:{name:'Boost',short:'Boost',type:'ewallet',tone:'red'},shopeepay:{name:'ShopeePay',short:'SPay',type:'ewallet',tone:'orange'},bigpay:{name:'BigPay',short:'Big',type:'ewallet',tone:'blue'},mae:{name:'MAE',short:'MAE',type:'ewallet',tone:'gold'},
+  shopee:{name:'Shopee',short:'SP',type:'merchant',tone:'orange'},lazada:{name:'Lazada',short:'LZD',type:'merchant',tone:'purple'},grab:{name:'Grab',short:'Grab',type:'merchant',tone:'green'},foodpanda:{name:'foodpanda',short:'FP',type:'merchant',tone:'purple'},starbucks:{name:'Starbucks',short:'SB',type:'merchant',tone:'green'},kfc:{name:'KFC',short:'KFC',type:'merchant',tone:'red'},mcdonalds:{name:"McDonald's",short:'MCD',type:'merchant',tone:'gold'},tealive:{name:'Tealive',short:'Tea',type:'merchant',tone:'purple'},familymart:{name:'FamilyMart',short:'FM',type:'merchant',tone:'blue'},seveneleven:{name:'7-Eleven',short:'7-11',type:'merchant',tone:'green'},petronas:{name:'Petronas',short:'PET',type:'merchant',tone:'green'},shell:{name:'Shell',short:'Shell',type:'merchant',tone:'gold'}
+};
+function escHtml20_2A(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function normalizeBrandId20_2A(v){return String(v||'').toLowerCase().replace(/[^a-z0-9]+/g,'').trim();}
+function brandIdFromAssetPath20_2A(v){return normalizeBrandId20_2A(String(v||'').split('/').pop().replace(/\.[^.]+$/,''));}
+function getBrandVisual20_2A(v){const raw=String(v||''),id=normalizeBrandId20_2A(raw),assetId=brandIdFromAssetPath20_2A(raw);let hit=BRAND_VISUALS_20_2A[id]||BRAND_VISUALS_20_2A[assetId];if(!hit){hit=Object.keys(BRAND_VISUALS_20_2A).map(k=>BRAND_VISUALS_20_2A[k]).find(x=>normalizeBrandId20_2A(x.name)===id||normalizeBrandId20_2A(x.short)===id)}const fallbackName=raw&&!/^assets\//i.test(raw)?raw:'Account';return hit||{name:fallbackName,short:normalizeBrandId20_2A(fallbackName).slice(0,4).toUpperCase()||'RM',type:'generic',tone:'neutral'};}
+function renderBrandBadge20_2A(v,opts={}){const visual=getBrandVisual20_2A(v),size=opts.size||'md',label=escHtml20_2A(visual.short||visual.name||'RM'),title=escHtml20_2A(visual.name||label),tone=escHtml20_2A(visual.tone||'neutral');return `<span class="brand-badge20_2A ${size} tone-${tone}" title="${title}" aria-label="${title}">${label}</span>`;}
+function isKnownMissingAssetPath20_2A(src){return /^assets\/(brands|ewallets|merchants)\//i.test(String(src||''));}
+window.BRAND_VISUALS_20_2A=BRAND_VISUALS_20_2A;
+window.normalizeBrandId20_2A=normalizeBrandId20_2A;
+window.getBrandVisual20_2A=getBrandVisual20_2A;
+window.renderBrandBadge20_2A=renderBrandBadge20_2A;
+window.isKnownMissingAssetPath20_2A=isKnownMissingAssetPath20_2A;
 const CARD_BANKS=[
   {id:'maybank',name:'Maybank'},{id:'cimb',name:'CIMB'},{id:'public',name:'Public Bank'},{id:'rhb',name:'RHB'},{id:'hlb',name:'Hong Leong Bank'},{id:'ambank',name:'AmBank'},
   {id:'bsn',name:'BSN'},{id:'islamicbk',name:'Bank Islam'},{id:'bankrakyat',name:'Bank Rakyat'},{id:'ocbc',name:'OCBC'},{id:'affin',name:'Affin Bank'},{id:'uob',name:'UOB'}
@@ -1475,7 +1499,7 @@ function assetPathForIcon(id){return REAL_ASSETS.brands[id]||REAL_ASSETS.ewallet
 function safeLocalAssetPath(path){return typeof path==='string'&&/^assets\/(brands|cards|ewallets|merchants)\/[a-z0-9][a-z0-9._-]*$/i.test(path)?path:null;}
 function assetLoaded(img){img.style.display='block';const fb=img.nextElementSibling;if(fb)fb.style.display='none';}
 function assetMissing(img){img.style.display='none';const fb=img.nextElementSibling;if(fb)fb.style.display='flex';}
-function realAssetHTML(path,kind='logo',label='',size=null,radius=null){const isData=typeof path==='string'&&path.startsWith('data:image/'),p=isData?path:safeLocalAssetPath(path),txt='图片待添加',style=(size?`width:${Number(size)}px;height:${Number(size)}px;`:'')+(radius!==null?`border-radius:${Number(radius)}px;`:'');const fallback=`<span class="real-asset-fallback"${p?'':` style="display:flex"`}><i class="ti ti-photo"></i><small>${txt}</small></span>`;return`<span class="real-asset ${kind}" style="${style}">${p?`<img src="${p}" alt="" onload="assetLoaded(this)" onerror="assetMissing(this)"/>`:''}${fallback}</span>`;}
+function realAssetHTML(path,kind='logo',label='',size=null,radius=null){const isData=typeof path==='string'&&path.startsWith('data:image/'),style=(size?`width:${Number(size)}px;height:${Number(size)}px;`:'')+(radius!==null?`border-radius:${Number(radius)}px;`:'');if(isKnownMissingAssetPath20_2A(path)){const badgeSize=kind==='thumb'||kind==='card-art'?'lg':(kind==='bank'||kind==='logo'?'md':'sm');return`<span class="real-asset ${kind}" style="${style}">${renderBrandBadge20_2A(label||path,{size:badgeSize})}</span>`;}const p=isData?path:safeLocalAssetPath(path),txt='图片待添加';const fallback=`<span class="real-asset-fallback"${p?'':` style="display:flex"`}><i class="ti ti-photo"></i><small>${txt}</small></span>`;return`<span class="real-asset ${kind}" style="${style}">${p?`<img src="${p}" alt="" onload="assetLoaded(this)" onerror="assetMissing(this)"/>`:''}${fallback}</span>`;}
 function hasRealSvg(id){return!!(id&&(SI_MAP[id]||BRAND_PATHS[id]));}
 function presetIconHTML(spec,size=42,radius=12){const ic=typeof spec==='string'?gi(spec):spec;if(ic&&hasRealSvg(ic.id))return iconHTML(ic,size,radius);const path=ic&&assetPathForIcon(ic.id);return path?realAssetHTML(path,'logo',ic.l,size,radius):iconHTML(ic,size,radius);}
 // Renders a brand icon tile (or uploaded custom image)
@@ -2228,6 +2252,15 @@ window.inspectCleanCopy20_1B=function(){
   const longHelperPatterns=[/对象账本显示当前未结清/,/已结清记录在账本记录里查看/,/到期日前准备钱/,/AA 款到 AA 页确认收到/];
   const longHelpersVisible=longHelperPatterns.map(rx=>({pattern:String(rx),found:rx.test(bodyText)})).filter(x=>x.found);
   return {phase:'20.1B',visibleBad,longHelpersVisible,addHubStillExists:typeof window.inspectFab20_1==='function',addHubCopyInspectorExists:typeof window.inspectAddHubCopy20_1A==='function',passed:visibleBad.length===0&&longHelpersVisible.length===0};
+};
+
+window.inspectBrandAssets20_2A=function(){
+  const registryCount=Object.keys(BRAND_VISUALS_20_2A||{}).length,brandPaths=Object.values(REAL_ASSETS.brands||{}),ewalletPaths=Object.values(REAL_ASSETS.ewallets||{}),merchantPaths=Object.values(REAL_ASSETS.merchants||{}),cardPaths=Object.values(REAL_ASSETS.cards||{});
+  const sampleBrand=realAssetHTML('assets/brands/maybank.png','bank','Maybank',40,11),sampleEwallet=realAssetHTML('assets/ewallets/tng-ewallet.png','logo','Touch n Go',42,12),sampleMerchant=realAssetHTML('assets/merchants/shopee.png','logo','Shopee',42,12),sampleCard=realAssetHTML('assets/cards/maybank-visa-platinum.png','thumb','Maybank Visa');
+  const guardedKnownPaths=brandPaths.concat(ewalletPaths,merchantPaths).every(isKnownMissingAssetPath20_2A),cardsPreserved=cardPaths.length>0&&cardPaths.every(p=>!isKnownMissingAssetPath20_2A(p))&&/<img\s+src="assets\/cards\//.test(sampleCard);
+  const badgeSamples=[sampleBrand,sampleEwallet,sampleMerchant],knownPathsAvoidImg=badgeSamples.every(x=>x.includes('brand-badge20_2A')&&!/<img\s+src="assets\/(brands|ewallets|merchants)\//i.test(x));
+  const rendererSource=String(realAssetHTML),appRoot=document.getElementById('app')||document.body,visibleText=appRoot?(appRoot.innerText||appRoot.textContent||''):'',noInternalCopyVisible=!/20\.2A|BRAND_VISUALS_20_2A|known missing asset|developer|debug/i.test(visibleText);
+  return {phase:'20.2A',registryCount,knownMissingPathsGuarded:guardedKnownPaths,brandBadgeCssPresent:!!document.querySelector('style')&&/brand-badge20_2A/.test(document.documentElement.innerHTML),brandBadgeSamples:badgeSamples,knownPathsAvoidImg,cardsAssetImagesPreserved:cardsPreserved,helpersExposed:typeof window.normalizeBrandId20_2A==='function'&&typeof window.getBrandVisual20_2A==='function'&&typeof window.renderBrandBadge20_2A==='function'&&typeof window.isKnownMissingAssetPath20_2A==='function',realAssetRendererPatched:/isKnownMissingAssetPath20_2A/.test(rendererSource),noInternalCopyVisible,passed:registryCount>=10&&guardedKnownPaths&&knownPathsAvoidImg&&cardsPreserved&&noInternalCopyVisible};
 };
 
 let _lastRenderedTab=null;
