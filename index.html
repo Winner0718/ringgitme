@@ -2844,6 +2844,20 @@ function renderAA(){
     if(/netflix|spotify|icloud|youtube|subscription|订阅/.test(s))return want(/订阅|subscription/)||cats[0];
     return cats.find(c=>/其他|others/i.test(c.label))||cats[0];
   }
+  function normalizeQuickEntryRaw20_10D(raw,existingFiles){
+    raw=(raw&&typeof raw==='object')?raw:{};
+    return {
+      subcatId:raw.subcatId||raw.subcat_id||'',
+      entryMethod:raw.entryMethod||raw.entry_method||'telegram',
+      merchant:raw.merchant||'',
+      locationText:raw.locationText||raw.location_text||'',
+      receiptItems:Array.isArray(raw.receiptItems)?raw.receiptItems:(Array.isArray(raw.receipt_items)?raw.receipt_items:[]),
+      files:Array.isArray(raw.files)?raw.files:(Array.isArray(existingFiles)?existingFiles:[]),
+      coverIdx:Number.isFinite(Number(raw.coverIdx))?Number(raw.coverIdx):0,
+      categoryGroup:raw.category_group||raw.groupId||'',
+      subcatLabel:raw.subcatLabel||raw.subcat_label||''
+    };
+  }
   function importExpense(e){
     const amt=round2(e.amount);if(!amt)return true;
     if((D.txns||[]).some(t=>t.shortcutEntryId===e.id))return true;
@@ -2853,7 +2867,9 @@ function renderAA(){
     const pay=((D.cards||[]).find(c=>same(c.id,raw.payment_id))||resolvePay(e.payment||''));
     const iso=e.occurred_date||todayISO();
     const time=e.occurred_time||'';
-    const txn={id:nid(),amt,desc,catId:cat.id,catLabel:cat.label,catIcon:cat.icon||'ti-receipt',payId:pay?pay.id:null,payName:pay?pay.name:null,postingMode:pay?'normal':'recordOnly',date:formatDateMY19_1A(iso),isoDate:iso,time,files:telegramFiles15(raw),source:e.source||e.raw?.source||'shortcut_cloud',quickEntryId:e.id,shortcutEntryId:e.id,telegramQuickEntryId:(e.source==='telegram_bot'||e.raw?.source==='telegram_bot')?e.id:null};
+    const existingFiles=telegramFiles15(raw);
+    const v2=normalizeQuickEntryRaw20_10D(raw,existingFiles);
+    const txn={id:nid(),amt,desc,catId:cat.id,catLabel:cat.label,catIcon:cat.icon||'ti-receipt',payId:pay?pay.id:null,payName:pay?pay.name:null,postingMode:pay?'normal':'recordOnly',date:formatDateMY19_1A(iso),isoDate:iso,time,files:v2.files,subcatId:v2.subcatId,entryMethod:v2.entryMethod,merchant:v2.merchant,locationText:v2.locationText,receiptItems:v2.receiptItems,coverIdx:v2.coverIdx,categoryGroup:v2.categoryGroup,subcatLabel:v2.subcatLabel,source:e.source||e.raw?.source||'shortcut_cloud',quickEntryId:e.id,shortcutEntryId:e.id,telegramQuickEntryId:(e.source==='telegram_bot'||e.raw?.source==='telegram_bot')?e.id:null};
     if(pay&& !applyTransactionBalanceEffect(txn)){txn.postingMode='recordOnly';txn.desc=desc+'（余额不足，已补录）';}
     if(pay&&pay.type==='cc')ensureCardCycle(pay,iso);
     D.txns.unshift(txn);return true;
@@ -2897,6 +2913,23 @@ function renderAA(){
     if(Date.now()-_shortcutLastSync<45000)return;
     setTimeout(()=>rmSyncShortcutEntries(false),1200);
   }
+  window.inspectQuickEntryV2Import20_10D=function(){
+    const sample={raw:{subcatId:'f2',entryMethod:'telegram',merchant:'Thong Kee',locationText:'Kepong',receiptItems:[],files:[],coverIdx:0}};
+    const normalized=normalizeQuickEntryRaw20_10D(sample.raw,telegramFiles15(sample.raw));
+    const hasRawFieldsInApp=normalized.subcatId==='f2'&&normalized.entryMethod==='telegram'&&normalized.merchant==='Thong Kee'&&normalized.locationText==='Kepong'&&Array.isArray(normalized.receiptItems)&&Array.isArray(normalized.files)&&normalized.coverIdx===0;
+    const bodyText=document.body?(document.body.textContent||''):'';
+    const badCopy=/Phase\s*20|debug|developer|runtime|inspector|implementation/i.test(bodyText);
+    return {
+      phase:'20.10D',
+      buildMonthlyReportExists:typeof window.buildMonthlyReport==='function',
+      quickRecordInspectorExists:typeof window.inspectQuickRecordPolish20_4B==='function',
+      analyticsInspectorExists:typeof window.inspectAnalytics20_9A==='function',
+      noInternalCopyVisible:!badCopy,
+      hasRawFieldsInApp,
+      expectedBotFields:['subcatId','entryMethod','merchant','locationText','receiptItems','files','coverIdx'],
+      passed:hasRawFieldsInApp&&typeof window.buildMonthlyReport==='function'&&typeof window.inspectAnalytics20_9A==='function'&&!badCopy
+    };
+  };
   const baseBuildModal=window.buildModal||buildModal;
   window.buildModal=function(){
     let html=baseBuildModal();
