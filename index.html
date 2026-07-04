@@ -2137,11 +2137,13 @@ function getFabActions20_1(tab){
     a('card_cc','添加信用卡','Credit card','ti-credit-card'),
     a('card_saving','添加储蓄','Savings','ti-building-bank'),
     a('card_ew','添加钱包','eWallet','ti-wallet'),
+    a('repayment','记还款','Repayment','ti-credit-card-refund'),
     a('transfer','账户转账','Transfer','ti-transfer')
   ];
   if(t==='record'||t==='history')return [
     a('expense','记消费','Expense','ti-shopping-bag'),
     a('income','记收入','Income','ti-cash'),
+    a('repayment','记还款','Repayment','ti-credit-card-refund'),
     a('receipt_photo','拍收据','Receipt / Photo','ti-camera')
   ];
   if(t==='fixed')return [
@@ -2157,10 +2159,16 @@ function getFabActions20_1(tab){
   return [
     a('record_hub','记一笔','Expense / Income','ti-receipt'),
     a('receipt_photo','拍收据','Receipt / Photo','ti-camera'),
+    a('repayment','记还款','Repayment','ti-credit-card-refund'),
     a('card_add','加账户 / 卡片','Account / Card','ti-credit-card'),
     a('fixed_add','加固定支出','Fixed','ti-repeat'),
     a('ledger_person','加账本对象','Ledger','ti-users')
   ];
+}
+function repaymentCard20_1A(){
+  const cards=((D&&D.cards)||[]).filter(c=>c&&c.type==='cc');
+  if(cards.length===1)return cards[0];
+  return null;
 }
 function runFabAction20_1(actionId){
   const id=String(actionId||'');
@@ -2170,7 +2178,8 @@ function runFabAction20_1(actionId){
   if(id==='fixed_add')return hubDrill20_1('fixed');
   if(id==='expense')return {ok:openModal20_1('spend'),route:'spend'};
   if(id==='income')return {ok:openModal20_1('addincome'),route:'addincome'};
-  if(id==='receipt_photo'){if(U)U.addHub20_1=null;render();safeToast20_1('拍收据会在 Receipt Memory 阶段接上');return {ok:false,reason:'receipt_memory_pending'};}
+  if(id==='repayment'){const cc=repaymentCard20_1A();if(cc&&typeof openModal==='function')return {ok:openModal20_1('pay',{editId:cc.id}),route:'pay',cardId:cc.id};if(U)U.addHub20_1=null;render();safeToast20_1('还款入口会在下一阶段接上信用卡、AA 和对象账本');return {ok:false,reason:'repayment_route_needs_context'};}
+  if(id==='receipt_photo'){if(U)U.addHub20_1=null;render();safeToast20_1('收据扫描会在 Receipt Memory 阶段开启');return {ok:false,reason:'receipt_memory_pending'};}
   if(id==='card_cc')return {ok:openModal20_1('addcc'),route:'addcc'};
   if(id==='card_saving')return {ok:openModal20_1('addsaving'),route:'addsaving'};
   if(id==='card_ew')return {ok:openModal20_1('addew'),route:'addew'};
@@ -2185,9 +2194,9 @@ function runFabAction20_1(actionId){
 }
 function addHubHTML20_1(){
   const tab=U&&U.addHub20_1;if(!tab||U.modal)return '';
-  const actions=getFabActions20_1(tab),names={home:'添加',cards:'添加账户',record:'记账',history:'补一笔记录',fixed:'添加固定项目',aa:'对象账本',settings:'设置'};
+  const actions=getFabActions20_1(tab),copy={home:{title:'添加',sub:'选择要添加的内容'},cards:{title:'添加账户',sub:'卡片、储蓄、电子钱包'},record:{title:'记账',sub:'支出、收入、还款或收据'},history:{title:'记账',sub:'支出、收入、还款或收据'},fixed:{title:'添加固定项目',sub:'订阅、贷款、租金、信用卡月供'},aa:{title:'对象账本',sub:'添加对象、账本项目或 AA 分账'},settings:{title:'设置',sub:''}},c=copy[tab]||copy.home;
   if(!actions.length)return '';
-  return `<div class="addhub20_1" onclick="closeAddHub20_1()"><div class="addhub-card20_1" onclick="event.stopPropagation()"><div class="addhub-head20_1"><div><div class="addhub-title20_1">${esc20_1(names[tab]||'添加')}</div><div class="addhub-sub20_1">Phase 20.1 · page-aware add hub</div></div><button type="button" class="addhub-close20_1" onclick="closeAddHub20_1()" title="关闭"><i class="ti ti-x"></i></button></div><div class="addhub-actions20_1">${actions.map(x=>`<button type="button" class="addhub-act20_1" onclick="runFabAction20_1('${esc20_1(x.id)}')"><span class="addhub-ic20_1"><i class="ti ${esc20_1(x.icon)}"></i></span><span><span class="addhub-lab20_1">${esc20_1(x.label)}</span><span class="addhub-note20_1">${esc20_1(x.sub)}</span></span></button>`).join('')}</div></div></div>`;
+  return `<div class="addhub20_1" onclick="closeAddHub20_1()"><div class="addhub-card20_1" onclick="event.stopPropagation()"><div class="addhub-head20_1"><div><div class="addhub-title20_1">${esc20_1(c.title)}</div><div class="addhub-sub20_1">${esc20_1(c.sub)}</div></div><button type="button" class="addhub-close20_1" onclick="closeAddHub20_1()" title="关闭"><i class="ti ti-x"></i></button></div><div class="addhub-actions20_1">${actions.map(x=>`<button type="button" class="addhub-act20_1" onclick="runFabAction20_1('${esc20_1(x.id)}')"><span class="addhub-ic20_1"><i class="ti ${esc20_1(x.icon)}"></i></span><span><span class="addhub-lab20_1">${esc20_1(x.label)}</span><span class="addhub-note20_1">${esc20_1(x.sub)}</span></span></button>`).join('')}</div></div></div>`;
 }
 function inspectArch20_0Runtime(){
   const sampleOld={id:'old',amt:12.3,desc:'legacy'},sampleNew={merchant:'KFC',locationText:'SS15',subcatId:'food_fast',receiptItems:[{name:'Set'}],entryMethod:'manual',files:['a.jpg','b.jpg'],coverIdx:1};
@@ -2207,6 +2216,11 @@ window.getFabActions20_1=getFabActions20_1;
 window.runFabAction20_1=runFabAction20_1;
 window.inspectFab20_1=inspectFab20_1;
 window.inspectArch20_0Runtime=inspectArch20_0Runtime;
+window.inspectAddHubCopy20_1A=function(){
+  const hub=document.querySelector('.addhub20_1'),text=hub?(hub.textContent||''):'',badCopyVisible=/Phase 20\.1|page-aware|debug|developer/i.test(text);
+  const recordActions=typeof getFabActions20_1==='function'?(getFabActions20_1('history')||getFabActions20_1('record')||[]):[],hasRepayment=Array.isArray(recordActions)&&recordActions.some(a=>a&&(a.id==='repayment'||/还款|Repayment/i.test((a.label||'')+' '+(a.sub||''))));
+  return {phase:'20.1A',hubOpen:!!hub,noTechnicalCopyVisible:!badCopyVisible,hasRepaymentAction:hasRepayment,inspectFabStillExists:typeof window.inspectFab20_1==='function',fabHelpersStillExist:typeof getActiveMainTab20_1==='function'&&typeof getFabActions20_1==='function'&&typeof openAddHub20_1==='function'&&typeof runFabAction20_1==='function',passed:!badCopyVisible&&hasRepayment&&typeof window.inspectFab20_1==='function'&&typeof getFabActions20_1==='function'};
+};
 
 let _lastRenderedTab=null;
 function render(){
