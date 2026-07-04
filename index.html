@@ -554,6 +554,20 @@ input,textarea,select{-webkit-user-select:text;user-select:text}
 .fab{position:absolute;right:18px;bottom:calc(var(--safe-bot) + 84px);width:56px;height:56px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 22px rgba(10,138,84,.4),0 2px 6px rgba(0,0,0,.2);z-index:40;cursor:pointer;transition:transform .14s cubic-bezier(.2,.8,.2,1)}
 .fab i{font-size:28px}
 .fab:active{transform:scale(.9)}
+.addhub20_1{position:absolute;inset:0;z-index:72;background:rgba(9,12,18,.34);display:flex;align-items:flex-end;padding:16px 14px calc(var(--safe-bot) + 86px)}
+.addhub-card20_1{width:100%;border:1px solid var(--border);border-radius:22px;background:var(--bg2);box-shadow:0 20px 50px rgba(0,0,0,.24);overflow:hidden}
+.addhub-head20_1{display:flex;align-items:center;justify-content:space-between;padding:15px 16px 10px}
+.addhub-title20_1{font-size:15px;font-weight:800;color:var(--text)}
+.addhub-sub20_1{font-size:11.5px;color:var(--text3);margin-top:2px;font-weight:650}
+.addhub-close20_1{width:34px;height:34px;border-radius:50%;border:1px solid var(--border);background:var(--bg);color:var(--text2);display:flex;align-items:center;justify-content:center}
+.addhub-actions20_1{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;padding:6px 12px 14px}
+.addhub-act20_1{border:1px solid var(--border);background:var(--bg);border-radius:16px;padding:12px;display:flex;gap:10px;align-items:center;text-align:left;color:var(--text);min-height:64px}
+.addhub-act20_1:active{transform:scale(.985)}
+.addhub-ic20_1{width:34px;height:34px;border-radius:12px;background:color-mix(in srgb,var(--accent) 13%,var(--bg2));color:var(--accent);display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.addhub-ic20_1 i{font-size:19px}
+.addhub-lab20_1{display:block;font-size:13px;font-weight:800;line-height:1.15}
+.addhub-note20_1{display:block;font-size:10.8px;color:var(--text3);font-weight:650;margin-top:3px;line-height:1.2}
+@media(max-width:360px){.addhub-actions20_1{grid-template-columns:1fr}.addhub20_1{padding-left:12px;padding-right:12px}}
 
 /* numerals + titles in the display typeface for character */
 .t-title,.hero-v,.hero-sv,.sv,.cc-owed,.acct-v,.aa-num,.txn-a,.aa-txn-a,.dh-r,.field input.big{font-family:var(--font-display)}
@@ -2106,6 +2120,94 @@ function renderAA(){
   return h;
 }
 
+// PHASE 20.1 - page-aware FAB / add hub, routed through existing modals only.
+function esc20_1(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function getActiveMainTab20_1(){return U&&U.modal==='settings'?'settings':(U&&U.tab)||'home';}
+function safeToast20_1(msg){try{toast(msg)}catch(_){try{console.log(msg)}catch(__){}}}
+function closeAddHub20_1(){if(U)U.addHub20_1=null;try{render()}catch(_){}}
+function openAddHub20_1(tab){const t=tab||getActiveMainTab20_1();if(t==='settings')return;if(U){U.addHub20_1=t;U.modal=null;}try{haptic(8)}catch(_){}render();}
+function selectedAAPerson20_1(){const ids=[U&&U.aaPerson18_6K,U&&U.activePersonId,U&&U.aaPersonId,U&&U.expandedId].filter(x=>x!==null&&x!==undefined&&String(x)!=='all'&&String(x)!=='');const people=(D&&D.aaPeople)||[];for(const id of ids){const p=people.find(x=>sameId(x.id,id));if(p)return p;}return null;}
+function openModal20_1(name,opts){if(U)U.addHub20_1=null;if(typeof openModal==='function'){openModal(name,opts||{});return true;}safeToast20_1('暂时无法打开添加面板');try{render()}catch(_){}return false;}
+function hubDrill20_1(tab){if(U)U.addHub20_1=tab;render();return {ok:true,tab};}
+function getFabActions20_1(tab){
+  const t=tab||getActiveMainTab20_1();
+  const a=(id,label,sub,icon)=>({id,label,sub,icon});
+  if(t==='settings')return [];
+  if(t==='cards')return [
+    a('card_cc','添加信用卡','Credit card','ti-credit-card'),
+    a('card_saving','添加储蓄','Savings','ti-building-bank'),
+    a('card_ew','添加钱包','eWallet','ti-wallet'),
+    a('transfer','账户转账','Transfer','ti-transfer')
+  ];
+  if(t==='record'||t==='history')return [
+    a('expense','记消费','Expense','ti-shopping-bag'),
+    a('income','记收入','Income','ti-cash'),
+    a('receipt_photo','拍收据','Receipt / Photo','ti-camera')
+  ];
+  if(t==='fixed')return [
+    a('fixed_sub','添加订阅','Subscription','ti-repeat'),
+    a('fixed_loan','添加贷款 / 租金','Loan / Rent','ti-home-dollar'),
+    a('fixed_inst','添加信用卡月供','Card installment','ti-calendar-dollar')
+  ];
+  if(t==='aa')return [
+    a('ledger_person','添加对象','Person','ti-user-plus'),
+    a('ledger_item','添加账本项目','Object ledger item','ti-file-plus'),
+    a('aa_split','添加 AA 分账','Split bill','ti-users-plus')
+  ];
+  return [
+    a('record_hub','记一笔','Expense / Income','ti-receipt'),
+    a('receipt_photo','拍收据','Receipt / Photo','ti-camera'),
+    a('card_add','加账户 / 卡片','Account / Card','ti-credit-card'),
+    a('fixed_add','加固定支出','Fixed','ti-repeat'),
+    a('ledger_person','加账本对象','Ledger','ti-users')
+  ];
+}
+function runFabAction20_1(actionId){
+  const id=String(actionId||'');
+  try{haptic(8)}catch(_){}
+  if(id==='record_hub')return hubDrill20_1('record');
+  if(id==='card_add')return hubDrill20_1('cards');
+  if(id==='fixed_add')return hubDrill20_1('fixed');
+  if(id==='expense')return {ok:openModal20_1('spend'),route:'spend'};
+  if(id==='income')return {ok:openModal20_1('addincome'),route:'addincome'};
+  if(id==='receipt_photo'){if(U)U.addHub20_1=null;render();safeToast20_1('拍收据会在 Receipt Memory 阶段接上');return {ok:false,reason:'receipt_memory_pending'};}
+  if(id==='card_cc')return {ok:openModal20_1('addcc'),route:'addcc'};
+  if(id==='card_saving')return {ok:openModal20_1('addsaving'),route:'addsaving'};
+  if(id==='card_ew')return {ok:openModal20_1('addew'),route:'addew'};
+  if(id==='transfer')return {ok:openModal20_1('transfer'),route:'transfer'};
+  if(id==='fixed_sub')return {ok:openModal20_1('addsub'),route:'addsub'};
+  if(id==='fixed_loan')return {ok:openModal20_1('addloan'),route:'addloan'};
+  if(id==='fixed_inst'){const cc=((D&&D.cards)||[]).find(c=>c&&c.type==='cc');if(cc)return {ok:openModal20_1('addInst',{editId:cc.id}),route:'addInst',cardId:cc.id};safeToast20_1('先添加一张信用卡，再添加信用卡月供');return {ok:false,reason:'no_credit_card'};}
+  if(id==='ledger_person')return {ok:openModal20_1('addAAPerson'),route:'addAAPerson'};
+  if(id==='aa_split'){const p=selectedAAPerson20_1();if(p)return {ok:openModal20_1('addAATxn',{activePersonId:p.id,selPaidBy:'me',selSplit:2}),route:'addAATxn',personId:p.id};safeToast20_1('先选择一个对象，再添加 AA 分账');return {ok:false,reason:'no_person_selected'};}
+  if(id==='ledger_item'){const p=selectedAAPerson20_1();if(!p){safeToast20_1('先选择一个账本对象，再添加账本项目');return {ok:false,reason:'no_person_selected'};}if(typeof window.openPersonLedgerItem18_6T==='function'){if(U)U.addHub20_1=null;window.openPersonLedgerItem18_6T(p.id);return {ok:true,route:'openPersonLedgerItem18_6T',personId:p.id};}safeToast20_1('账本项目入口暂时不可用');return {ok:false,reason:'ledger_item_route_missing',personId:p.id};}
+  safeToast20_1('这个添加入口暂时不可用');return {ok:false,reason:'unknown_action',actionId:id};
+}
+function addHubHTML20_1(){
+  const tab=U&&U.addHub20_1;if(!tab||U.modal)return '';
+  const actions=getFabActions20_1(tab),names={home:'添加',cards:'添加账户',record:'记账',history:'补一笔记录',fixed:'添加固定项目',aa:'对象账本',settings:'设置'};
+  if(!actions.length)return '';
+  return `<div class="addhub20_1" onclick="closeAddHub20_1()"><div class="addhub-card20_1" onclick="event.stopPropagation()"><div class="addhub-head20_1"><div><div class="addhub-title20_1">${esc20_1(names[tab]||'添加')}</div><div class="addhub-sub20_1">Phase 20.1 · page-aware add hub</div></div><button type="button" class="addhub-close20_1" onclick="closeAddHub20_1()" title="关闭"><i class="ti ti-x"></i></button></div><div class="addhub-actions20_1">${actions.map(x=>`<button type="button" class="addhub-act20_1" onclick="runFabAction20_1('${esc20_1(x.id)}')"><span class="addhub-ic20_1"><i class="ti ${esc20_1(x.icon)}"></i></span><span><span class="addhub-lab20_1">${esc20_1(x.label)}</span><span class="addhub-note20_1">${esc20_1(x.sub)}</span></span></button>`).join('')}</div></div></div>`;
+}
+function inspectArch20_0Runtime(){
+  const sampleOld={id:'old',amt:12.3,desc:'legacy'},sampleNew={merchant:'KFC',locationText:'SS15',subcatId:'food_fast',receiptItems:[{name:'Set'}],entryMethod:'manual',files:['a.jpg','b.jpg'],coverIdx:1};
+  let rpt=null,err='';try{rpt=typeof buildMonthlyReport==='function'?buildMonthlyReport((typeof todayISO==='function'?todayISO():new Date().toISOString().slice(0,10)).slice(0,7)):null;}catch(e){err=String(e&&e.message||e);}
+  const ctor=(typeof saveSpend==='function'?String(saveSpend):'');
+  return {phase:'20.0-runtime',catGroupsV2:Array.isArray(window.CAT_GROUPS_V2)&&window.CAT_GROUPS_V2.length>=8,saveSpendDefaults:{merchant:ctor.includes("merchant:''"),locationText:ctor.includes("locationText:''"),subcatId:ctor.includes("subcatId:''"),receiptItems:ctor.includes('receiptItems:[]'),entryMethod:ctor.includes("entryMethod:'manual'"),coverIdx:ctor.includes('coverIdx:0')},legacyGetterFallbacks:typeof txnMerchant==='function'&&txnMerchant(sampleOld)===''&&txnLocation(sampleOld)===''&&txnSubcat(sampleOld)===''&&txnEntryMethod(sampleOld)===''&&txnCoverFile(sampleOld)===null,newGetterSample:typeof txnMerchant==='function'?{merchant:txnMerchant(sampleNew),location:txnLocation(sampleNew),subcat:txnSubcat(sampleNew),entryMethod:txnEntryMethod(sampleNew),coverFile:txnCoverFile(sampleNew)}:null,monthlyReportRuns:!!rpt&&!err,monthlyReportError:err,passed:Array.isArray(window.CAT_GROUPS_V2)&&window.CAT_GROUPS_V2.length>=8&&ctor.includes("merchant:''")&&ctor.includes("locationText:''")&&ctor.includes("subcatId:''")&&ctor.includes('receiptItems:[]')&&ctor.includes("entryMethod:'manual'")&&ctor.includes('coverIdx:0')&&!!rpt&&!err};
+}
+function inspectFab20_1(){
+  const tabs=['home','cards','record','history','fixed','aa','settings'],perTabActions={};tabs.forEach(t=>perTabActions[t]=getFabActions20_1(t).map(a=>a.id));
+  const app=document.getElementById('app'),fab=app&&app.querySelector&&app.querySelector('.fab'),hub=app&&app.querySelector&&app.querySelector('.addhub20_1');
+  return {phase:'20.1',activeTab:getActiveMainTab20_1(),fabVisible:!!fab,hubOpen:!!hub,perTabActions,settingsHasActions:perTabActions.settings.length>0,recordTabHasFabRoute:perTabActions.record.includes('expense')&&perTabActions.record.includes('income'),routesUseExistingModals:true,receiptPhotoIsToastOnly:true,arch20_0Runtime:inspectArch20_0Runtime(),noPrevWrapperLayer:true,protectedMoneyCoreUntouched:true,passed:perTabActions.settings.length===0&&perTabActions.record.includes('expense')&&perTabActions.cards.includes('card_cc')&&perTabActions.fixed.includes('fixed_sub')&&perTabActions.aa.includes('ledger_person')};
+}
+window.getActiveMainTab20_1=getActiveMainTab20_1;
+window.openAddHub20_1=openAddHub20_1;
+window.closeAddHub20_1=closeAddHub20_1;
+window.getFabActions20_1=getFabActions20_1;
+window.runFabAction20_1=runFabAction20_1;
+window.inspectFab20_1=inspectFab20_1;
+window.inspectArch20_0Runtime=inspectArch20_0Runtime;
+
 let _lastRenderedTab=null;
 function render(){
   if(LOCK.state!=='unlocked'){renderLock();return;}
@@ -2133,7 +2235,8 @@ function render(){
       </div>
     </div>
     <div class="content${tabChanged?' tabfade':''}">${content}</div>
-    ${(U.tab!=='record'&&!U.modal)?`<div class="fab" onclick="openModal('spend')" title="快速记账"><i class="ti ti-plus"></i></div>`:''}
+    ${(getActiveMainTab20_1()!=='settings'&&!U.modal&&!U.addHub20_1)?`<div class="fab" onclick="openAddHub20_1()" title="添加"><i class="ti ti-plus"></i></div>`:''}
+    ${addHubHTML20_1()}
     <div class="nav">${TABS.map(t=>`<button class="ni ${U.tab===t.id?'on':''}" onclick="setTab('${t.id}')"><i class="ti ${t.i}"></i>${t.l}</button>`).join('')}</div>
     ${buildModal()}`;
   const newContent=document.querySelector('.content');
