@@ -2871,6 +2871,49 @@ function renderAA(){
     return {source:'telegram',entryMethod:raw.entryMethod||raw.entry_method||'telegram_ai',sourceEntryId:qid,quickEntryId:qid,shortcutEntryId:qid,telegramQuickEntryId:fixedIsTelegram22G(e,raw)?qid:null,importedAt:now,createdAt:e&&e.created_at||raw.createdAt||raw.created_at||now,payNow:false,fixedImport22G:true,importMeta:{quickEntryId:qid,rawKind:raw.kind||raw.type||e&&e.kind||'',fixedType:raw.fixedType||raw.fixed_type||'',linkedPersonName:raw.linkedPersonName||raw.linked_person_name||'',sourceType:raw.sourceType||raw.source_type||'',sourceHint:raw.sourceHint||raw.source_hint||'',raw}};
   }
   function fixedHasSource22G(o,qid){return !!(qid&&o&&[o.sourceEntryId,o.quickEntryId,o.shortcutEntryId,o.telegramQuickEntryId,o.importMeta&&o.importMeta.quickEntryId].some(x=>same(x,qid)))}
+  function transferKind22J(e,raw){return fixedText22G(raw.kind||raw.type||e&&e.kind).toLowerCase()}
+  function transferSafeAccounts22J(){return (D.cards||[]).filter(c=>c&&(c.type==='saving'||c.type==='ew'))}
+  function transferNorm22J(v){return fixedText22G(v).toLowerCase().replace(/[\s_\-]+/g,' ').trim()}
+  function transferAliases22J(c){
+    const n=transferNorm22J(c&&c.name),out=[n],type=String(c&&c.type||'');
+    if(type==='saving')out.push('saving','savings','bank');
+    if(type==='ew')out.push('ewallet','e wallet','wallet','tng','touch n go','touchngo');
+    if(/maybank|\bmbb\b/.test(n))out.push('maybank','mbb','maybank saving','my maybank saving','maybank sav');
+    if(/cimb/.test(n))out.push('cimb');
+    if(/rhb/.test(n))out.push('rhb');
+    if(/tng|touch/.test(n))out.push('tng','touchngo','touch n go','ewallet');
+    if(/cash|现金/.test(n))out.push('cash','现金');
+    return [...new Set(out.filter(Boolean))];
+  }
+  function resolveTransferAccount22J(id,hint,role){
+    const accs=transferSafeAccounts22J(),sid=fixedText22G(id);
+    if(sid){const byId=accs.find(c=>same(c.id,sid));return byId?{ok:true,account:byId,source:'id'}:{ok:false,reason:`missing_${role}_account`,hint:sid,matches:[]};}
+    const key=transferNorm22J(hint);
+    if(!key)return {ok:false,reason:`missing_${role}_account`,hint:'',matches:[]};
+    const exact=accs.filter(c=>transferNorm22J(c.name)===key);
+    if(exact.length===1)return {ok:true,account:exact[0],source:'exact'};
+    if(exact.length>1)return {ok:false,reason:`ambiguous_${role}_account`,hint:key,matches:exact.map(c=>c.name)};
+    const hits=accs.filter(c=>transferAliases22J(c).some(a=>a===key||a.includes(key)||key.includes(a)));
+    if(hits.length===1)return {ok:true,account:hits[0],source:'alias'};
+    return hits.length>1?{ok:false,reason:`ambiguous_${role}_account`,hint:key,matches:hits.map(c=>c.name)}:{ok:false,reason:`missing_${role}_account`,hint:key,matches:[]};
+  }
+  function transferDuplicate22J(e,raw){
+    const qid=fixedEntryId22G(e,raw);if(!qid)return false;
+    const rows=[].concat(D.transfers||[],D.txns||[],D.incomes||[]);
+    return rows.some(o=>fixedHasSource22G(o,qid)||same(o&&o.importedFromQuickEntryId,qid)||same(o&&o.raw&&o.raw.sourceEntryId,qid)||same(o&&o.raw&&o.raw.quickEntryId,qid));
+  }
+  function importTransferEntry22J(e){
+    const raw=fixedRaw22G(e),amount=fixedMoney22G(raw.amount||e.amount);
+    if(!(amount>0))return {ok:false,failed:true,reason:'invalid_transfer_amount'};
+    const from=resolveTransferAccount22J(raw.fromAccountId||raw.from_account_id,raw.fromAccountHint||raw.from_account_hint||raw.fromAccountName||raw.from_account_name,'from');
+    if(!from.ok)return {ok:false,failed:true,reason:from.reason,details:from};
+    const to=resolveTransferAccount22J(raw.toAccountId||raw.to_account_id,raw.toAccountHint||raw.to_account_hint||raw.toAccountName||raw.to_account_name,'to');
+    if(!to.ok)return {ok:false,failed:true,reason:to.reason,details:to};
+    if(same(from.account.id,to.account.id))return {ok:false,failed:true,reason:'same_transfer_account'};
+    if(transferDuplicate22J(e,raw))return {ok:true,duplicate:true};
+    return {ok:false,failed:true,reason:'transfer_import_pending_no_safe_model',fromAccount:from.account.name,toAccount:to.account.name};
+  }
+  function guardCardPaymentImport22J(){return {ok:false,failed:true,reason:'card_payment_import_pending'}}
   function fixedFindPay22G(e,raw){
     const id=fixedText22G(raw.paymentSourceId||raw.payment_id||raw.payId||raw.pay_id);
     if(id){const byId=(D.cards||[]).find(c=>same(c.id,id));if(byId)return byId;}
@@ -2953,6 +2996,8 @@ function renderAA(){
   }
   function importEntry(e){
     const raw=fixedRaw22G(e),k=String(raw.kind||raw.type||e.kind||'expense').toLowerCase();
+    if(k==='transfer')return importTransferEntry22J(e);
+    if(k==='card_payment')return guardCardPaymentImport22J(e);
     if(k==='fixed')return importFixedEntry22G(e);
     if(k==='income')return importIncome(e);
     return importExpense(e);
@@ -2974,7 +3019,7 @@ function renderAA(){
         toast('✓ 已导入 '+imported.length+' 笔 Shortcut 记录');
       }else if(show)toast('没有新的 Shortcut 记录');
       if(skipped.length){
-        await Promise.all(skipped.map(x=>supa.from('quick_entries').update({status:'skipped',raw:{...(x.raw||{}),importSkipped22G:true,importSkipReason:x.reason,importSkippedAt:new Date().toISOString()}}).eq('id',x.id).catch(()=>null)));
+        await Promise.all(skipped.map(x=>supa.from('quick_entries').update({status:'skipped',raw:{...(x.raw||{}),importSkipped22G:true,importSkipped22J:true,importSkipReason:x.reason,importSkippedAt:new Date().toISOString()}}).eq('id',x.id).catch(()=>null)));
       }
       _shortcutLastSync=Date.now();
     }catch(e){console.log('rmSyncShortcutEntries',e);if(show)toast('拉取失败：确认 SQL 已运行');}
@@ -2990,6 +3035,19 @@ function renderAA(){
     try{if(window.rmRefreshDerived)rmRefreshDerived();save();render()}catch(_){}
     const after={subs:(D.subs||[]).length,loans:(D.loans||[]).length,installments:(D.ccInstallments||[]).length,txns:(D.txns||[]).length};
     return {phase:'22G',results,before,after,noExpenseCreated:after.txns===before.txns};
+  };
+  window.__ringgitmeTestImportTransfer22J=function(){
+    const accounts=transferSafeAccounts22J().map(c=>({id:c.id,name:c.name,type:c.type,balance:round2(c.balance||0)}));
+    const sav=transferSafeAccounts22J().find(c=>c.type==='saving'),ew=transferSafeAccounts22J().find(c=>c.type==='ew');
+    const before={txns:(D.txns||[]).length,incomes:(D.incomes||[]).length,transfers:(D.transfers||[]).length,cash:typeof getCashNow==='function'?round2(getCashNow()):null,balances:accounts};
+    const samples=[];
+    if(sav&&ew)samples.push({id:'qa_transfer22j_saving_ewallet',kind:'expense',amount:1,note:'Saving transfer eWallet',occurred_date:todayISO(),source:'telegram_bot',raw:{source:'telegram_bot',kind:'transfer',type:'transfer',amount:1,fromAccountId:sav.id,toAccountId:ew.id,fromAccountHint:sav.name,toAccountHint:ew.name,note:'Saving transfer eWallet',entryMethod:'telegram_ai',createdBy:'telegram_ai'}});
+    const cash=(D.cards||[]).find(c=>/cash|现金/i.test(String(c.name||''))&&(c.type==='saving'||c.type==='ew')),cimb=(D.cards||[]).find(c=>/cimb/i.test(String(c.name||''))&&(c.type==='saving'||c.type==='ew'));
+    if(cash&&cimb&&!same(cash.id,cimb.id))samples.push({id:'qa_transfer22j_cash_cimb',kind:'expense',amount:1,note:'Cash transfer CIMB',occurred_date:todayISO(),source:'telegram_bot',raw:{source:'telegram_bot',kind:'transfer',type:'transfer',amount:1,fromAccountHint:cash.name,toAccountHint:cimb.name,note:'Cash transfer CIMB',entryMethod:'telegram_ai'}});
+    samples.push({id:'qa_transfer22j_ambiguous',kind:'expense',amount:1,note:'Ambiguous transfer',occurred_date:todayISO(),source:'telegram_bot',raw:{source:'telegram_bot',kind:'transfer',type:'transfer',amount:1,fromAccountHint:'Saving',toAccountHint:'eWallet',note:'Ambiguous transfer',entryMethod:'telegram_ai'}});
+    const results=samples.map(e=>({id:e.id,result:importEntry(e)}));
+    const after={txns:(D.txns||[]).length,incomes:(D.incomes||[]).length,transfers:(D.transfers||[]).length,cash:typeof getCashNow==='function'?round2(getCashNow()):null,balances:transferSafeAccounts22J().map(c=>({id:c.id,name:c.name,type:c.type,balance:round2(c.balance||0)}))};
+    return {phase:'22J',mode:'skipped_only_no_safe_transfer_model',availableAccounts:accounts,results,before,after,noExpenseCreated:after.txns===before.txns,noIncomeCreated:after.incomes===before.incomes,noTransferCreated:after.transfers===before.transfers,totalCashUnchanged:before.cash===after.cash};
   };
   function maybeAutoSync(){
     if(typeof U!=='undefined'&&U&&U.tab==='aa')return;/* AA-stability fix: don't auto-import / cloud-sync while the AA page is open, so a background sync can't replace the AA DOM under the user. Imports resume on other tabs / unlock / online. */
