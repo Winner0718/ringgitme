@@ -2858,6 +2858,75 @@ function renderAA(){
       subcatLabel:raw.subcatLabel||raw.subcat_label||''
     };
   }
+  function fixedRaw22G(e){return (e&&e.raw&&typeof e.raw==='object')?e.raw:{}}
+  function fixedText22G(v){return String(v==null?'':v).trim()}
+  function fixedMoney22G(v){return round2(Number(v)||0)}
+  function fixedDay22G(v,fallback){const n=parseInt(v);return n>=1&&n<=31?n:(fallback||1)}
+  function fixedStartDate22G(e,raw){const d=fixedText22G(raw.startDate||raw.start_date||e.occurred_date||todayISO());return /^\d{4}-\d{2}-\d{2}/.test(d)?d.slice(0,10):todayISO()}
+  function fixedStartMonth22G(e,raw){const d=fixedText22G(raw.startDate||raw.start_date||e.occurred_date||todayISO());return /^\d{4}-\d{2}/.test(d)?d.slice(0,7):todayISO().slice(0,7)}
+  function fixedEntryId22G(e,raw){return fixedText22G(e&&e.id||raw.quickEntryId||raw.quick_entry_id||raw.sourceEntryId||raw.source_entry_id||raw.id)}
+  function fixedIsTelegram22G(e,raw){return fixedText22G(e&&e.source||raw.source).toLowerCase()==='telegram_bot'||/telegram/i.test(fixedText22G(raw.entryMethod||raw.entry_method||raw.createdBy))}
+  function fixedMeta22G(e,raw){
+    const qid=fixedEntryId22G(e,raw),now=new Date().toISOString();
+    return {source:'telegram',entryMethod:raw.entryMethod||raw.entry_method||'telegram_ai',sourceEntryId:qid,quickEntryId:qid,shortcutEntryId:qid,telegramQuickEntryId:fixedIsTelegram22G(e,raw)?qid:null,importedAt:now,createdAt:e&&e.created_at||raw.createdAt||raw.created_at||now,payNow:false,fixedImport22G:true,importMeta:{quickEntryId:qid,rawKind:raw.kind||raw.type||e&&e.kind||'',fixedType:raw.fixedType||raw.fixed_type||'',linkedPersonName:raw.linkedPersonName||raw.linked_person_name||'',sourceType:raw.sourceType||raw.source_type||'',sourceHint:raw.sourceHint||raw.source_hint||'',raw}};
+  }
+  function fixedHasSource22G(o,qid){return !!(qid&&o&&[o.sourceEntryId,o.quickEntryId,o.shortcutEntryId,o.telegramQuickEntryId,o.importMeta&&o.importMeta.quickEntryId].some(x=>same(x,qid)))}
+  function fixedFindPay22G(e,raw){
+    const id=fixedText22G(raw.paymentSourceId||raw.payment_id||raw.payId||raw.pay_id);
+    if(id){const byId=(D.cards||[]).find(c=>same(c.id,id));if(byId)return byId;}
+    const name=fixedText22G(raw.paymentSourceName||raw.payment_name||raw.payName||raw.pay_name||e.payment);
+    if(!name)return null;
+    const key=norm(name);
+    return (D.cards||[]).find(c=>norm(c.name)===key||key.includes(norm(c.name))||norm(c.name).includes(key))||null;
+  }
+  function fixedType22G(e,raw){const k=fixedText22G(raw.fixedType||raw.fixed_type||raw.type||e.kind).toLowerCase();return /installment|分期/.test(k)?'installment':'monthly'}
+  function fixedIsLoan22G(raw,title){
+    const target=fixedText22G(raw.targetStore||raw.target_store).toLowerCase();
+    const text=(title+' '+fixedText22G(raw.category||raw.categoryName||raw.category_name||raw.type||raw.loanType)).toLowerCase();
+    return target==='loans'||/rent|loan|ptptn|房租|租|贷款|车贷|房贷/.test(text);
+  }
+  function importMonthlyFixed22G(e,raw){
+    const qid=fixedEntryId22G(e,raw),title=fixedText22G(raw.title||raw.name||raw.label||e.note),amount=fixedMoney22G(raw.amount||raw.monthlyAmount||raw.monthly_amount||e.amount);
+    if(!title||!(amount>0))return {ok:false,failed:true,reason:'invalid_monthly_fixed'};
+    const isLoan=fixedIsLoan22G(raw,title),list=isLoan?(D.loans||(D.loans=[])):(D.subs||(D.subs=[]));
+    if(list.some(o=>fixedHasSource22G(o,qid)))return {ok:true,duplicate:true};
+    const rec=raw.recurrence&&typeof raw.recurrence==='object'?raw.recurrence:{},day=fixedDay22G(rec.dayOfMonth||rec.day_of_month||raw.dayOfMonth||raw.day||raw.dueDay||raw.due_day,1),start=fixedStartDate22G(e,raw),pay=fixedFindPay22G(e,raw),meta=fixedMeta22G(e,raw);
+    let obj;
+    if(isLoan){
+      const ltype=fixedText22G(raw.loanType||raw.loan_type||raw.typeLabel||raw.type)||(/rent|房租|租/i.test(title)?'房租 Rent':'贷款 / 租金');
+      obj={id:nid(),name:title,type:ltype,iconId:/车|car/i.test(ltype)?'car':'loan',img:null,color:'',monthly:amount,remaining:fixedMoney22G(raw.remainingAmount||raw.remaining_amount||0),total:fixedMoney22G(raw.remainingAmount||raw.remaining_amount||0),dueDay:day,startDate:start,loanStartDate:start,moveInDate:/rent|房租|租/i.test(ltype)?start:'',payId:pay?pay.id:'',paymentSourceId:pay?pay.id:'',payName:pay?pay.name:'',aaSplit:raw.aaSplit||raw.aa_split||null,...meta};
+      D.loans.push(obj);try{if(typeof syncFixedAAReceivable==='function')syncFixedAAReceivable('loan',obj)}catch(_){}
+    }else{
+      obj={id:nid(),name:title,iconId:'star',img:null,color:'',amt:amount,day,startDate:start,subscriptionStartDate:start,payId:pay?pay.id:'',paymentSourceId:pay?pay.id:'',payName:pay?pay.name:'',aaSplit:raw.aaSplit||raw.aa_split||null,...meta};
+      D.subs.push(obj);try{if(typeof syncFixedAAReceivable==='function')syncFixedAAReceivable('sub',obj)}catch(_){}
+    }
+    return {ok:true,kind:isLoan?'loan':'sub',id:obj.id};
+  }
+  function importInstallmentFixed22G(e,raw){
+    const qid=fixedEntryId22G(e,raw);
+    if((D.ccInstallments||[]).some(o=>fixedHasSource22G(o,qid)))return {ok:true,duplicate:true};
+    const title=fixedText22G(raw.title||raw.name||raw.itemName||raw.item_name||e.note);
+    let months=parseInt(raw.months||raw.tenureMonths||raw.tenure_months||raw.installmentMonths||raw.installment_months),total=fixedMoney22G(raw.totalAmount||raw.total_amount||raw.amount||e.amount),monthly=fixedMoney22G(raw.monthlyAmount||raw.monthly_amount||raw.monthlyPayment||raw.monthly_payment);
+    if(months>0&&!(monthly>0)&&total>0)monthly=round2(total/months);
+    if(months>0&&!(total>0)&&monthly>0)total=round2(monthly*months);
+    if(!title||!(months>0)||!(total>0)||!(monthly>0))return {ok:false,failed:true,reason:'invalid_installment_fixed'};
+    const linkedCardId=fixedText22G(raw.linkedCardId||raw.linked_card_id||raw.cardId||raw.card_id),card=(D.cards||[]).find(c=>same(c.id,linkedCardId)&&c.type==='cc'),rec=raw.recurrence&&typeof raw.recurrence==='object'?raw.recurrence:{},day=fixedDay22G(rec.dayOfMonth||rec.day_of_month||raw.dayOfMonth||raw.dueDay||raw.due_day,null),startMonth=fixedStartMonth22G(e,raw),remainingMonths=months,remainingBalance=round2(monthly*remainingMonths),meta=fixedMeta22G(e,raw),due=raw.nextDueDate||raw.next_due_date||(day?`${todayISO().slice(0,7)}-${String(day).padStart(2,'0')}`:'');
+    const obj={id:nid(),cardId:card?card.id:'',itemName:title,totalAmount:total,tenureMonths:months,monthlyPayment:monthly,calcMode:'manual',startDate:startMonth,paidMonths:0,remainingMonths,remainingBalance,nextDueDate:due,status:'active',notes:fixedText22G(raw.notes||raw.note||raw.sourceHint||raw.source_hint||raw.linkedPersonName||raw.linked_person_name),includeInMonthlyPressure:raw.includeInMonthlyPressure!==false&&raw.include_in_monthly_pressure!==false,includeInTotalDebt:raw.includeInTotalDebt===true||raw.include_in_total_debt===true,aaSplit:raw.aaSplit||raw.aa_split||null,sourceType:raw.sourceType||raw.source_type||'unknown',sourceHint:raw.sourceHint||raw.source_hint||'',linkedCardId:linkedCardId||'',linkedCardName:card?card.name:(raw.linkedCardName||raw.linked_card_name||''),linkedPersonName:raw.linkedPersonName||raw.linked_person_name||'',...meta};
+    if(!Array.isArray(D.ccInstallments))D.ccInstallments=[];D.ccInstallments.push(obj);
+    try{if(obj.aaSplit&&obj.aaSplit.enabled&&typeof upsertAAReceivable==='function')upsertAAReceivable('installment',obj.id,obj.monthlyPayment,obj.aaSplit,obj.itemName)}catch(_){}
+    return {ok:true,kind:'installment',id:obj.id};
+  }
+  function importFixedEntry22G(e){const raw=fixedRaw22G(e);return fixedType22G(e,raw)==='installment'?importInstallmentFixed22G(e,raw):importMonthlyFixed22G(e,raw)}
+  const baseCreditCardMonthlyObligations22G=typeof getCreditCardMonthlyObligations==='function'?getCreditCardMonthlyObligations:null;
+  if(baseCreditCardMonthlyObligations22G&&!window.__fixedImport22GObligationsWrapped){
+    window.__fixedImport22GObligationsWrapped=true;
+    window.getCreditCardMonthlyObligations=function(){
+      const out=baseCreditCardMonthlyObligations22G.apply(this,arguments)||[];
+      try{(typeof getInstallments==='function'?getInstallments():D.ccInstallments||[]).map(normalizeInstallment).filter(p=>!p.cardId&&p.includeInMonthlyPressure&&p.status!=='completed'&&p.remainingMonths>0).forEach(p=>out.push({type:'installment',cardId:'',id:p.id,name:p.itemName,cardName:p.sourceHint||p.sourceType||'Standalone installment',amount:p.monthlyPayment,remainingMonths:p.remainingMonths,tenureMonths:p.tenureMonths,remainingBalance:p.remainingBalance,nextDueDate:p.nextDueDate||'',countInTotal:true,aaSplit:p.aaSplit||null,sourceType:p.sourceType||'unknown'}));}catch(_){}
+      return out;
+    };
+    try{getCreditCardMonthlyObligations=window.getCreditCardMonthlyObligations}catch(_){}
+  }
   function importExpense(e){
     const amt=round2(e.amount);if(!amt)return true;
     if((D.txns||[]).some(t=>t.shortcutEntryId===e.id))return true;
@@ -2883,7 +2952,8 @@ function renderAA(){
     return true;
   }
   function importEntry(e){
-    const k=String(e.kind||'expense').toLowerCase();
+    const raw=fixedRaw22G(e),k=String(raw.kind||raw.type||e.kind||'expense').toLowerCase();
+    if(k==='fixed')return importFixedEntry22G(e);
     if(k==='income')return importIncome(e);
     return importExpense(e);
   }
@@ -2894,8 +2964,8 @@ function renderAA(){
     try{
       const {data,error}=await supa.from('quick_entries').select('*').eq('status','pending').order('created_at',{ascending:true}).limit(30);
       if(error)throw error;
-      const imported=[];
-      (data||[]).forEach(e=>{try{if(importEntry(e))imported.push(e.id);}catch(err){console.log('quick import skipped',e,err);}});
+      const imported=[],skipped=[];
+      (data||[]).forEach(e=>{try{const res=importEntry(e);if(res===true||(res&&res.ok))imported.push(e.id);else if(res&&res.failed)skipped.push({id:e.id,reason:res.reason,raw:e.raw||{}});}catch(err){console.log('quick import skipped',e,err);}});
       if(imported.length){
         if(window.rmRefreshDerived)rmRefreshDerived();
         save();
@@ -2903,9 +2973,23 @@ function renderAA(){
         render();
         toast('✓ 已导入 '+imported.length+' 笔 Shortcut 记录');
       }else if(show)toast('没有新的 Shortcut 记录');
+      if(skipped.length){
+        await Promise.all(skipped.map(x=>supa.from('quick_entries').update({status:'skipped',raw:{...(x.raw||{}),importSkipped22G:true,importSkipReason:x.reason,importSkippedAt:new Date().toISOString()}}).eq('id',x.id).catch(()=>null)));
+      }
       _shortcutLastSync=Date.now();
     }catch(e){console.log('rmSyncShortcutEntries',e);if(show)toast('拉取失败：确认 SQL 已运行');}
     _shortcutSyncing=false;
+  };
+  window.__ringgitmeTestImportFixed22G=function(){
+    const before={subs:(D.subs||[]).length,loans:(D.loans||[]).length,installments:(D.ccInstallments||[]).length,txns:(D.txns||[]).length};
+    const samples=[
+      {id:'qa_fixed22g_monthly_netflix',kind:'fixed',amount:1,note:'测试 Netflix',occurred_date:todayISO(),source:'telegram_bot',raw:{source:'telegram_bot',entryMethod:'telegram_ai',kind:'fixed',fixedType:'monthly',title:'测试 Netflix',amount:1,category:'账单',recurrence:{frequency:'monthly',dayOfMonth:10},payNow:false,createdBy:'telegram'}},
+      {id:'qa_fixed22g_installment_phone',kind:'fixed',amount:12,note:'测试手机',occurred_date:todayISO(),source:'telegram_bot',raw:{source:'telegram_bot',entryMethod:'telegram_ai',kind:'fixed',fixedType:'installment',title:'测试手机',totalAmount:12,months:3,monthlyAmount:4,category:'购物',recurrence:{frequency:'monthly',dayOfMonth:null},payNow:false,sourceType:'unknown',sourceHint:'',createdBy:'telegram'}}
+    ];
+    const results=samples.map(e=>({id:e.id,result:importEntry(e)}));
+    try{if(window.rmRefreshDerived)rmRefreshDerived();save();render()}catch(_){}
+    const after={subs:(D.subs||[]).length,loans:(D.loans||[]).length,installments:(D.ccInstallments||[]).length,txns:(D.txns||[]).length};
+    return {phase:'22G',results,before,after,noExpenseCreated:after.txns===before.txns};
   };
   function maybeAutoSync(){
     if(typeof U!=='undefined'&&U&&U.tab==='aa')return;/* AA-stability fix: don't auto-import / cloud-sync while the AA page is open, so a background sync can't replace the AA DOM under the user. Imports resume on other tabs / unlock / online. */
