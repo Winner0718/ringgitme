@@ -1291,7 +1291,7 @@ function hasData(o){return !!(o&&(o.cards&&o.cards.length||o.txns&&o.txns.length
 function accounts(){try{return JSON.parse(localStorage.getItem('rm_accounts')||'[]');}catch(e){return [];}}
 function rememberAccount(s){if(!s||!s.user||!s.access_token||!s.refresh_token)return;const list=accounts().filter(a=>a.id!==s.user.id);list.push({id:s.user.id,email:s.user.email||'',access_token:s.access_token,refresh_token:s.refresh_token});try{localStorage.setItem('rm_accounts',JSON.stringify(list));}catch(e){}}
 function forgetAccount(id){try{localStorage.setItem('rm_accounts',JSON.stringify(accounts().filter(a=>a.id!==id)));}catch(e){}}
-function initSupa(){const c=supaCfg();if(!c.url||!c.key||!window.supabase)return;try{supa=window.supabase.createClient(c.url,c.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});supa.auth.onAuthStateChange((_e,s)=>{const prevUid=SESSION&&SESSION.user?SESSION.user.id:null;SESSION=s;if(s){rememberAccount(s);if(s.user.id!==prevUid){U.addAccount=false;adoptCloudOrPush();}if(LOCK&&LOCK.state==='welcome'){localStorage.setItem('rm_onboarded','1');LOCK.state='sec_setup';renderLock();}}if(LOCK&&LOCK.state==='unlocked'&&U.modal==='settings')render();});}catch(e){console.log('initSupa',e);}}
+function initSupa(){const c=supaCfg();if(!c.url||!c.key||!window.supabase)return;try{supa=window.supabase.createClient(c.url,c.key,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});supa.auth.onAuthStateChange((_e,s)=>{const prevUid=SESSION&&SESSION.user?SESSION.user.id:null;SESSION=s;if(s){rememberAccount(s);if(s.user.id!==prevUid){U.addAccount=false;adoptCloudOrPush();}if(LOCK&&LOCK.state==='welcome'){localStorage.setItem('rm_onboarded','1');LOCK.state='sec_setup';renderLock();}}if(LOCK&&LOCK.state==='unlocked'&&U.modal==='settings')render();});if(typeof processPendingNativeOAuthIOS2==='function')processPendingNativeOAuthIOS2();}catch(e){console.log('initSupa',e);}}
 function schedulePush(){if(!supaReady())return;clearTimeout(_pushT);_pushT=setTimeout(pushCloud,1500);}
 async function pushCloud(){if(!supaReady())return;try{await supa.from('ledgers').upsert({user_id:SESSION.user.id,data:D,updated_at:new Date(D.updatedAt||Date.now()).toISOString()});}catch(e){console.log('pushCloud',e);}}
 async function pullCloud(){if(!supaReady())return null;try{const{data,error}=await supa.from('ledgers').select('data').eq('user_id',SESSION.user.id).maybeSingle();if(error){console.log('pullCloud',error);return null;}return data?data.data:null;}catch(e){console.log('pullCloud',e);return null;}}
@@ -1302,7 +1302,62 @@ async function adoptCloudOrPush(){if(!supaReady())return;const uid=SESSION.user.
 async function flushCurrent(){if(supaReady()){clearTimeout(_pushT);await pushCloud();}}
 async function authSignUp(){if(!supa){toast('请先配置云同步');return;}const email=v('au-email'),pw=v('au-pw');if(!email||pw.length<6){toast('邮箱 + 至少6位密码');return;}await flushCurrent();toast('注册中…');const{data,error}=await supa.auth.signUp({email,password:pw});if(error){toast('注册失败：'+error.message);return;}if(data.session){toast('✓ 注册成功，已登录');}else{toast('✓ 注册成功，请到邮箱点确认链接后登录');}}
 async function authSignIn(){if(!supa){toast('请先配置云同步');return;}const email=v('au-email'),pw=v('au-pw');if(!email||!pw){toast('填邮箱和密码');return;}await flushCurrent();toast('登录中…');const{error}=await supa.auth.signInWithPassword({email,password:pw});if(error){toast('登录失败：'+error.message);return;}toast('✓ 登录成功');}
-async function authGoogle(){if(!supa){toast('请先配置云同步');return;}await flushCurrent();const{error}=await supa.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.href.split('#')[0],queryParams:{prompt:'select_account'}}});if(error)toast('Google 登录失败：'+error.message);}
+const NATIVE_OAUTH_CALLBACK_IOS2='ringgitme://auth/callback';
+const NATIVE_URL_SCHEME_IOS2='ringgitme';
+let nativeOAuthPendingUrlIOS2='',nativeOAuthCallbackProcessingIOS2=false,nativeOAuthCallbackHandledIOS2=false,nativeOAuthInitPromiseIOS2=null,nativeOAuthListenerRegisteredIOS2=false;
+function isNativeCapacitorIOS2(){try{return !!(window.Capacitor&&typeof window.Capacitor.isNativePlatform==='function'&&window.Capacitor.isNativePlatform())}catch(_){return false}}
+function capacitorPluginIOS2(name){try{return window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins[name]||null}catch(_){return null}}
+function resetNativeOAuthAttemptIOS2(){nativeOAuthPendingUrlIOS2='';nativeOAuthCallbackProcessingIOS2=false;nativeOAuthCallbackHandledIOS2=false}
+function isAcceptedNativeOAuthCallbackIOS2(rawUrl){try{const u=new URL(String(rawUrl||''));return u.protocol==='ringgitme:'&&u.hostname==='auth'&&u.pathname==='/callback'}catch(_){return false}}
+async function handleNativeOAuthCallbackIOS2(rawUrl){
+  if(!isAcceptedNativeOAuthCallbackIOS2(rawUrl))return {ok:false,ignored:true};
+  if(nativeOAuthCallbackProcessingIOS2||nativeOAuthCallbackHandledIOS2)return {ok:false,duplicate:true};
+  if(!supa){nativeOAuthPendingUrlIOS2=String(rawUrl);return {ok:false,queued:true}}
+  let callback;
+  try{callback=new URL(String(rawUrl))}catch(_){return {ok:false,ignored:true}}
+  const fragment=new URLSearchParams(callback.hash&&callback.hash.charAt(0)==='#'?callback.hash.slice(1):''),accessToken=fragment.get('access_token'),refreshToken=fragment.get('refresh_token');
+  if(!accessToken||!refreshToken){nativeOAuthCallbackHandledIOS2=true;toast('Google 登录没有完成，请再试一次。');return {ok:false,reason:'missing_tokens'}}
+  nativeOAuthCallbackProcessingIOS2=true;
+  try{
+    const{data,error}=await supa.auth.setSession({access_token:accessToken,refresh_token:refreshToken});
+    if(error||!data||!data.session)throw new Error('session_restore_failed');
+    nativeOAuthPendingUrlIOS2='';nativeOAuthCallbackProcessingIOS2=false;nativeOAuthCallbackHandledIOS2=true;
+    const browser=capacitorPluginIOS2('Browser');if(browser&&typeof browser.close==='function')try{await browser.close()}catch(_){}
+    toast('✓ Google 登录成功');
+    return {ok:true};
+  }catch(_){nativeOAuthPendingUrlIOS2='';nativeOAuthCallbackProcessingIOS2=false;nativeOAuthCallbackHandledIOS2=true;toast('Google 登录失败，请再试一次。');return {ok:false,reason:'session_restore_failed'}}
+}
+function processPendingNativeOAuthIOS2(){if(!supa||!nativeOAuthPendingUrlIOS2)return false;const pending=nativeOAuthPendingUrlIOS2;nativeOAuthPendingUrlIOS2='';void handleNativeOAuthCallbackIOS2(pending);return true}
+function initNativeOAuthIOS2(){
+  if(!isNativeCapacitorIOS2())return Promise.resolve(false);
+  if(nativeOAuthInitPromiseIOS2)return nativeOAuthInitPromiseIOS2;
+  nativeOAuthInitPromiseIOS2=(async()=>{
+    const app=capacitorPluginIOS2('App');if(!app||typeof app.addListener!=='function'||typeof app.getLaunchUrl!=='function')return false;
+    try{
+      await app.addListener('appUrlOpen',event=>{const callbackUrl=event&&typeof event.url==='string'?event.url:'';if(callbackUrl)void handleNativeOAuthCallbackIOS2(callbackUrl)});
+      nativeOAuthListenerRegisteredIOS2=true;
+      const launch=await app.getLaunchUrl();if(launch&&typeof launch.url==='string')await handleNativeOAuthCallbackIOS2(launch.url);
+      return true;
+    }catch(_){nativeOAuthListenerRegisteredIOS2=false;return false}
+  })();
+  return nativeOAuthInitPromiseIOS2;
+}
+async function authGoogle(){
+  if(!supa){toast('请先配置云同步');return;}
+  await flushCurrent();
+  if(isNativeCapacitorIOS2()){
+    resetNativeOAuthAttemptIOS2();
+    const browser=capacitorPluginIOS2('Browser');
+    if(!browser||typeof browser.open!=='function'){toast('Google 登录暂时不可用，请稍后再试。');return;}
+    const{data,error}=await supa.auth.signInWithOAuth({provider:'google',options:{redirectTo:NATIVE_OAUTH_CALLBACK_IOS2,skipBrowserRedirect:true,queryParams:{prompt:'select_account'}}});
+    if(error){toast('Google 登录失败：'+error.message);return;}
+    if(!data||!data.url){toast('无法开始 Google 登录，请再试一次。');return;}
+    try{await browser.open({url:data.url})}catch(_){toast('无法打开 Google 登录，请再试一次。');}
+    return;
+  }
+  const{error}=await supa.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.href.split('#')[0],queryParams:{prompt:'select_account'}}});if(error)toast('Google 登录失败：'+error.message);
+}
+window.__ringgitmeTestIOS2OAuth=function(){const authSrc=String(authGoogle),handlerSrc=String(handleNativeOAuthCallbackIOS2),initSrc=String(initNativeOAuthIOS2),pendingSrc=String(processPendingNativeOAuthIOS2),nativeCallbackUrlOk=NATIVE_OAUTH_CALLBACK_IOS2==='ringgitme://auth/callback',urlSchemeConfigured=NATIVE_URL_SCHEME_IOS2==='ringgitme',appPluginAvailable=!!capacitorPluginIOS2('App'),browserPluginAvailable=!!capacitorPluginIOS2('Browser'),nativeRedirectBranchOk=authSrc.includes('NATIVE_OAUTH_CALLBACK_IOS2')&&authSrc.includes('skipBrowserRedirect:true')&&authSrc.includes('browser.open'),webRedirectUnchanged=authSrc.includes("redirectTo:location.href.split('#')[0]"),implicitFlowUsesSetSession=handlerSrc.includes('supa.auth.setSession')&&handlerSrc.includes("fragment.get('access_token')")&&handlerSrc.includes("fragment.get('refresh_token')"),noExchangeCodeForSession=![authSrc,handlerSrc,initSrc,pendingSrc].some(src=>src.includes('exchangeCodeForSession')),warmCallbackHandled=initSrc.includes("addListener('appUrlOpen'")&&initSrc.includes('handleNativeOAuthCallbackIOS2'),coldStartHandled=initSrc.includes('getLaunchUrl')&&initSrc.includes('handleNativeOAuthCallbackIOS2'),duplicateGuardOk=handlerSrc.includes('nativeOAuthCallbackProcessingIOS2')&&handlerSrc.includes('nativeOAuthCallbackHandledIOS2')&&initSrc.includes('nativeOAuthInitPromiseIOS2'),noTokenLogging=![authSrc,handlerSrc,initSrc,pendingSrc].some(src=>src.includes('console.')),generatedCopiesSynced=[...document.scripts].some(s=>(s.textContent||'').includes('window.__ringgitmeTestIOS2OAuth=function')),out={phase:'iOS-2',nativeCallbackUrlOk,urlSchemeConfigured,appPluginAvailable,browserPluginAvailable,nativeRedirectBranchOk,webRedirectUnchanged,implicitFlowUsesSetSession,noExchangeCodeForSession,warmCallbackHandled,coldStartHandled,duplicateGuardOk,noTokenLogging,generatedCopiesSynced,safe:false};out.safe=out.nativeCallbackUrlOk&&out.urlSchemeConfigured&&out.appPluginAvailable&&out.browserPluginAvailable&&out.nativeRedirectBranchOk&&out.webRedirectUnchanged&&out.implicitFlowUsesSetSession&&out.noExchangeCodeForSession&&out.warmCallbackHandled&&out.coldStartHandled&&out.duplicateGuardOk&&out.noTokenLogging&&out.generatedCopiesSynced;return out};
 async function switchAccount(id){if(!supa){toast('云同步未就绪');return;}if(SESSION&&SESSION.user&&SESSION.user.id===id)return;const acc=accounts().find(a=>a.id===id);if(!acc){toast('账号信息丢失，请重新登录');return;}toast('切换中…');await flushCurrent();const{data,error}=await supa.auth.setSession({access_token:acc.access_token,refresh_token:acc.refresh_token});if(error||!data||!data.session){toast('该账号登录已过期，请重新登录');forgetAccount(id);U.addAccount=true;render();return;}/* onAuthStateChange 会因 uid 变化自动 adoptCloudOrPush */}
 function addAnotherAccount(){U.addAccount=true;render();}
 function cancelAddAccount(){U.addAccount=false;render();}
@@ -1704,9 +1759,10 @@ function renderLock(){
     ${buildPinPad()}`;
     if(SEC.hasSavedCred())html+=`<div class="pin-btn-link" onclick="LOCK.state='locked_face';LOCK.pinInput='';LOCK.pinError='';renderLock()"><i class="ti ti-face-id" style="font-size:14px;vertical-align:-2px"></i> 改用 Face ID</div>`;
   }
-  // Tip: only show when NOT already running as an installed app
+  // Tip: only show when NOT already running as an installed web or Capacitor app.
   var standalone=window.navigator.standalone===true||(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches);
-  if(!standalone&&LOCK.state!=='checking'&&LOCK.state!=='setup_webauthn'){
+  var nativeCapacitor=!!(window.Capacitor&&typeof window.Capacitor.isNativePlatform==='function'&&window.Capacitor.isNativePlatform());
+  if(!standalone&&!nativeCapacitor&&LOCK.state!=='checking'&&LOCK.state!=='setup_webauthn'){
     html+=`<div style="position:absolute;left:0;right:0;bottom:calc(var(--safe-bot) + 18px);font-size:12px;color:var(--text3);display:flex;align-items:center;justify-content:center;gap:6px;padding:0 24px;line-height:1.5"><i class="ti ti-device-mobile-share" style="font-size:15px"></i>点 Safari「分享 → 加到主屏幕」，全屏体验更佳</div>`;
   }
   html+='</div>';
@@ -4061,6 +4117,7 @@ function renderAA(){
 
 initSecurity();
 initSupa();
+void initNativeOAuthIOS2();
 
 
 

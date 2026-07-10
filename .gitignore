@@ -1,0 +1,13 @@
+node_modules/
+www/
+.vite/
+.DS_Store
+
+# Native build products and user-specific Xcode state.
+ios/App/Pods/
+ios/App/build/
+ios/App/DerivedData/
+ios/App/*.xcworkspace/xcuserdata/
+ios/App/*.xcodeproj/xcuserdata/
+*.xcuserstate
+

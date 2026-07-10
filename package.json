@@ -1,0 +1,20 @@
+{
+  "name": "ringgitme",
+  "version": "1.0.0",
+  "private": true,
+  "description": "RinggitMe Capacitor iOS shell",
+  "scripts": {
+    "web:prepare": "node scripts/prepare-capacitor-web.mjs",
+    "ios:sync": "npm run web:prepare && npx cap sync ios",
+    "ios:open": "npm run ios:sync && npx cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/app": "8.1.0",
+    "@capacitor/browser": "8.0.3",
+    "@capacitor/core": "8.4.1",
+    "@capacitor/ios": "8.4.1"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.4.1"
+  }
+}
