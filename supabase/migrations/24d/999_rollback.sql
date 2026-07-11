@@ -2,6 +2,23 @@
 -- This destroys only data in the new 24D shared-layer objects. It must never
 -- alter or drop any pre-24D RinggitMe table. RPCs are removed first.
 
+drop function if exists public.remove_unclaimed_member(uuid, uuid, bigint);
+drop function if exists public.create_member_invitation(uuid, uuid, text, text, timestamptz, uuid, bigint);
+drop function if exists public.revoke_invitation(uuid, bigint);
+drop function if exists public.reject_invitation(text);
+drop function if exists public.inspect_invitation(text);
+drop function if exists public.accept_invitation(text);
+
+drop index if exists public.invitations_rejected_by_idx;
+drop index if exists public.invitations_active_member_lookup_idx;
+drop index if exists public.invitations_open_code_hash_uidx;
+alter table if exists public.invitations
+  drop constraint if exists invitations_terminal_state_ck,
+  drop constraint if exists invitations_rejected_time_ck,
+  drop constraint if exists invitations_rejection_actor_ck,
+  drop column if exists rejected_by_identity_id,
+  drop column if exists rejected_at;
+
 drop function if exists public.bootstrap_current_user_identity(text, text, text);
 drop function if exists public.issue_media_url(uuid, text);
 drop function if exists public.record_settlement(uuid, uuid, uuid, uuid, uuid, bigint, timestamptz, uuid, uuid);
@@ -13,7 +30,6 @@ drop function if exists public.void_entry(uuid, integer, uuid);
 drop function if exists public.revise_entry(uuid, text, text, text, bigint, jsonb, integer, uuid);
 drop function if exists public.respond_to_line(uuid, text, text, integer, uuid);
 drop function if exists public.create_shared_entry(uuid, uuid, text, text, text, text, bigint, date, jsonb, uuid, uuid);
-drop function if exists public.accept_invitation(text);
 drop function if exists public.invite_member(uuid, text, text, text, timestamptz, uuid);
 drop function if exists public.create_shared_ledger(text, text, uuid, uuid);
 drop function if exists public.ensure_current_identity();

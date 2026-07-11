@@ -69,7 +69,7 @@ select public.create_shared_ledger(
 ) as ledger_id \gset
 select public.invite_member(
   :'ledger_id'::uuid, 'User B', 'code',
-  encode(digest('scratch-probe-invite-only', 'sha256'), 'hex'),
+  encode(extensions.digest(convert_to('scratch-probe-invite-only', 'UTF8'), 'sha256'), 'hex'),
   now() + interval '1 hour',
   '10000000-0000-4000-8000-000000000003'::uuid
 ) as invitation_id \gset
@@ -80,7 +80,7 @@ reset role;
 set local role authenticated;
 select set_config('request.jwt.claim.sub', :'user_b', true);
 select public.accept_invitation(
-  encode(digest('scratch-probe-invite-only', 'sha256'), 'hex')
+  encode(extensions.digest(convert_to('scratch-probe-invite-only', 'UTF8'), 'sha256'), 'hex')
 ) as member_b_id \gset
 
 reset role;
@@ -158,7 +158,7 @@ declare v_rejected boolean := false;
 begin
   begin
     perform public.accept_invitation(
-      encode(digest('scratch-probe-invite-only', 'sha256'), 'hex')
+      encode(extensions.digest(convert_to('scratch-probe-invite-only', 'UTF8'), 'sha256'), 'hex')
     );
   exception when check_violation then v_rejected := true;
   end;

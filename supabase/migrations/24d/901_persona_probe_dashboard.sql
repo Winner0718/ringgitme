@@ -127,7 +127,7 @@ select pg_temp.probe_put(
   'invitation_id',
   public.invite_member(
     pg_temp.probe_id('ledger_id'), 'User B', 'code',
-    encode(digest('scratch-probe-invite-only', 'sha256'), 'hex'),
+    encode(extensions.digest(convert_to('scratch-probe-invite-only', 'UTF8'), 'sha256'), 'hex'),
     now() + interval '1 hour',
     '10000000-0000-4000-8000-000000000003'::uuid
   )
@@ -148,7 +148,7 @@ select set_config('request.jwt.claim.sub', pg_temp.probe_user('user_b')::text, t
 select pg_temp.probe_put(
   'member_b_id',
   public.accept_invitation(
-    encode(digest('scratch-probe-invite-only', 'sha256'), 'hex')
+    encode(extensions.digest(convert_to('scratch-probe-invite-only', 'UTF8'), 'sha256'), 'hex')
   )
 );
 
@@ -242,7 +242,7 @@ declare v_rejected boolean := false;
 begin
   begin
     perform public.accept_invitation(
-      encode(digest('scratch-probe-invite-only', 'sha256'), 'hex')
+      encode(extensions.digest(convert_to('scratch-probe-invite-only', 'UTF8'), 'sha256'), 'hex')
     );
   exception when check_violation then v_rejected := true;
   end;
