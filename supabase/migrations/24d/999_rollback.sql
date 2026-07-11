@@ -2,6 +2,7 @@
 -- This destroys only data in the new 24D shared-layer objects. It must never
 -- alter or drop any pre-24D RinggitMe table. RPCs are removed first.
 
+drop function if exists public.bootstrap_current_user_identity(text, text, text);
 drop function if exists public.issue_media_url(uuid, text);
 drop function if exists public.record_settlement(uuid, uuid, uuid, uuid, uuid, bigint, timestamptz, uuid, uuid);
 drop function if exists public.reopen_line(uuid, integer, uuid);

@@ -13,10 +13,21 @@ Amounts are integer sen. Financial and audit foreign keys use restrictive deleti
 1. `001_shared_core.sql` — 13 additive tables, constraints, indexes, and the shared-JSON privacy check.
 2. `002_shared_rls.sql` — helper functions, timestamp triggers, explicit grants, and enabled RLS policies.
 3. `003_shared_rpcs.sql` — authenticated `SECURITY DEFINER` mutations and fail-closed media URL signature.
-4. `900_persona_probe.sql` — psql-oriented, transactional scratch-project probe only; never a production migration.
-5. `999_rollback.sql` — destructive rollback for the new 24D objects only.
+4. `004_app_identity_bootstrap.sql` — idempotent current-user profile and `app_user` identity bootstrap; no shared financial writes.
+5. `900_persona_probe.sql` — psql-oriented, transactional scratch-project probe only; never a production migration.
+6. `901_persona_probe_dashboard.sql` — pure-SQL Dashboard version of the 24D-B persona probe; scratch only.
+7. `902_app_identity_bootstrap_probe_dashboard.sql` — pure-SQL Dashboard probe for 004; scratch only.
+8. `999_rollback.sql` — destructive rollback for the new 24D objects only.
 
-Production migration tooling must include only 001–003, after independent SQL/security review. Do not put 900 or 999 into an automatic production migration sequence.
+Production migration tooling must include only 001–004, after independent SQL/security review. Do not put 900, 901, 902, or 999 into an automatic production migration sequence.
+
+## Phase 24D-C app identity bootstrap
+
+`004_app_identity_bootstrap.sql` adds one authenticated RPC that ensures the current Auth user has one profile and one active `app_user` identity. Suggested display name, avatar, and locale values apply only when the profile is missing. Existing profile fields are never overwritten, so user-edited profile data remains authoritative. Repeated and concurrent calls converge on the existing active-auth-user unique index and return the same identity.
+
+The RPC derives ownership exclusively from `auth.uid()` and rejects a conflicting active identity kind. It does not accept another user's UUID and does not write ledgers, memberships, entries, lines, events, settlements, private postings, accounts, balances, Worker data, or Telegram data.
+
+The app foundation may ship before 004 is deployed. In that order, the client classifies a genuinely missing RPC as `not_deployed`, keeps existing private sync and app startup non-blocking, and retries only transient failures within a bounded session budget. Apply 004 only through a separately approved database deployment; this repository task does not execute it.
 
 ## Scratch-project dry run (examples only)
 
@@ -27,6 +38,7 @@ These commands are documentation, not commands executed during this task. Use a 
 psql "$SCRATCH_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/24d/001_shared_core.sql
 psql "$SCRATCH_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/24d/002_shared_rls.sql
 psql "$SCRATCH_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/24d/003_shared_rpcs.sql
+psql "$SCRATCH_DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/24d/004_app_identity_bootstrap.sql
 ```
 
 Alternative Supabase CLI commands, again examples only:
@@ -54,6 +66,18 @@ All 13 required tables were verified present. The RLS and RPC files completed su
 `900_persona_probe.sql` remains the canonical psql probe. `901_persona_probe_dashboard.sql` is the Dashboard-compatible probe used for this validation.
 
 This is evidence of a disposable scratch validation only. It is not production deployment approval, and the production RinggitMe Supabase project was never contacted or modified.
+
+The recorded 11/07/2026 validation above predates 004 and therefore covers only 001–003 plus 901. Phase 24D-C validation is recorded separately below.
+
+## Phase 24D-C scratch validation — 11/07/2026
+
+Result: **PASS**
+
+The existing disposable scratch project already had 001, 002, and 003 applied. `004_app_identity_bootstrap.sql` then executed successfully using Role `postgres`, followed by `902_app_identity_bootstrap_probe_dashboard.sql` in Supabase Dashboard SQL Editor using Role `postgres`.
+
+All `identity_probe_assert` checks completed with no `PERSONA PROBE FAILED` or other SQL error. The probe's final `ROLLBACK` executed and retained no probe fixtures. This validation used a disposable scratch project only; production RinggitMe Supabase was never contacted or modified, and the App Supabase URL/key were not changed.
+
+This is not production deployment approval. Production deployment of 001–004 remains a separate, explicitly approved decision.
 
 ## Security fixes before scratch dry-run
 

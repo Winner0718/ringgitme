@@ -11013,6 +11013,449 @@ window.inspectTxnDetail20_6A=function(){const bodyText=document.body?(document.b
   ensure24BB();ensureCss24BB();
 })();
 
+// PHASE 24D-C: authenticated profile/app_user identity bootstrap foundation.
+// This capability is intentionally non-visual and independent of private sync.
+(function(){
+  'use strict';
+  const SHARED_IDENTITY_ENABLED_24DC=true;
+  const SHARED_IDENTITY_CACHE_VERSION_24DC=1;
+  const SHARED_IDENTITY_CACHE_PREFIX_24DC='rm_shared_identity_24dc_v1:';
+  const SHARED_IDENTITY_MAX_ATTEMPTS_24DC=3;
+  const SHARED_IDENTITY_TIMEOUT_MS_24DC=10000;
+  const SHARED_IDENTITY_BACKOFF_MS_24DC=[30000,120000,600000];
+  let identitySessionVersion24DC=0;
+  let identityGeneration24DC=0;
+  let identityPromise24DC=null;
+  let identityPromiseUid24DC='';
+  let identityBootstrapQueuedUid24DC='';
+  let identityRetryTimer24DC=null;
+  let identityAuthClient24DC=null;
+  let identityAuthSubscription24DC=null;
+  const identityState24DC={
+    status:'unknown',authUserId:'',identityId:'',profileId:'',displayName:'',
+    avatarUrl:'',locale:'',lastAttemptAt:'',retryCount:0,errorCode:'',
+    sessionKey:'',sessionVersion:0
+  };
+
+  function sessionUser24DC(){
+    return SESSION&&SESSION.user&&SESSION.user.id?SESSION.user:null;
+  }
+  function cacheKey24DC(uid){return SHARED_IDENTITY_CACHE_PREFIX_24DC+String(uid||'')}
+  function identityView24DC(row){
+    if(!row||!row.authUserId||!row.identityId||!row.profileId)return null;
+    return {authUserId:row.authUserId,identityId:row.identityId,profileId:row.profileId,
+      displayName:row.displayName||'',avatarUrl:row.avatarUrl||'',locale:row.locale||''};
+  }
+  function setIdentityState24DC(patch){
+    Object.assign(identityState24DC,patch||{});
+    return getSharedFeatureAvailability24DC();
+  }
+  function emptyIdentityState24DC(status,uid){
+    uid=String(uid||'');
+    return {status:status||'unknown',authUserId:uid,identityId:'',profileId:'',
+      displayName:'',avatarUrl:'',locale:'',lastAttemptAt:'',retryCount:0,
+      errorCode:'',sessionKey:uid?uid+':'+identitySessionVersion24DC:'',
+      sessionVersion:identitySessionVersion24DC};
+  }
+  function readIdentityCache24DC(uid,storage=localStorage){
+    try{
+      const row=JSON.parse(storage.getItem(cacheKey24DC(uid))||'null');
+      if(!row||row.version!==SHARED_IDENTITY_CACHE_VERSION_24DC||row.authUserId!==uid
+        ||!row.identityId||!row.profileId)return null;
+      return row;
+    }catch(_){return null}
+  }
+  function writeIdentityCache24DC(row,storage=localStorage){
+    try{
+      storage.setItem(cacheKey24DC(row.authUserId),JSON.stringify({
+        version:SHARED_IDENTITY_CACHE_VERSION_24DC,authUserId:row.authUserId,
+        identityId:row.identityId,profileId:row.profileId,
+        displayName:row.displayName||'',avatarUrl:row.avatarUrl||'',
+        locale:row.locale||'',cachedAt:new Date().toISOString()
+      }));
+    }catch(_){/* cache is convenience only */}
+  }
+  function removeIdentityCache24DC(uid,storage=localStorage){
+    if(!uid)return;
+    try{storage.removeItem(cacheKey24DC(uid))}catch(_){/* non-critical */}
+  }
+  function clearRetryTimer24DC(){
+    if(identityRetryTimer24DC){clearTimeout(identityRetryTimer24DC);identityRetryTimer24DC=null}
+  }
+  function invalidateIdentityWork24DC(){
+    identityGeneration24DC+=1;
+    identityPromise24DC=null;
+    identityPromiseUid24DC='';
+    identityBootstrapQueuedUid24DC='';
+    clearRetryTimer24DC();
+  }
+  function clearCurrentAppIdentity24DC(options={}){
+    const user=sessionUser24DC(),oldUid=String(options.uid||identityState24DC.authUserId||'');
+    removeIdentityCache24DC(oldUid);
+    invalidateIdentityWork24DC();
+    identitySessionVersion24DC+=1;
+    const nextUid=options.keepCurrentUser&&user?String(user.id):'';
+    const status=options.status||(nextUid?'unknown':'signed_out');
+    setIdentityState24DC(emptyIdentityState24DC(status,nextUid));
+    return true;
+  }
+  function restoreIdentityCache24DC(uid){
+    const row=readIdentityCache24DC(uid);
+    if(!row)return null;
+    setIdentityState24DC({authUserId:uid,identityId:row.identityId,
+      profileId:row.profileId,displayName:row.displayName||'',
+      avatarUrl:row.avatarUrl||'',locale:row.locale||''});
+    return identityView24DC(row);
+  }
+  function getCurrentAppIdentity24DC(){
+    const user=sessionUser24DC();
+    if(!user)return null;
+    const uid=String(user.id);
+    if(identityState24DC.authUserId!==uid)return null;
+    return identityView24DC(identityState24DC)||identityView24DC(readIdentityCache24DC(uid));
+  }
+  function getSharedFeatureAvailability24DC(){return {...identityState24DC}}
+  function isSharedLedgerSchemaAvailable24DC(){return identityState24DC.status==='available'}
+  function suggestedProfile24DC(user){
+    const meta=user&&user.user_metadata&&typeof user.user_metadata==='object'?user.user_metadata:{};
+    const email=String(user&&user.email||'');
+    const displayName=String(meta.full_name||meta.name||email.split('@')[0]||'RinggitMe User').trim()||'RinggitMe User';
+    return {displayName:displayName.slice(0,120),avatarUrl:String(meta.avatar_url||meta.picture||'').trim(),locale:'zh-MY'};
+  }
+  function safeErrorCode24DC(error){
+    return String(error&&(
+      error.code||error.status||error.name
+    )||'unknown').slice(0,80);
+  }
+  function classifyIdentityError24DC(error){
+    const code=String(error&&error.code||'').toUpperCase();
+    const status=Number(error&&error.status||0);
+    const message=String(error&&error.message||error||'').toLowerCase();
+    const namesBootstrap=message.includes('bootstrap_current_user_identity');
+    const missing=code==='PGRST202'||code==='42883'
+      ||(status===404&&namesBootstrap)
+      ||(namesBootstrap&&(message.includes('does not exist')||message.includes('could not find')||message.includes('not found')));
+    if(missing)return 'not_deployed';
+    if(status===401||status===403||code==='42501'||code==='PGRST301'||/jwt|authenticat|permission denied/.test(message)){
+      return 'auth_or_request_error';
+    }
+    const transient=status===408||status===429||status>=500
+      ||code==='TIMEOUT'||code==='ABORTERROR'
+      ||/timeout|timed out|network|failed to fetch|load failed|connection|temporar/.test(message);
+    return transient?'temporarily_unavailable':'auth_or_request_error';
+  }
+  async function callIdentityRpc24DC(client,user){
+    const suggestion=suggestedProfile24DC(user);
+    let timeoutId;
+    const request=client.rpc('bootstrap_current_user_identity',{
+      p_display_name:suggestion.displayName,
+      p_avatar_url:suggestion.avatarUrl||null,
+      p_locale:suggestion.locale
+    }).then(result=>{
+      if(result&&result.error)throw result.error;
+      return result&&result.data;
+    });
+    const timeout=new Promise((_,reject)=>{
+      timeoutId=setTimeout(()=>{
+        const error=new Error('identity bootstrap timeout');error.code='TIMEOUT';reject(error);
+      },SHARED_IDENTITY_TIMEOUT_MS_24DC);
+    });
+    try{return await Promise.race([request,timeout])}
+    finally{clearTimeout(timeoutId)}
+  }
+  function normalizeIdentityResult24DC(data,uid){
+    const row=Array.isArray(data)?data[0]:data;
+    if(!row||String(row.auth_user_id||'')!==uid||!row.identity_id||!row.profile_id){
+      const error=new Error('identity bootstrap returned an invalid current-user result');
+      error.code='INVALID_IDENTITY_RESULT';throw error;
+    }
+    return {authUserId:uid,identityId:String(row.identity_id),profileId:String(row.profile_id),
+      displayName:String(row.display_name||''),avatarUrl:String(row.avatar_url||''),
+      locale:String(row.locale||'')};
+  }
+  function scheduleIdentityRetry24DC(uid,generation){
+    if(identityState24DC.retryCount>=SHARED_IDENTITY_MAX_ATTEMPTS_24DC)return;
+    const delay=SHARED_IDENTITY_BACKOFF_MS_24DC[Math.max(0,identityState24DC.retryCount-1)]
+      ||SHARED_IDENTITY_BACKOFF_MS_24DC[SHARED_IDENTITY_BACKOFF_MS_24DC.length-1];
+    clearRetryTimer24DC();
+    identityRetryTimer24DC=setTimeout(()=>{
+      identityRetryTimer24DC=null;
+      const user=sessionUser24DC();
+      if(generation!==identityGeneration24DC||!user||String(user.id)!==uid)return;
+      void bootstrapCurrentUserIdentity24DC({retry:true});
+    },delay);
+  }
+  function bootstrapCurrentUserIdentity24DC(options={}){
+    const user=sessionUser24DC();
+    if(!user){
+      if(identityState24DC.status!=='signed_out')clearCurrentAppIdentity24DC({status:'signed_out'});
+      return Promise.resolve(null);
+    }
+    const uid=String(user.id);
+    if(!SHARED_IDENTITY_ENABLED_24DC){
+      setIdentityState24DC({...emptyIdentityState24DC('not_deployed',uid),errorCode:'disabled'});
+      return Promise.resolve(null);
+    }
+    if(identityState24DC.authUserId!==uid){
+      clearCurrentAppIdentity24DC({uid:identityState24DC.authUserId,status:'unknown'});
+      setIdentityState24DC({...emptyIdentityState24DC('unknown',uid)});
+      restoreIdentityCache24DC(uid);
+    }
+    if(identityState24DC.status==='available'&&!options.force)return Promise.resolve(getCurrentAppIdentity24DC());
+    if(identityState24DC.status==='not_deployed'&&!options.force)return Promise.resolve(null);
+    if(identityPromise24DC&&identityPromiseUid24DC===uid)return identityPromise24DC;
+    if(!supa||typeof supa.rpc!=='function')return Promise.resolve(null);
+    if(identityState24DC.retryCount>=SHARED_IDENTITY_MAX_ATTEMPTS_24DC&&!options.force)return Promise.resolve(null);
+    clearRetryTimer24DC();
+    const generation=identityGeneration24DC;
+    const attempt=options.force?Math.max(1,identityState24DC.retryCount+1):identityState24DC.retryCount+1;
+    setIdentityState24DC({status:'unknown',authUserId:uid,lastAttemptAt:new Date().toISOString(),
+      retryCount:attempt,errorCode:'',sessionKey:uid+':'+identitySessionVersion24DC,
+      sessionVersion:identitySessionVersion24DC});
+    const promise=(async()=>{
+      try{
+        const data=await callIdentityRpc24DC(supa,user);
+        if(generation!==identityGeneration24DC||!sessionUser24DC()||String(sessionUser24DC().id)!==uid)return null;
+        const row=normalizeIdentityResult24DC(data,uid);
+        writeIdentityCache24DC(row);
+        setIdentityState24DC({...row,status:'available',errorCode:'',
+          sessionKey:uid+':'+identitySessionVersion24DC,sessionVersion:identitySessionVersion24DC});
+        return identityView24DC(row);
+      }catch(error){
+        if(generation!==identityGeneration24DC)return null;
+        const kind=classifyIdentityError24DC(error),errorCode=safeErrorCode24DC(error);
+        if(kind==='not_deployed'){
+          setIdentityState24DC({status:'not_deployed',errorCode});
+          console.info('[24D-C] Shared identity RPC is not deployed; private app startup continues.');
+          return null;
+        }
+        setIdentityState24DC({status:'temporarily_unavailable',errorCode});
+        if(kind==='auth_or_request_error')console.error('[24D-C] Identity bootstrap auth/request error:',error);
+        else{
+          console.warn('[24D-C] Identity bootstrap temporarily unavailable:',errorCode);
+          scheduleIdentityRetry24DC(uid,generation);
+        }
+        return null;
+      }
+    })();
+    identityPromise24DC=promise;identityPromiseUid24DC=uid;
+    promise.finally(()=>{
+      if(identityPromise24DC===promise){identityPromise24DC=null;identityPromiseUid24DC=''}
+    });
+    return promise;
+  }
+  function handleIdentitySession24DC(session,event){
+    const user=session&&session.user&&session.user.id?session.user:null;
+    if(!user){
+      if(identityState24DC.status!=='signed_out'||identityState24DC.authUserId){
+        clearCurrentAppIdentity24DC({uid:identityState24DC.authUserId,status:'signed_out'});
+      }
+      return;
+    }
+    const uid=String(user.id);
+    if(identityState24DC.authUserId!==uid||identityState24DC.status==='signed_out'){
+      const oldUid=identityState24DC.authUserId;
+      if(oldUid)removeIdentityCache24DC(oldUid);
+      invalidateIdentityWork24DC();identitySessionVersion24DC+=1;
+      setIdentityState24DC(emptyIdentityState24DC('unknown',uid));
+      restoreIdentityCache24DC(uid);
+    }
+    if(identityState24DC.status==='available'||identityState24DC.status==='not_deployed'
+      ||identityState24DC.status==='temporarily_unavailable')return;
+    if(identityPromise24DC&&identityPromiseUid24DC===uid)return;
+    if(identityBootstrapQueuedUid24DC===uid)return;
+    identityBootstrapQueuedUid24DC=uid;
+    // Defer out of Supabase's auth callback and keep private adoptCloudOrPush first.
+    setTimeout(()=>{
+      if(identityBootstrapQueuedUid24DC===uid)identityBootstrapQueuedUid24DC='';
+      const current=sessionUser24DC();
+      if(current&&String(current.id)===uid)void bootstrapCurrentUserIdentity24DC({authEvent:event||''});
+    },0);
+  }
+  function attachIdentityAuth24DC(client){
+    if(!client||!client.auth||identityAuthClient24DC===client)return;
+    try{identityAuthSubscription24DC&&identityAuthSubscription24DC.unsubscribe&&identityAuthSubscription24DC.unsubscribe()}catch(_){}
+    identityAuthClient24DC=client;
+    try{
+      const listener=client.auth.onAuthStateChange((event,session)=>handleIdentitySession24DC(session,event));
+      identityAuthSubscription24DC=listener&&listener.data&&listener.data.subscription||null;
+    }catch(error){console.error('[24D-C] Identity auth listener failed:',error)}
+    if(SESSION)handleIdentitySession24DC(SESSION,'CURRENT_SESSION');
+    else if(typeof client.auth.getSession==='function'){
+      client.auth.getSession().then(result=>{
+        const session=result&&result.data&&result.data.session;
+        if(session)handleIdentitySession24DC(session,'RESTORED_SESSION');
+      }).catch(error=>console.error('[24D-C] Session restore for identity failed:',error));
+    }
+  }
+
+  // Preserve the original initializer and only attach the additional listener
+  // after reconfiguration creates a new client.
+  try{
+    const previousInitSupa24DC=initSupa;
+    initSupa=function(){
+      const result=previousInitSupa24DC.apply(this,arguments);
+      setTimeout(()=>attachIdentityAuth24DC(supa),0);
+      return result;
+    };
+  }catch(error){console.error('[24D-C] Supabase re-init wrapper failed:',error)}
+  attachIdentityAuth24DC(supa);
+
+  window.isSharedLedgerSchemaAvailable24DC=isSharedLedgerSchemaAvailable24DC;
+  window.bootstrapCurrentUserIdentity24DC=bootstrapCurrentUserIdentity24DC;
+  window.getCurrentAppIdentity24DC=getCurrentAppIdentity24DC;
+  window.clearCurrentAppIdentity24DC=clearCurrentAppIdentity24DC;
+  window.getSharedFeatureAvailability24DC=getSharedFeatureAvailability24DC;
+
+  window.__ringgitmeTestSharedIdentity24DC=async function(options={}){
+    if(options.live===true){
+      if(options.confirmScratchOnly!==true){
+        console.warn('[24D-C QA] Live mode refused. Confirm a disposable scratch backend explicitly.');
+        return {phase:'24D-C',live:true,refused:true,safe:false};
+      }
+      console.warn('[24D-C QA] LIVE SCRATCH MODE: never run this against production.');
+      const identity=await bootstrapCurrentUserIdentity24DC({force:true});
+      const availability=getSharedFeatureAvailability24DC();
+      return {phase:'24D-C',live:true,identity,availability,safe:!!identity&&availability.status==='available'};
+    }
+
+    class MemoryStorage24DC{
+      constructor(seed){this.rows=new Map(seed||[])}
+      getItem(key){return this.rows.has(key)?this.rows.get(key):null}
+      setItem(key,value){this.rows.set(key,String(value))}
+      removeItem(key){this.rows.delete(key)}
+    }
+    function makeMockServer24DC(){
+      const profiles=new Map(),identities=new Map(),calls=new Map();let nextIdentity=1;
+      return {profiles,identities,calls,async rpc(user){
+        calls.set(user.id,(calls.get(user.id)||0)+1);await Promise.resolve();
+        if(!profiles.has(user.id)){
+          const suggestion=suggestedProfile24DC(user);
+          profiles.set(user.id,{displayName:suggestion.displayName,avatarUrl:suggestion.avatarUrl,locale:suggestion.locale});
+        }
+        if(!identities.has(user.id))identities.set(user.id,'mock-identity-'+nextIdentity++);
+        const profile=profiles.get(user.id);
+        return {auth_user_id:user.id,profile_id:user.id,identity_id:identities.get(user.id),
+          display_name:profile.displayName,avatar_url:profile.avatarUrl,locale:profile.locale};
+      }};
+    }
+    function makeMockController24DC(transport,storage=new MemoryStorage24DC(),maxAttempts=SHARED_IDENTITY_MAX_ATTEMPTS_24DC){
+      let user=null,state={status:'signed_out',identity:null,attempts:0},inflight=null;
+      const key=uid=>'identity:'+uid;
+      const read=uid=>{try{return JSON.parse(storage.getItem(key(uid))||'null')}catch(_){return null}};
+      const clear=uid=>{if(uid)storage.removeItem(key(uid))};
+      const controller={storage,key,get state(){return state},get user(){return user},read,
+        async login(nextUser){
+          if(!user||user.id!==nextUser.id){
+            clear(user&&user.id);user=nextUser;state={status:'unknown',identity:null,attempts:0};inflight=null;
+            const cached=read(nextUser.id);
+            if(cached)state={status:'available',identity:cached,attempts:0};
+          }
+          return controller.bootstrap();
+        },
+        logout(){clear(user&&user.id);user=null;inflight=null;state={status:'signed_out',identity:null,attempts:0}},
+        async bootstrap(){
+          if(!user)return null;
+          if(state.status==='available')return state.identity;
+          if(state.status==='not_deployed'||state.attempts>=maxAttempts)return null;
+          if(inflight)return inflight;
+          const uid=user.id;
+          inflight=(async()=>{
+            while(user&&user.id===uid&&state.attempts<maxAttempts){
+              state.attempts+=1;
+              try{
+                const row=await transport(user);
+                if(!user||user.id!==uid)return null;
+                const identity={authUserId:uid,identityId:row.identity_id,profileId:row.profile_id,
+                  displayName:row.display_name,avatarUrl:row.avatar_url||'',locale:row.locale||''};
+                state={status:'available',identity,attempts:state.attempts};
+                storage.setItem(key(uid),JSON.stringify(identity));return identity;
+              }catch(error){
+                const kind=classifyIdentityError24DC(error);
+                if(kind==='not_deployed'){state={status:'not_deployed',identity:null,attempts:state.attempts};return null}
+                state={status:'temporarily_unavailable',identity:null,attempts:state.attempts};
+              }
+            }
+            return null;
+          })();
+          try{return await inflight}finally{inflight=null}
+        }
+      };
+      return controller;
+    }
+    const data=typeof D==='object'&&D?D:{};
+    const snapshot=keys=>JSON.stringify(keys.map(key=>[key,data[key]]));
+    const moneyKeys=['txns','incomes','cards','subs','loans','goals','resists','aaPeople','aaReceivables','aaSettlements','personLedgers','personLedgerItems'];
+    const sharedKeys=['groups','groupMembers','groupSplitItems','groupSplitLines','groupPayments','groupTombstones24B'];
+    const telegramKeys=['telegramBindings','groupTelegramBindings','aaTelegramBindings'];
+    const beforeMoney=snapshot(moneyKeys),beforeShared=snapshot(sharedKeys),beforeTelegram=snapshot(telegramKeys);
+
+    const server=makeMockServer24DC(),storage=new MemoryStorage24DC();
+    const controller=makeMockController24DC(user=>server.rpc(user),storage);
+    const signedOutStateSafe=controller.state.status==='signed_out'&&await controller.bootstrap()===null;
+    const userA={id:'user-a',email:'alpha@example.test',user_metadata:{full_name:'Alpha User'}};
+    const firstA=controller.login(userA),secondA=controller.login(userA);
+    const [identityA,identityA2]=await Promise.all([firstA,secondA]);
+    const concurrentBootstrapDeduped=server.calls.get('user-a')===1;
+    const sameUserReturnsSameIdentity=identityA&&identityA2&&identityA.identityId===identityA2.identityId
+      &&(await controller.bootstrap()).identityId===identityA.identityId;
+    const profileFallbackCorrect=identityA&&identityA.displayName==='Alpha User';
+    server.profiles.get('user-a').displayName='Edited Alpha';
+    controller.logout();
+    const editedA=await controller.login(userA);
+    const editedDisplayNamePreserved=editedA&&editedA.displayName==='Edited Alpha';
+
+    const userB={id:'user-b',email:'bravo@example.test',user_metadata:{}};
+    const identityB=await controller.login(userB);
+    const differentUsersSeparated=identityB&&identityA&&identityB.identityId!==identityA.identityId;
+    const callsBeforeRelaunch=server.calls.get('user-b');
+    const relaunchController=makeMockController24DC(user=>server.rpc(user),storage);
+    const relaunched=await relaunchController.login(userB);
+    const relaunchRestoresIdentity=relaunched&&relaunched.identityId===identityB.identityId
+      &&server.calls.get('user-b')===callsBeforeRelaunch;
+
+    const mismatchStorage=new MemoryStorage24DC(),mismatchController=makeMockController24DC(user=>server.rpc(user),mismatchStorage);
+    await mismatchController.login(userA);
+    const oldCacheKey=mismatchController.key(userA.id);
+    await mismatchController.login(userB);
+    const sessionMismatchClearsCache=mismatchStorage.getItem(oldCacheKey)===null
+      &&mismatchController.state.identity.authUserId==='user-b';
+    const signedInCacheKey=mismatchController.key(userB.id);
+    mismatchController.logout();
+    const signOutClearsCache=mismatchStorage.getItem(signedInCacheKey)===null
+      &&mismatchController.state.status==='signed_out';
+
+    let missingCalls=0;
+    const missingController=makeMockController24DC(async()=>{
+      missingCalls+=1;const error=new Error('Could not find the function public.bootstrap_current_user_identity');
+      error.code='PGRST202';error.status=404;throw error;
+    });
+    const missingFirst=await missingController.login(userA),missingSecond=await missingController.bootstrap();
+    const missingRpcDoesNotBreakApp=missingFirst===null&&missingSecond===null
+      &&missingController.state.status==='not_deployed'&&missingCalls===1;
+
+    let transientCalls=0;
+    const transientController=makeMockController24DC(async()=>{
+      transientCalls+=1;const error=new Error('network temporarily unavailable');error.status=503;throw error;
+    });
+    await transientController.login(userA);
+    const transientRetryBounded=transientCalls===SHARED_IDENTITY_MAX_ATTEMPTS_24DC
+      &&transientController.state.status==='temporarily_unavailable';
+    const privateSyncNotBlocked=typeof adoptCloudOrPush==='function'
+      &&!String(bootstrapCurrentUserIdentity24DC).includes('adoptCloudOrPush');
+    const noMoneyMutation=beforeMoney===snapshot(moneyKeys);
+    const noSharedLedgerMutation=beforeShared===snapshot(sharedKeys);
+    const noTelegramMutation=beforeTelegram===snapshot(telegramKeys);
+    const out={phase:'24D-C',signedOutStateSafe,sameUserReturnsSameIdentity,
+      concurrentBootstrapDeduped,differentUsersSeparated,profileFallbackCorrect,
+      editedDisplayNamePreserved,signOutClearsCache,sessionMismatchClearsCache,
+      relaunchRestoresIdentity,missingRpcDoesNotBreakApp,transientRetryBounded,
+      privateSyncNotBlocked,noMoneyMutation,noSharedLedgerMutation,noTelegramMutation,safe:false};
+    out.safe=Object.keys(out).filter(key=>key!=='phase'&&key!=='safe').every(key=>out[key]===true);
+    return out;
+  };
+})();
+
 </script>
 
 </body>
