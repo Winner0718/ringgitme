@@ -458,6 +458,7 @@ function telegramFiles15(raw){
   ensureCss18_7G();
 })();
 
+
 </script>
 <link rel="icon" type="image/svg+xml" href="icon.svg"/>
 <link rel="apple-touch-icon" href="icon.svg"/>
@@ -11453,6 +11454,366 @@ window.inspectTxnDetail20_6A=function(){const bodyText=document.body?(document.b
       privateSyncNotBlocked,noMoneyMutation,noSharedLedgerMutation,noTelegramMutation,safe:false};
     out.safe=Object.keys(out).filter(key=>key!=='phase'&&key!=='safe').every(key=>out[key]===true);
     return out;
+  };
+})();
+// PHASE 24D-D2A: invisible invitation/shared-ledger client foundation.
+// No UI or link routing belongs here. The hardcoded SUPA_URL still wins in
+// supaCfg(); the D2-C scratch walkthrough needs a separate reviewed solution.
+(function(){
+  'use strict';
+  const SHARED_LEDGER_24DD_ENABLED=true;
+  const INVITE_TIMEOUT_MS_24DD=10000;
+  const PENDING_INVITE_KEY_24DD='rm_pending_invite_24dd_v1';
+  const PENDING_INVITE_VERSION_24DD=1;
+  const PENDING_INVITE_TTL_MS_24DD=24*60*60*1000;
+  const UUID_RE_24DD=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const HASH_RE_24DD=/^[0-9a-f]{64}$/;
+  const CODE_RE_24DD=/^[0-9A-HJKMNP-TV-Z]{26}$/;
+  const INVITATION_RPCS_24DD=['create_shared_ledger','invite_member','inspect_invitation','accept_invitation',
+    'reject_invitation','revoke_invitation','create_member_invitation','remove_unclaimed_member'];
+  let invitationGeneration24DD=0;
+  let invitationUid24DD='';
+  let invitationCapability24DD={status:'unknown',uid:'',errorCode:''};
+  let generatedInviteResult24DD=null;
+  let invitationAuthClient24DD=null;
+  let invitationAuthSubscription24DD=null;
+  const inflight24DD=new Map();
+
+  function sessionUser24DD(){return SESSION&&SESSION.user&&SESSION.user.id?SESSION.user:null}
+  function currentUid24DD(){const user=sessionUser24DD();return user?String(user.id):''}
+  function secureCrypto24DD(){
+    const value=typeof globalThis!=='undefined'&&globalThis.crypto;
+    if(!value||typeof value.getRandomValues!=='function')throw invitationFailure24DD('invalid_input','secure_crypto');
+    return value;
+  }
+  function randomUuid24DD(){
+    const cryptoApi=secureCrypto24DD();
+    if(typeof cryptoApi.randomUUID==='function')return cryptoApi.randomUUID();
+    const bytes=cryptoApi.getRandomValues(new Uint8Array(16));
+    bytes[6]=(bytes[6]&15)|64;bytes[8]=(bytes[8]&63)|128;
+    const hex=Array.from(bytes,byte=>byte.toString(16).padStart(2,'0')).join('');
+    return `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+  }
+  function generateInviteCode24DD(){
+    const bytes=secureCrypto24DD().getRandomValues(new Uint8Array(16));
+    const alphabet='0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+    let bits=0,value=0,out='';
+    for(const byte of bytes){value=(value<<8)|byte;bits+=8;while(bits>=5){out+=alphabet[(value>>>(bits-5))&31];bits-=5}}
+    if(bits)out+=alphabet[(value<<(5-bits))&31];
+    return out;
+  }
+  function normalizeInviteCode24DD(rawCode){
+    if(typeof rawCode!=='string')throw invitationFailure24DD('invalid_input','invite_code');
+    const code=rawCode.trim().toUpperCase().replace(/[\s-]+/g,'');
+    if(!CODE_RE_24DD.test(code))throw invitationFailure24DD('invalid_input','invite_code');
+    return code;
+  }
+  async function hashInviteCode24DD(rawCode){
+    const code=normalizeInviteCode24DD(rawCode),cryptoApi=secureCrypto24DD();
+    if(!cryptoApi.subtle||typeof cryptoApi.subtle.digest!=='function'||typeof TextEncoder!=='function'){
+      throw invitationFailure24DD('invalid_input','secure_crypto');
+    }
+    const digest=await cryptoApi.subtle.digest('SHA-256',new TextEncoder().encode(code));
+    return Array.from(new Uint8Array(digest),byte=>byte.toString(16).padStart(2,'0')).join('');
+  }
+  function validUuid24DD(value){return typeof value==='string'&&UUID_RE_24DD.test(value)}
+  function validRevision24DD(value){return Number.isSafeInteger(value)&&value>=0}
+  function cleanText24DD(value,max){const text=String(value==null?'':value).trim();return text&&text.length<=max?text:''}
+  function cleanDate24DD(value){const date=new Date(value);return Number.isFinite(date.getTime())&&date.getTime()>Date.now()?date.toISOString():''}
+  function invitationFailure24DD(category,operation){
+    const error=new Error(category);error.name='InvitationClientError';error.category=category;error.operation=operation||'';return error;
+  }
+  function normalizeInvitationError24DD(error,operation){
+    if(error&&error.normalizedInvitationError24DD)return error;
+    const code=String(error&&error.code||'').toUpperCase(),status=Number(error&&error.status||0);
+    const message=String(error&&error.message||error||'').toLowerCase();
+    let category=String(error&&error.category||'');
+    const namesRpc=INVITATION_RPCS_24DD.some(name=>message.includes(name));
+    if(!category&&(code==='PGRST202'||code==='42883'||(status===404&&namesRpc)
+      ||(namesRpc&&/does not exist|could not find|not found/.test(message))))category='not_deployed';
+    if(!category&&(code==='TIMEOUT'||code==='ABORTERROR'||status===408||/timeout|timed out/.test(message)))category='timeout';
+    if(!category&&((error&&error.status===0)||status===429||status>=500||/network|failed to fetch|load failed|connection|temporar/.test(message)))category='network';
+    if(!category&&(status===401||code==='PGRST301'||/jwt|not signed|authentication required/.test(message)))category='signed_out';
+    if(!category&&(code==='40001'||/stale ledger revision/.test(message)))category='stale_revision';
+    if(!category&&/member seat has shared history|has shared history/.test(message))category='member_has_history';
+    if(!category&&/already an active member|active member/.test(message))category='active_member';
+    if(!category&&(code==='23505'||/existing invitation|duplicate|already bound/.test(message)))category='duplicate_invitation';
+    if(!category&&(code==='22023'||/invalid|required|must be/.test(message)))category='invalid_input';
+    if(!category&&(code==='P0002'&&/invitation|ledger/.test(message)
+      ||code==='23514'&&/invitation|expired|revoked|rejected|consumed|deleted|removed|seat|ledger/.test(message)))category='unavailable_invitation';
+    if(!category&&(status===403||code==='42501'||/permission denied|owner required|not authorized/.test(message)))category='permission_denied';
+    if(!category)category='unknown';
+    return {normalizedInvitationError24DD:true,category,operation:operation||'',code:code.slice(0,40)};
+  }
+  function internalResult24DD(operation,data){return {ok:true,operation,data}}
+  function internalErrorResult24DD(operation,error,extra={}){
+    return {ok:false,operation,error:normalizeInvitationError24DD(error,operation),...extra};
+  }
+  function setCapabilityFromError24DD(error,uid){
+    const normalized=normalizeInvitationError24DD(error,'capability');
+    if(normalized.category==='not_deployed')invitationCapability24DD={status:'not_deployed',uid,errorCode:normalized.code};
+    else if(normalized.category==='network'||normalized.category==='timeout'){
+      invitationCapability24DD={status:'temporarily_unavailable',uid,errorCode:normalized.code};
+    }
+    return normalized;
+  }
+  function getInvitationCapability24DD(){
+    const uid=currentUid24DD();
+    if(!uid)return {status:'signed_out',uid:'',errorCode:''};
+    return invitationCapability24DD.uid===uid?{...invitationCapability24DD}:{status:'unknown',uid,errorCode:''};
+  }
+  async function ensureInvitationCapability24DD(){
+    const uid=currentUid24DD();
+    if(!uid){invitationCapability24DD={status:'signed_out',uid:'',errorCode:''};return getInvitationCapability24DD()}
+    if(!SHARED_LEDGER_24DD_ENABLED){invitationCapability24DD={status:'not_deployed',uid,errorCode:'disabled'};return getInvitationCapability24DD()}
+    if(invitationCapability24DD.uid!==uid)invitationCapability24DD={status:'unknown',uid,errorCode:''};
+    if(invitationCapability24DD.status==='not_deployed')return getInvitationCapability24DD();
+    if(invitationCapability24DD.status==='temporarily_unavailable')invitationCapability24DD={status:'unknown',uid,errorCode:''};
+    let availability=typeof window.getSharedFeatureAvailability24DC==='function'?window.getSharedFeatureAvailability24DC():null;
+    if((!availability||availability.status==='unknown')&&typeof window.bootstrapCurrentUserIdentity24DC==='function'){
+      await window.bootstrapCurrentUserIdentity24DC();
+      availability=window.getSharedFeatureAvailability24DC();
+    }
+    if(!availability||availability.status!=='available'){
+      const status=availability&&availability.status==='not_deployed'?'not_deployed':
+        availability&&availability.status==='signed_out'?'signed_out':'temporarily_unavailable';
+      invitationCapability24DD={status,uid,errorCode:String(availability&&availability.errorCode||'')};
+    }
+    return getInvitationCapability24DD();
+  }
+  function clearGeneratedInviteResult24DD(){generatedInviteResult24DD=null}
+  function setGeneratedInviteResult24DD(result){
+    if(!result||typeof result!=='object'||!result.rawCode){generatedInviteResult24DD=null;return null}
+    const rawCode=normalizeInviteCode24DD(result.rawCode);
+    generatedInviteResult24DD={...result,rawCode,uid:currentUid24DD(),createdAt:new Date().toISOString()};
+    return {...generatedInviteResult24DD};
+  }
+  function getGeneratedInviteResult24DD(){return generatedInviteResult24DD?{...generatedInviteResult24DD}:null}
+  function clearPendingInviteCode24DD(storage=sessionStorage){try{storage.removeItem(PENDING_INVITE_KEY_24DD)}catch(_){}}
+  function setPendingInviteCode24DD(rawCode,storage=sessionStorage,now=Date.now(),uid=currentUid24DD()){
+    const code=normalizeInviteCode24DD(rawCode);if(!uid)throw invitationFailure24DD('signed_out','pending_code');
+    const row={version:PENDING_INVITE_VERSION_24DD,uid:String(uid),code,cachedAt:now,expiresAt:now+PENDING_INVITE_TTL_MS_24DD};
+    try{storage.setItem(PENDING_INVITE_KEY_24DD,JSON.stringify(row))}catch(_){throw invitationFailure24DD('invalid_input','session_storage')}
+    return code;
+  }
+  function getPendingInviteCode24DD(storage=sessionStorage,now=Date.now(),uid=currentUid24DD()){
+    try{
+      const row=JSON.parse(storage.getItem(PENDING_INVITE_KEY_24DD)||'null');
+      if(!row||row.version!==PENDING_INVITE_VERSION_24DD||row.uid!==String(uid||'')
+        ||!Number.isFinite(row.cachedAt)||!Number.isFinite(row.expiresAt)||row.expiresAt<=now
+        ||row.expiresAt-row.cachedAt!==PENDING_INVITE_TTL_MS_24DD||!CODE_RE_24DD.test(row.code)){
+        clearPendingInviteCode24DD(storage);return null;
+      }
+      return row.code;
+    }catch(_){clearPendingInviteCode24DD(storage);return null}
+  }
+  function clearInvitationState24DD(options={}){
+    invitationGeneration24DD+=1;inflight24DD.clear();clearGeneratedInviteResult24DD();clearPendingInviteCode24DD();
+    const uid=String(options.uid||currentUid24DD()||'');
+    invitationCapability24DD={status:options.status||'unknown',uid,errorCode:''};invitationUid24DD=uid;
+    return getInvitationCapability24DD();
+  }
+  function buildHostedInviteLink24DD(rawCode){return 'https://winner0718.github.io/ringgitme/index.html?invite='+encodeURIComponent(normalizeInviteCode24DD(rawCode))}
+  function buildNativeInviteLink24DD(rawCode){return 'ringgitme://invite/'+encodeURIComponent(normalizeInviteCode24DD(rawCode))}
+
+  async function productionContext24DD(operation){
+    const uid=currentUid24DD();if(!uid)return {error:invitationFailure24DD('signed_out',operation)};
+    const capability=await ensureInvitationCapability24DD();
+    if(capability.status!=='unknown'&&capability.status!=='available')return {error:invitationFailure24DD(capability.status,operation)};
+    const identity=typeof window.getCurrentAppIdentity24DC==='function'?window.getCurrentAppIdentity24DC():null;
+    if(!identity||identity.authUserId!==uid)return {error:invitationFailure24DD('signed_out',operation)};
+    if(!supa)return {error:invitationFailure24DD('network',operation)};
+    const generation=invitationGeneration24DD;
+    return {client:supa,uid,generation,isCurrent:()=>generation===invitationGeneration24DD&&currentUid24DD()===uid};
+  }
+  function withTimeout24DD(promise){
+    let timer;const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>{const error=new Error('request timeout');error.code='TIMEOUT';reject(error)},INVITE_TIMEOUT_MS_24DD)});
+    return Promise.race([promise,timeout]).finally(()=>clearTimeout(timer));
+  }
+  function dedupe24DD(key,work){
+    if(inflight24DD.has(key))return inflight24DD.get(key);
+    const promise=Promise.resolve().then(work);inflight24DD.set(key,promise);
+    promise.finally(()=>{if(inflight24DD.get(key)===promise)inflight24DD.delete(key)});return promise;
+  }
+  function runRpc24DD(operation,rpcName,payload,key,context){
+    return dedupe24DD(operation+':'+key,async()=>{
+      try{
+        const response=await withTimeout24DD(Promise.resolve(context.client.rpc(rpcName,payload)));
+        if(response&&response.error)throw response.error;
+        if(!context.isCurrent())return internalErrorResult24DD(operation,invitationFailure24DD('signed_out',operation),{ignored:true});
+        invitationCapability24DD={status:'available',uid:context.uid,errorCode:''};
+        return internalResult24DD(operation,response&&response.data);
+      }catch(error){
+        if(!context.isCurrent())return internalErrorResult24DD(operation,invitationFailure24DD('signed_out',operation),{ignored:true});
+        setCapabilityFromError24DD(error,context.uid);return internalErrorResult24DD(operation,error);
+      }
+    });
+  }
+  async function callRpcAdapter24DD(operation,rpcName,payload,key,afterSuccess,contextOverride){
+    const context=contextOverride||await productionContext24DD(operation);
+    if(context.error)return internalErrorResult24DD(operation,context.error);
+    const result=await runRpc24DD(operation,rpcName,payload,key,context);
+    if(result.ok&&afterSuccess)afterSuccess(result);return result;
+  }
+  async function createSharedLedger24DD(input={},context){
+    const kind=input.kind,title=cleanText24DD(input.title,160),ledgerId=input.clientLedgerId,ownerId=input.clientOwnerMemberId;
+    if(!['pair','group'].includes(kind)||!title||!validUuid24DD(ledgerId)||!validUuid24DD(ownerId))return internalErrorResult24DD('create_ledger',invitationFailure24DD('invalid_input','create_ledger'));
+    const payload={p_kind:kind,p_title:title,p_client_ledger_id:ledgerId,p_client_owner_member_id:ownerId};
+    return callRpcAdapter24DD('create_ledger','create_shared_ledger',payload,JSON.stringify(payload),null,context);
+  }
+  async function inviteMember24DD(input={},context){
+    const ledgerId=input.ledgerId,name=cleanText24DD(input.displayName,120),method=input.method||'link',expiresAt=cleanDate24DD(input.expiresAt),memberId=input.clientMemberId;
+    if(!validUuid24DD(ledgerId)||!name||!['code','link','qr','telegram','contact'].includes(method)||!expiresAt||!validUuid24DD(memberId))return internalErrorResult24DD('invite_member',invitationFailure24DD('invalid_input','invite_member'));
+    let rawCode,hash;try{rawCode=normalizeInviteCode24DD(input.rawCode);hash=await hashInviteCode24DD(rawCode)}catch(error){return internalErrorResult24DD('invite_member',error)}
+    const payload={p_ledger_id:ledgerId,p_display_name:name,p_method:method,p_code_hash:hash,p_expires_at:expiresAt,p_client_member_id:memberId};
+    return callRpcAdapter24DD('invite_member','invite_member',payload,JSON.stringify(payload),result=>{
+      result.rawCode=rawCode;setGeneratedInviteResult24DD({rawCode,invitationId:result.data,ledgerId,memberName:name});
+    },context);
+  }
+  async function inspectInvitation24DD(rawCode,context){
+    let code;try{code=normalizeInviteCode24DD(rawCode)}catch(error){return internalErrorResult24DD('inspect',error)}
+    return callRpcAdapter24DD('inspect','inspect_invitation',{p_raw_code:code},code,null,context);
+  }
+  async function acceptInvitation24DD(rawCode,context){
+    let code;try{code=normalizeInviteCode24DD(rawCode)}catch(error){return internalErrorResult24DD('accept',error)}
+    // Legacy SQL name: p_code_hash carries RAW code; the server hashes it.
+    return callRpcAdapter24DD('accept','accept_invitation',{p_code_hash:code},code,result=>{
+      clearPendingInviteCode24DD(context&&context.pendingStorage||sessionStorage);result.memberId=result.data;
+    },context);
+  }
+  async function rejectInvitation24DD(rawCode,context){
+    let code;try{code=normalizeInviteCode24DD(rawCode)}catch(error){return internalErrorResult24DD('reject',error)}
+    return callRpcAdapter24DD('reject','reject_invitation',{p_raw_code:code},code,()=>clearPendingInviteCode24DD(context&&context.pendingStorage||sessionStorage),context);
+  }
+  async function revokeInvitation24DD(input={},context){
+    if(!validUuid24DD(input.invitationId)||!validRevision24DD(input.expectedLedgerRevision))return internalErrorResult24DD('revoke',invitationFailure24DD('invalid_input','revoke'));
+    const payload={p_invitation_id:input.invitationId,p_expected_ledger_revision:input.expectedLedgerRevision};
+    return callRpcAdapter24DD('revoke','revoke_invitation',payload,JSON.stringify(payload),null,context);
+  }
+  async function createMemberInvitation24DD(input={},context){
+    const method=input.method||'link',expiresAt=cleanDate24DD(input.expiresAt),invitationId=input.clientInvitationId;
+    if(!validUuid24DD(input.ledgerId)||!validUuid24DD(input.memberId)||!validUuid24DD(invitationId)
+      ||!validRevision24DD(input.expectedLedgerRevision)||!['code','link','qr','telegram','contact'].includes(method)||!expiresAt){
+      return internalErrorResult24DD('reinvite',invitationFailure24DD('invalid_input','reinvite'));
+    }
+    let rawCode,hash;try{rawCode=normalizeInviteCode24DD(input.rawCode);hash=await hashInviteCode24DD(rawCode)}catch(error){return internalErrorResult24DD('reinvite',error)}
+    // Keep p_code_hash before p_method to mirror the committed SQL signature.
+    const payload={p_ledger_id:input.ledgerId,p_member_id:input.memberId,p_code_hash:hash,p_method:method,
+      p_expires_at:expiresAt,p_client_invitation_id:invitationId,p_expected_ledger_revision:input.expectedLedgerRevision};
+    return callRpcAdapter24DD('reinvite','create_member_invitation',payload,JSON.stringify(payload),result=>{
+      result.rawCode=rawCode;setGeneratedInviteResult24DD({rawCode,invitationId,ledgerId:input.ledgerId,memberId:input.memberId});
+    },context);
+  }
+  async function removeUnclaimedMember24DD(input={},context){
+    if(!validUuid24DD(input.ledgerId)||!validUuid24DD(input.memberId)||!validRevision24DD(input.expectedLedgerRevision))return internalErrorResult24DD('remove',invitationFailure24DD('invalid_input','remove'));
+    const payload={p_ledger_id:input.ledgerId,p_member_id:input.memberId,p_expected_ledger_revision:input.expectedLedgerRevision};
+    return callRpcAdapter24DD('remove','remove_unclaimed_member',payload,JSON.stringify(payload),null,context);
+  }
+  function normalizeLedger24DD(row){return {id:String(row.id),kind:String(row.kind||''),title:String(row.title||''),status:String(row.status||''),revision:Number(row.revision),createdAt:String(row.created_at||'')}}
+  function normalizeMember24DD(row){return {id:String(row.id),ledgerId:String(row.ledger_id),identityId:String(row.identity_id||''),role:String(row.role||''),status:String(row.status||''),displayName:String(row.display_name||''),joinedAt:row.joined_at||null,createdAt:String(row.created_at||'')}}
+  function normalizeOwnedInvitation24DD(row){return {id:String(row.id),ledgerId:String(row.ledger_id),memberId:String(row.member_id),method:String(row.method||''),expiresAt:String(row.expires_at||''),useCount:Number(row.use_count||0),consumedAt:row.consumed_at||null,revokedAt:row.revoked_at||null,rejectedAt:row.rejected_at||null,createdAt:String(row.created_at||'')}}
+  function runSelect24DD(operation,key,build,normalize,sort,contextOverride){
+    return dedupe24DD(operation+':'+key,async()=>{
+      const context=contextOverride||await productionContext24DD(operation);if(context.error)return internalErrorResult24DD(operation,context.error);
+      try{
+        const response=await withTimeout24DD(Promise.resolve(build(context.client)));
+        if(response&&response.error)throw response.error;
+        if(!context.isCurrent())return internalErrorResult24DD(operation,invitationFailure24DD('signed_out',operation),{ignored:true});
+        const rows=(Array.isArray(response&&response.data)?response.data:[]).map(normalize).sort(sort);
+        invitationCapability24DD={status:'available',uid:context.uid,errorCode:''};return internalResult24DD(operation,rows);
+      }catch(error){
+        if(!context.isCurrent())return internalErrorResult24DD(operation,invitationFailure24DD('signed_out',operation),{ignored:true});
+        setCapabilityFromError24DD(error,context.uid);return internalErrorResult24DD(operation,error);
+      }
+    });
+  }
+  function loadMySharedLedgers24DD(context){return runSelect24DD('list_ledgers','all',client=>client.from('shared_ledgers').select('id,kind,title,status,revision,created_at').eq('status','active').is('deleted_at',null).order('created_at',{ascending:false}),normalizeLedger24DD,(a,b)=>b.createdAt.localeCompare(a.createdAt)||a.id.localeCompare(b.id),context)}
+  function loadSharedLedgerMembers24DD(ledgerId,context){
+    if(!validUuid24DD(ledgerId))return Promise.resolve(internalErrorResult24DD('list_members',invitationFailure24DD('invalid_input','list_members')));
+    return runSelect24DD('list_members',ledgerId,client=>client.from('shared_ledger_members').select('id,ledger_id,identity_id,role,status,display_name,joined_at,created_at').eq('ledger_id',ledgerId).is('deleted_at',null),normalizeMember24DD,(a,b)=>a.createdAt.localeCompare(b.createdAt)||a.id.localeCompare(b.id),context);
+  }
+  function loadMyOwnedInvitations24DD(ledgerId,context){
+    if(!validUuid24DD(ledgerId))return Promise.resolve(internalErrorResult24DD('list_invitations',invitationFailure24DD('invalid_input','list_invitations')));
+    return runSelect24DD('list_invitations',ledgerId,client=>client.from('invitations').select('id,ledger_id,member_id,method,expires_at,use_count,consumed_at,revoked_at,rejected_at,created_at').eq('ledger_id',ledgerId),normalizeOwnedInvitation24DD,(a,b)=>b.createdAt.localeCompare(a.createdAt)||a.id.localeCompare(b.id),context);
+  }
+  function handleInvitationSession24DD(session){
+    const uid=session&&session.user&&session.user.id?String(session.user.id):'';
+    if(uid!==invitationUid24DD)clearInvitationState24DD({uid,status:uid?'unknown':'signed_out'});
+  }
+  function attachInvitationAuth24DD(client){
+    if(!client||!client.auth||invitationAuthClient24DD===client)return;
+    try{invitationAuthSubscription24DD&&invitationAuthSubscription24DD.unsubscribe&&invitationAuthSubscription24DD.unsubscribe()}catch(_){}
+    invitationAuthClient24DD=client;
+    try{const listener=client.auth.onAuthStateChange((_event,session)=>handleInvitationSession24DD(session));invitationAuthSubscription24DD=listener&&listener.data&&listener.data.subscription||null}catch(_){}
+    handleInvitationSession24DD(SESSION);
+  }
+  try{const previousInitSupa24DD=initSupa;initSupa=function(){const result=previousInitSupa24DD.apply(this,arguments);setTimeout(()=>attachInvitationAuth24DD(supa),0);return result}}catch(_){}
+  attachInvitationAuth24DD(supa);
+
+  Object.assign(window,{randomUuid24DD,generateInviteCode24DD,hashInviteCode24DD,normalizeInviteCode24DD,
+    createSharedLedger24DD,inviteMember24DD,createMemberInvitation24DD,inspectInvitation24DD,
+    acceptInvitation24DD,rejectInvitation24DD,revokeInvitation24DD,removeUnclaimedMember24DD,
+    loadMySharedLedgers24DD,loadSharedLedgerMembers24DD,loadMyOwnedInvitations24DD,
+    getInvitationCapability24DD,ensureInvitationCapability24DD,clearInvitationState24DD,
+    setPendingInviteCode24DD,getPendingInviteCode24DD,clearPendingInviteCode24DD,
+    setGeneratedInviteResult24DD,getGeneratedInviteResult24DD,clearGeneratedInviteResult24DD,
+    buildHostedInviteLink24DD,buildNativeInviteLink24DD,normalizeInvitationError24DD});
+
+  window.__ringgitmeTestInvitations24DD2=async function(options={}){
+    if(options.live===true)return {phase:'24D-D2A',live:true,refused:true,safe:false};
+    class MemoryStorage24DD{constructor(){this.rows=new Map()}getItem(k){return this.rows.has(k)?this.rows.get(k):null}setItem(k,v){this.rows.set(k,String(v))}removeItem(k){this.rows.delete(k)}key(i){return [...this.rows.keys()][i]||null}get length(){return this.rows.size}}
+    const capabilityBefore={...invitationCapability24DD},generationBefore=invitationGeneration24DD,uidBefore=invitationUid24DD;
+    const data=typeof D==='object'&&D?D:{},snapshot=keys=>JSON.stringify(keys.map(key=>[key,data[key]]));
+    const moneyKeys=['txns','incomes','cards','subs','loans','goals','resists','aaPeople','aaReceivables','aaSettlements','personLedgers','personLedgerItems'];
+    const sharedKeys=['groups','groupMembers','groupSplitItems','groupSplitLines','groupPayments','groupTombstones24B'];
+    const telegramKeys=['telegramBindings','groupTelegramBindings','aaTelegramBindings'];
+    const beforeMoney=snapshot(moneyKeys),beforeShared=snapshot(sharedKeys),beforeTelegram=snapshot(telegramKeys);
+    const calls=[],logs=[],mockClient={rpc:async(name,payload)=>{calls.push({name,payload});return {data:name==='create_shared_ledger'?'10000000-0000-4000-8000-000000000001':name==='accept_invitation'?'20000000-0000-4000-8000-000000000002':{ok:true},error:null}}};
+    const qaPendingStorage=new MemoryStorage24DD();
+    const context={client:mockClient,uid:'qa-user',generation:1,isCurrent:()=>true,pendingStorage:qaPendingStorage};
+    const codes=Array.from({length:100},()=>generateInviteCode24DD()),rawCode=codes[0],hash=await hashInviteCode24DD(rawCode),uuid=randomUuid24DD();
+    const ledgerId='30000000-0000-4000-8000-000000000003',memberA='40000000-0000-4000-8000-000000000004',memberB='50000000-0000-4000-8000-000000000005';
+    const expiresAt=new Date(Date.now()+3600000).toISOString();
+    const pair=await createSharedLedger24DD({kind:'pair',title:'Pair',clientLedgerId:ledgerId,clientOwnerMemberId:memberA},context);
+    const group=await createSharedLedger24DD({kind:'group',title:'Group',clientLedgerId:'60000000-0000-4000-8000-000000000006',clientOwnerMemberId:'70000000-0000-4000-8000-000000000007'},context);
+    const creator=await inviteMember24DD({ledgerId,displayName:'Seat A',method:'link',expiresAt,clientMemberId:memberB,rawCode},context);
+    const creator2=await inviteMember24DD({ledgerId,displayName:'Seat B',method:'link',expiresAt,clientMemberId:'90000000-0000-4000-8000-000000000009',rawCode:codes[1]},context);
+    await acceptInvitation24DD(rawCode,context);await inspectInvitation24DD(rawCode,context);await rejectInvitation24DD(rawCode,context);
+    await createMemberInvitation24DD({ledgerId,memberId:memberB,rawCode:codes[1],method:'link',expiresAt,clientInvitationId:'80000000-0000-4000-8000-000000000008',expectedLedgerRevision:0},context);
+    const creatorCalls=calls.filter(call=>call.name==='invite_member'),creatorCall=creatorCalls[0],acceptCall=calls.find(call=>call.name==='accept_invitation'),inspectCall=calls.find(call=>call.name==='inspect_invitation'),rejectCall=calls.find(call=>call.name==='reject_invitation'),reinviteCall=calls.find(call=>call.name==='create_member_invitation');
+    const duplicateStart=calls.length,deferred={};deferred.promise=new Promise(resolve=>{deferred.resolve=resolve});
+    const dedupeClient={rpc:(name,payload)=>{calls.push({name,payload,dedupe:true});return deferred.promise}};
+    const dedupeContext={client:dedupeClient,uid:'qa-user',isCurrent:()=>true};
+    const tap1=inspectInvitation24DD(codes[2],dedupeContext),tap2=inspectInvitation24DD(codes[2],dedupeContext);deferred.resolve({data:{can_accept:true},error:null});await Promise.all([tap1,tap2]);
+    let current=true,staleResolve;const staleContext={client:{rpc:()=>new Promise(resolve=>{staleResolve=resolve})},uid:'qa-user',isCurrent:()=>current};
+    const stalePromise=inspectInvitation24DD(codes[3],staleContext);await Promise.resolve();current=false;staleResolve({data:{can_accept:true},error:null});const stale=await stalePromise;
+    const pendingStorage=new MemoryStorage24DD();setPendingInviteCode24DD(codes[4],pendingStorage,1000,'qa-user');
+    const pendingValid=getPendingInviteCode24DD(pendingStorage,1001,'qa-user')===codes[4],pendingExpired=getPendingInviteCode24DD(pendingStorage,1000+PENDING_INVITE_TTL_MS_24DD,'qa-user')===null;
+    pendingStorage.setItem(PENDING_INVITE_KEY_24DD,'{"bad":true}');const malformedClosed=getPendingInviteCode24DD(pendingStorage,1001,'qa-user')===null;
+    const memoryStorage=new MemoryStorage24DD(),localStorageMock=new MemoryStorage24DD(),fakeD={},localBefore=JSON.stringify(fakeD);setPendingInviteCode24DD(codes[5],memoryStorage,1000,'qa-user');
+    const terminalErrors=['expired invitation','rejected invitation','revoked invitation','consumed invitation','deleted ledger'].map(message=>normalizeInvitationError24DD({code:'23514',message},'accept').category);
+    const missing=normalizeInvitationError24DD({code:'PGRST202',status:404,message:'Could not find the function public.inspect_invitation'},'inspect');
+    const display=normalizeLedger24DD({id:ledgerId,kind:'group',title:'QA',status:'active',revision:0,created_at:'2026-07-11T00:00:00Z'});
+    const generatedBefore=getGeneratedInviteResult24DD();setGeneratedInviteResult24DD({rawCode:codes[6]});const switchHadRaw=!!getGeneratedInviteResult24DD();clearGeneratedInviteResult24DD();const switchCleared=!getGeneratedInviteResult24DD();
+    setGeneratedInviteResult24DD({rawCode:codes[7]});clearGeneratedInviteResult24DD();const signOutCleared=!getGeneratedInviteResult24DD();
+    const signedOutAttempt=await createSharedLedger24DD({kind:'pair',title:'Blocked',clientLedgerId:'a0000000-0000-4000-8000-00000000000a',clientOwnerMemberId:'b0000000-0000-4000-8000-00000000000b'},{error:invitationFailure24DD('signed_out','create_ledger')});
+    const signedOutBlocked=!signedOutAttempt.ok&&signedOutAttempt.error.category==='signed_out';
+    const result={phase:'24D-D2A',signedOutBlocked,unavailableCapabilitySafe:missing.category==='not_deployed',
+      localGroupsUnaffected:beforeShared===snapshot(sharedKeys),pairCreationShapeValid:pair.ok&&calls[0].payload.p_kind==='pair',groupCreationShapeValid:group.ok&&calls[1].payload.p_kind==='group',
+      secureCodeEntropy:new Set(codes).size===100&&codes.every(code=>CODE_RE_24DD.test(code))&&String(generateInviteCode24DD).includes('getRandomValues')&&!String(generateInviteCode24DD).includes('Math.random'),secureCodeLength:codes.every(code=>code.length===26),uuidShapeValid:UUID_RE_24DD.test(uuid),hashShapeValid:HASH_RE_24DD.test(hash),
+      creatorRpcGetsHashOnly:creator.ok&&HASH_RE_24DD.test(creatorCall.payload.p_code_hash)&&creatorCall.payload.p_code_hash!==rawCode&&!JSON.stringify(creatorCall.payload).includes(rawCode),
+      acceptRpcGetsRawUnderLegacyHashKey:acceptCall.payload.p_code_hash===rawCode,inspectRejectGetRawCode:inspectCall.payload.p_raw_code===rawCode&&rejectCall.payload.p_raw_code===rawCode,
+      createMemberInvitationParameterOrderSafe:Object.keys(reinviteCall.payload).join(',')==='p_ledger_id,p_member_id,p_code_hash,p_method,p_expires_at,p_client_invitation_id,p_expected_ledger_revision'&&HASH_RE_24DD.test(reinviteCall.payload.p_code_hash),
+      rawCodeTemporaryOnly:localBefore===JSON.stringify(fakeD)&&localStorageMock.length===0&&![...memoryStorage.rows.values()].some(value=>value.includes(codes[6]))&&logs.every(value=>!value.includes(rawCode))&&[inviteMember24DD,acceptInvitation24DD,inspectInvitation24DD,rejectInvitation24DD].every(fn=>!String(fn).includes('console.')),
+      pendingCodeSessionOnly:memoryStorage.getItem(PENDING_INVITE_KEY_24DD).includes(codes[5]),pendingCodeTtlSafe:pendingValid&&pendingExpired&&malformedClosed,
+      separateSeatInvites:creator.ok&&creator2.ok&&creatorCalls.length===2&&creatorCalls[0].payload.p_client_member_id!==creatorCalls[1].payload.p_client_member_id&&creatorCalls[0].payload.p_code_hash!==creatorCalls[1].payload.p_code_hash,duplicateTapDeduped:calls.slice(duplicateStart).filter(call=>call.dedupe).length===1,staleResultIgnored:stale.ok===false&&stale.ignored===true,
+      userSwitchClearsRawCode:switchHadRaw&&switchCleared,signOutClearsRawCode:signOutCleared,unavailableInviteGeneric:terminalErrors.every(category=>category==='unavailable_invitation'),
+      staleRevisionNormalized:normalizeInvitationError24DD({code:'40001',message:'stale ledger revision'},'revoke').category==='stale_revision',
+      displayDataContainsNoPrivateAccountFields:!/[Aa]ccount|private|snapshot|posting|card|wallet|payName|payId|last4/.test(JSON.stringify(display)),
+      noMoneyMutation:beforeMoney===snapshot(moneyKeys),noSharedEntryMutation:beforeShared===snapshot(sharedKeys),noTelegramMutation:beforeTelegram===snapshot(telegramKeys),safe:false};
+    if(generatedBefore)setGeneratedInviteResult24DD(generatedBefore);else clearGeneratedInviteResult24DD();
+    invitationCapability24DD=capabilityBefore;invitationGeneration24DD=generationBefore;invitationUid24DD=uidBefore;
+    result.safe=Object.keys(result).filter(key=>key!=='phase'&&key!=='safe').every(key=>result[key]===true);return result;
   };
 })();
 
