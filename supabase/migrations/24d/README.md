@@ -138,6 +138,14 @@ The Race 2 operator temporarily replaced the runbook's fake D UUID only in dispo
 
 Production RinggitMe Supabase was never contacted or modified; App URL/key configuration was unchanged; only disposable Auth users were used. This successful scratch validation is **not** production deployment approval.
 
+## Phase 24D-D2C manual App validation — 12/07/2026
+
+**Result: PASS.** A two-account browser validation passed using the local, loopback-only scratch harness, disposable scratch Supabase, isolated browser profiles, and disposable email/password accounts. Pair acceptance, rejection, re-invitation, revocation, and removal of an eligible unclaimed member all passed. Invitation single-use was verified, including generic terminal-state privacy for unusable codes.
+
+Shared-member privacy was verified: members could see only the shared ledger title, member display names, and membership status; another user's private finance data remained isolated. User-switch/sign-out cleanup also passed: invitation results, raw codes, selected detail state, and prior shared-ledger visibility did not persist across users.
+
+Harness cleanup and repository-leakage verification passed, ending with `D2C HARNESS CLEAN — SAFE TO RETURN TO NORMAL DEVELOPMENT`. The production RinggitMe Supabase project was untouched. iOS Simulator and hosted/native deep-link testing are deferred to Phase 24D-D3. This is **not** production deployment approval.
+
 ## Security fixes before scratch dry-run
 
 The post-implementation security audit produced six required corrections, all reflected in these files:
