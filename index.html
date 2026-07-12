@@ -12042,11 +12042,11 @@ window.inspectTxnDetail20_6A=function(){const bodyText=document.body?(document.b
     const context=beginRequest24DDB('creator',{kind:'retry',ledgerId:progress.ledgerId});
     return withBusy24DDB('retry',async()=>{if(!await ensureSharedReady24DDB(context)||!requestCurrent24DDB(context,{modal:'summary'}))return;const seat=progress.failed.shift();seat.rawCode=seat.rawCode||window.generateInviteCode24DD();const result=await window.inviteMember24DD({ledgerId:progress.ledgerId,displayName:seat.memberName,method:'link',expiresAt:seat.expiresAt,clientMemberId:seat.clientMemberId,rawCode:seat.rawCode});if(!requestCurrent24DDB(context)){discardCreatorCompletion24DDB(context,seat);return}if(result.ok){progress.created.push({memberName:seat.memberName});replaceCreatorResult24DDB({rawCode:seat.rawCode,ledgerTitle:progress.ledgerTitle,ledgerId:progress.ledgerId,memberName:seat.memberName});seat.rawCode='';ui24DDB.modal='result'}else{seat.category=result.error&&result.error.category||'unknown';if(!['network','timeout','unknown'].includes(seat.category))seat.rawCode='';progress.failed.unshift(seat);ui24DDB.error=productError24DDB(result.error)}});
   }
-  async function inspectIncoming24DDB(){
-    if(isBusy24DDB('inspect'))return null;const context=beginRequest24DDB('inspect');return withBusy24DDB('inspect',async()=>{let code;try{code=window.normalizeInviteCode24DD(ui24DDB.inputCode);window.setPendingInviteCode24DD(code)}catch(_){ui24DDB.error='请输入有效的邀请码。';return}if(!await ensureSharedReady24DDB(context)||!requestCurrent24DDB(context,{modal:'incoming'}))return;const result=await window.inspectInvitation24DD(code);if(!requestCurrent24DDB(context,{modal:'incoming'}))return;if(!result.ok){const category=result.error.category;ui24DDB.error=productError24DDB(result.error);if(!['network','timeout'].includes(category))window.clearPendingInviteCode24DD();return}const row=result.data||{};ui24DDB.preview={ledgerKind:String(row.ledger_kind||''),ledgerTitle:String(row.ledger_title||''),inviterDisplayName:String(row.inviter_display_name||''),assignedMemberDisplayName:String(row.assigned_member_display_name||''),expiresAt:String(row.expires_at||''),canAccept:row.can_accept===true};ui24DDB.error=''});
+  async function inspectIncoming24DDB(suppliedRawCode){
+    if(isBusy24DDB('inspect'))return null;const supplied=typeof suppliedRawCode==='string',context=beginRequest24DDB('inspect');return withBusy24DDB('inspect',async()=>{let code;try{code=window.normalizeInviteCode24DD(supplied?suppliedRawCode:ui24DDB.inputCode);window.setPendingInviteCode24DD(code)}catch(_){ui24DDB.error=supplied?'这个邀请无法使用。':'请输入有效的邀请码。';if(supplied)clearIncomingState24DD3({terminal:true});return}if(!await ensureSharedReady24DDB(context)||!requestCurrent24DDB(context,{modal:'incoming'}))return;const result=await window.inspectInvitation24DD(code);if(!requestCurrent24DDB(context,{modal:'incoming'}))return;if(!result.ok){const category=result.error.category;ui24DDB.error=productError24DDB(result.error);if(!['network','timeout'].includes(category)){window.clearPendingInviteCode24DD();if(supplied)clearIncomingState24DD3({terminal:true,keepModal:true})}return}const row=result.data||{};ui24DDB.preview={ledgerKind:String(row.ledger_kind||''),ledgerTitle:String(row.ledger_title||''),inviterDisplayName:String(row.inviter_display_name||''),assignedMemberDisplayName:String(row.assigned_member_display_name||''),expiresAt:String(row.expires_at||''),canAccept:row.can_accept===true};ui24DDB.error=''});
   }
   async function incomingDecision24DDB(kind){
-    if(isBusy24DDB('incoming'))return null;const context=beginRequest24DDB('decision',{kind});return withBusy24DDB('incoming',async()=>{const code=window.getPendingInviteCode24DD();if(!code){ui24DDB.error='这个邀请无法使用。';ui24DDB.preview=null;return}if(!await ensureSharedReady24DDB(context)||!requestCurrent24DDB(context,{modal:'incoming'}))return;const result=kind==='accept'?await window.acceptInvitation24DD(code):await window.rejectInvitation24DD(code);if(!requestCurrent24DDB(context,{modal:'incoming'}))return;if(!result.ok){const category=result.error.category;ui24DDB.error=productError24DDB(result.error);if(category==='unavailable_invitation'||category==='signed_out'){window.clearPendingInviteCode24DD();ui24DDB.preview=null;ui24DDB.inputCode=''}return}window.clearPendingInviteCode24DD();ui24DDB.preview=null;ui24DDB.inputCode='';ui24DDB.modal=null;toast24DDB(kind==='accept'?'你已加入这个共享群组。':'已拒绝这个邀请。');if(kind==='accept')await refreshSharedList24DDB()});
+    if(isBusy24DDB('incoming'))return null;const context=beginRequest24DDB('decision',{kind});return withBusy24DDB('incoming',async()=>{const code=window.getPendingInviteCode24DD();if(!code){ui24DDB.error='这个邀请无法使用。';ui24DDB.preview=null;clearIncomingState24DD3({terminal:true,keepModal:true});return}if(!await ensureSharedReady24DDB(context)||!requestCurrent24DDB(context,{modal:'incoming'}))return;const result=kind==='accept'?await window.acceptInvitation24DD(code):await window.rejectInvitation24DD(code);if(!requestCurrent24DDB(context,{modal:'incoming'}))return;if(!result.ok){const category=result.error.category;ui24DDB.error=productError24DDB(result.error);if(category==='unavailable_invitation'||category==='signed_out'){window.clearPendingInviteCode24DD();ui24DDB.preview=null;ui24DDB.inputCode='';clearIncomingState24DD3({terminal:true,keepModal:true})}return}window.clearPendingInviteCode24DD();clearIncomingState24DD3({terminal:true});ui24DDB.preview=null;ui24DDB.inputCode='';ui24DDB.modal=null;toast24DDB(kind==='accept'?'你已加入这个共享群组。':'已拒绝这个邀请。');if(kind==='accept')await refreshSharedList24DDB()});
   }
   async function memberAction24DDB(action,memberId,invitationId){
     const ledger=ui24DDB.ledgers.find(row=>row.id===ui24DDB.selectedLedgerId);if(!ledger)return;
@@ -12082,7 +12082,7 @@ window.inspectTxnDetail20_6A=function(){const bodyText=document.body?(document.b
     if(action==='revoke'||action==='reinvite'||action==='remove-member')return void memberAction24DDB(action,button.getAttribute('data-member-id'),button.getAttribute('data-invitation-id'));
     if(action==='copy-link')return void copyInvite24DDB('link');if(action==='copy-code')return void copyInvite24DDB('code');if(action==='next-result')return closeResult24DDB();
     if(action==='close-modal'||action==='backdrop'){clearCreatorState24DDB();ui24DDB.createDraft=null;ui24DDB.modal=null;return renderNow24DDB()}
-    if(action==='close-incoming'){ui24DDB.preview=null;ui24DDB.inputCode='';ui24DDB.modal=null;window.clearPendingInviteCode24DD();return renderNow24DDB()}
+    if(action==='close-incoming'){clearIncomingState24DD3();ui24DDB.preview=null;ui24DDB.inputCode='';ui24DDB.modal=null;window.clearPendingInviteCode24DD();return renderNow24DDB()}
     if(action==='close-detail'){ui24DDB.requests.delete('detail');ui24DDB.requests.delete('member');ui24DDB.selectedLedgerId='';ui24DDB.modal=null;return renderNow24DDB()}
     if(action==='close-summary'){clearCreatorState24DDB();ui24DDB.createDraft=null;ui24DDB.modal=null;return renderNow24DDB()}
   },true);
@@ -12092,6 +12092,132 @@ window.inspectTxnDetail20_6A=function(){const bodyText=document.body?(document.b
 
   function attachAuth24DDB(client){if(!client||!client.auth||authClient24DDB===client)return;try{authSubscription24DDB&&authSubscription24DDB.unsubscribe&&authSubscription24DDB.unsubscribe()}catch(_){}authClient24DDB=client;try{const listener=client.auth.onAuthStateChange((_event,session)=>{const uid=session&&session.user&&session.user.id?String(session.user.id):'';if(uid!==ui24DDB.uid)resetForUser24DDB(uid)});authSubscription24DDB=listener&&listener.data&&listener.data.subscription||null}catch(_){}if(uid24DDB()!==ui24DDB.uid)resetForUser24DDB(uid24DDB())}
   try{const previousInitSupa24DDB=initSupa;initSupa=function(){const result=previousInitSupa24DDB.apply(this,arguments);setTimeout(()=>attachAuth24DDB(supa),0);return result}}catch(_){}attachAuth24DDB(supa);
+
+  // PHASE 24D-D3A
+  const ANON_INVITE_KEY_24DD3='rm_pending_invite_anon_24dd3_v1',ANON_INVITE_VERSION_24DD3=1;
+  const ANON_INVITE_TTL_MS_24DD3=15*60*1000,DELIVERY_DEDUPE_MS_24DD3=5000,MAX_WEB_INVITE_INPUT_24DD3=128;
+  const deliverySeen24DD3=new Map();
+  let webInviteCaptured24DD3=false,incomingIntent24DD3=false,incomingAuthClient24DD3=null,incomingAuthSubscription24DD3=null;
+  const incomingAuthState24DD3={uid:uid24DDB()};
+
+  function normalizedIncomingCode24DD3(rawCode){
+    if(typeof rawCode!=='string'||rawCode.length>MAX_WEB_INVITE_INPUT_24DD3)throw new Error('invalid');
+    return window.normalizeInviteCode24DD(rawCode);
+  }
+  function clearAnonPendingInvite24DD3(storage=sessionStorage){try{storage.removeItem(ANON_INVITE_KEY_24DD3)}catch(_){}return null}
+  function setAnonPendingInvite24DD3(rawCode,storage=sessionStorage,now=Date.now()){
+    let code;try{code=normalizedIncomingCode24DD3(rawCode)}catch(_){return null}
+    const row={version:ANON_INVITE_VERSION_24DD3,code,cachedAt:now,expiresAt:now+ANON_INVITE_TTL_MS_24DD3};
+    try{storage.setItem(ANON_INVITE_KEY_24DD3,JSON.stringify(row));return code}catch(_){return null}
+  }
+  function getAnonPendingInvite24DD3(storage=sessionStorage,now=Date.now()){
+    try{
+      const row=JSON.parse(storage.getItem(ANON_INVITE_KEY_24DD3)||'null');let code='';
+      try{code=normalizedIncomingCode24DD3(row&&row.code)}catch(_){}
+      if(!row||row.version!==ANON_INVITE_VERSION_24DD3||!Number.isFinite(row.cachedAt)||!Number.isFinite(row.expiresAt)
+        ||row.expiresAt<=now||row.expiresAt-row.cachedAt!==ANON_INVITE_TTL_MS_24DD3||code!==row.code){clearAnonPendingInvite24DD3(storage);return null}
+      return code;
+    }catch(_){clearAnonPendingInvite24DD3(storage);return null}
+  }
+  function closeIncomingPreview24DD3(){
+    ui24DDB.requests.delete('inspect');ui24DDB.busy.delete('inspect');ui24DDB.preview=null;ui24DDB.inputCode='';
+    if(ui24DDB.modal==='incoming')ui24DDB.modal=null;
+  }
+  function clearIncomingState24DD3(options={}){
+    clearAnonPendingInvite24DD3();incomingIntent24DD3=false;deliverySeen24DD3.clear();
+    if(options.terminal)try{window.clearPendingInviteCode24DD()}catch(_){}
+    if(!options.keepModal)closeIncomingPreview24DD3();
+  }
+  function queueInviteMessage24DD3(message,deps={}){const notify=deps.toast||toast24DDB;try{(deps.defer||setTimeout)(()=>notify(message),0)}catch(_){}}
+  function acceptIncomingInviteCode24DD3(rawCode,source,deps={}){
+    let code;try{code=normalizedIncomingCode24DD3(rawCode)}catch(_){if(deps.notifyInvalid!==false)queueInviteMessage24DD3('这个邀请无法使用。',deps);return {ok:false,reason:'invalid'}}
+    const now=typeof deps.now==='function'?deps.now():Date.now(),seen=deps.seen||deliverySeen24DD3,last=seen.get(code);
+    if(Number.isFinite(last)&&now-last<DELIVERY_DEDUPE_MS_24DD3)return {ok:true,duplicate:true};
+    const getUid=deps.getUid||uid24DDB,getAnon=deps.getAnon||(()=>getAnonPendingInvite24DD3(deps.storage,now));
+    const getPending=deps.getPending||(()=>{try{return window.getPendingInviteCode24DD()}catch(_){return null}}),uid=String(getUid()||'');
+    const previous=uid?getPending():getAnon();
+    if(previous&&previous!==code){(deps.closePreview||closeIncomingPreview24DD3)();if(deps.clearAnon)deps.clearAnon();else clearAnonPendingInvite24DD3(deps.storage)}
+    seen.clear();seen.set(code,now);
+    if(!uid){const stored=(deps.setAnon||setAnonPendingInvite24DD3)(code,deps.storage,now);if(!stored)return {ok:false,reason:'custody'};(deps.onSignedOut||(()=>queueInviteMessage24DD3('登录后才能查看这个邀请。',deps)))();return {ok:true,signedOut:true}}
+    try{(deps.setPending||window.setPendingInviteCode24DD)(code,undefined,now,uid)}catch(_){return {ok:false,reason:'custody'}}
+    (deps.armIntent||(()=>{incomingIntent24DD3=true}))();if(deps.open!==false)(deps.maybeOpen||maybeOpenIncomingInvite24DD3)();return {ok:true,signedOut:false};
+  }
+  function captureWebInvite24DD3(options={}){
+    const once=options.onceState||null;if(once&&once.value)return {captured:false,alreadyCaptured:true};
+    if(!once&&options.useDocumentOnce!==false&&webInviteCaptured24DD3)return {captured:false,alreadyCaptured:true};
+    if(once)once.value=true;else if(options.useDocumentOnce!==false)webInviteCaptured24DD3=true;
+    const search=options.search!==undefined?String(options.search):location.search,pathname=options.pathname!==undefined?String(options.pathname):location.pathname;
+    const hash=options.hash!==undefined?String(options.hash):location.hash,params=new URLSearchParams(search),values=params.getAll('invite');
+    if(!values.length)return {captured:false};
+    params.delete('invite');const qs=params.toString(),cleanUrl=pathname+(qs?'?'+qs:'')+hash;
+    try{(options.replaceState||((state,title,url)=>history.replaceState(state,title,url)))(null,'',cleanUrl)}catch(_){}
+    if(values.length!==1||values[0].length>MAX_WEB_INVITE_INPUT_24DD3){queueInviteMessage24DD3('这个邀请无法使用。',options);return {captured:true,valid:false,cleanUrl}}
+    const result=(options.accept||acceptIncomingInviteCode24DD3)(values[0],'web',options);return {captured:true,valid:!!(result&&result.ok),cleanUrl,result};
+  }
+  function promoteAnonPendingInvite24DD3(deps={}){
+    const now=typeof deps.now==='function'?deps.now():Date.now(),getUid=deps.getUid||uid24DDB,uid=String(getUid()||'');if(!uid)return false;
+    const code=(deps.getAnon||getAnonPendingInvite24DD3)(deps.storage,now);if(!code)return false;
+    try{(deps.setPending||window.setPendingInviteCode24DD)(code,undefined,now,uid)}catch(_){return false}
+    (deps.clearAnon||clearAnonPendingInvite24DD3)(deps.storage);(deps.armIntent||(()=>{incomingIntent24DD3=true}))();
+    if(deps.open!==false)(deps.maybeOpen||maybeOpenIncomingInvite24DD3)();return true;
+  }
+  async function maybeOpenIncomingInvite24DD3(deps={}){
+    const hasIntent=deps.hasIntent||(()=>incomingIntent24DD3),getUid=deps.getUid||uid24DDB,getLock=deps.getLock||(()=>LOCK&&LOCK.state),uid=String(getUid()||'');
+    if(!hasIntent()||!uid||getLock()!=='unlocked')return false;
+    const code=(deps.getPending||(()=>{try{return window.getPendingInviteCode24DD()}catch(_){return null}}))();if(!code){(deps.disarm||(()=>{incomingIntent24DD3=false}))();return false}
+    (deps.disarm||(()=>{incomingIntent24DD3=false}))();const isCurrent=()=>String(getUid()||'')===uid;
+    (deps.route||(()=>{setTab('aa');U.aaSegment24B='groups';ui24DDB.mode='shared';ui24DDB.error='';ui24DDB.preview=null;ui24DDB.inputCode='';ui24DDB.modal='incoming';renderNow24DDB()}))();
+    if(!isCurrent())return false;await (deps.inspect||((value)=>inspectIncoming24DDB(value)))(code,{isCurrent});return isCurrent();
+  }
+  function handleIncomingAuthSession24DD3(session,deps={}){
+    const state=deps.authState||incomingAuthState24DD3,uid=session&&session.user&&session.user.id?String(session.user.id):'';
+    if(state.uid&&uid!==state.uid)(deps.clearAll||(()=>{clearIncomingState24DD3({terminal:true});closeIncomingPreview24DD3();}))();
+    state.uid=uid;if(uid)(deps.promote||promoteAnonPendingInvite24DD3)();return uid;
+  }
+  function attachIncomingAuth24DD3(client){
+    if(!client||!client.auth||incomingAuthClient24DD3===client)return;try{incomingAuthSubscription24DD3&&incomingAuthSubscription24DD3.unsubscribe&&incomingAuthSubscription24DD3.unsubscribe()}catch(_){}
+    incomingAuthClient24DD3=client;try{const listener=client.auth.onAuthStateChange((_event,session)=>handleIncomingAuthSession24DD3(session));incomingAuthSubscription24DD3=listener&&listener.data&&listener.data.subscription||null}catch(_){}
+    handleIncomingAuthSession24DD3(SESSION);
+  }
+  try{const previousInitSupa24DD3=initSupa;initSupa=function(){const result=previousInitSupa24DD3.apply(this,arguments);setTimeout(()=>attachIncomingAuth24DD3(supa),0);return result}}catch(_){}
+  try{const previousUnlock24DD3=unlock;unlock=function(){const result=previousUnlock24DD3.apply(this,arguments);setTimeout(()=>maybeOpenIncomingInvite24DD3(),0);return result}}catch(_){}
+  Object.assign(window,{captureWebInvite24DD3,acceptIncomingInviteCode24DD3,setAnonPendingInvite24DD3,getAnonPendingInvite24DD3,clearAnonPendingInvite24DD3,promoteAnonPendingInvite24DD3,maybeOpenIncomingInvite24DD3});
+  attachIncomingAuth24DD3(supa);captureWebInvite24DD3();
+
+  window.__ringgitmeTestInvitations24DD3=async function(options={}){
+    class MemoryStorage24DD3{constructor(){this.rows=new Map()}getItem(key){return this.rows.has(key)?this.rows.get(key):null}setItem(key,value){this.rows.set(key,String(value))}removeItem(key){this.rows.delete(key)}key(index){return [...this.rows.keys()][index]||null}get length(){return this.rows.size}}
+    const ASSERTION_KEYS_24DD3=['webInviteQueryCaptured','webInviteRemovedFromAddressBar','onlyInviteParamRemoved','unrelatedQueryParamsPreserved','oauthHashPreservedSafely','rawCodeNotForwardedToOAuth','invalidWebCodeRejected','invalidInviteStillScrubbed','signedOutPendingInvitePreservedTemporarily','anonPendingInviteVersionChecked','anonPendingInviteTtlChecked','anonPendingInviteMalformedCleared','loginThenInvitePromoted','anonymousSlotClearedAfterPromotion','loginThenPreviewOpened','previewRoutesToSharedGroups','userSwitchClearsPendingInvite','signOutClearsPendingInvite','browserRefreshCannotReviveInvite','browserBackCannotRestoreInvite','duplicateWebDeliveryDeduped','differentInviteReplacesPrevious','staleInspectDroppedAfterUserSwitch','noAutomaticAcceptance','terminalStateGeneric','rawCodeAbsentFromD','rawCodeAbsentFromLocalStorage','rawCodeAbsentFromVisibleDom','rawCodeAbsentFromLogs','noMoneyMutation','noTelegramMutation','qaCleanupRestoresState'];
+    let storage,invalidStorage,deliveryStorage,deliverySeen,out=null;
+    try{
+    const code='00000000000000000000000000',codeB='11111111111111111111111111',now=1700000000000,toasts=[],logs=[],seen=new Map(),historyEntries=['/index.html?quick=1&invite='+code+'&amount=8&note=tea&other=safe#access_token=oauth-token'];storage=new MemoryStorage24DD3();let replaced='',scrubCalls=0;
+    const beforeMoney=JSON.stringify([D.txns,D.incomes,D.cards,D.subs,D.loans,D.goals,D.aaPeople,D.personLedgers]),beforeTelegram=JSON.stringify([D.telegramBindings,D.groupTelegramBindings,D.aaTelegramBindings]);
+    const capture=captureWebInvite24DD3({useDocumentOnce:false,search:'?quick=1&invite='+code+'&amount=8&note=tea&other=safe',pathname:'/index.html',hash:'#access_token=oauth-token',replaceState:(_state,_title,url)=>{scrubCalls+=1;replaced=url;historyEntries[historyEntries.length-1]=url},storage,seen,now:()=>now,getUid:()=>'',defer:fn=>fn(),toast:message=>toasts.push(message)});
+    const cleanParams=new URLSearchParams((replaced.split('#')[0].split('?')[1]||'')),oauthBase=replaced.split('#')[0];
+    let invalidReplaced='';invalidStorage=new MemoryStorage24DD3();const invalid=captureWebInvite24DD3({useDocumentOnce:false,search:'?invite='+code+'&invite='+codeB+'&quick=1',pathname:'/index.html',hash:'#keep',replaceState:(_state,_title,url)=>{invalidReplaced=url},storage:invalidStorage,seen:new Map(),now:()=>now,getUid:()=>'',defer:fn=>fn(),toast:message=>toasts.push(message)});
+    const badVersion=new MemoryStorage24DD3();badVersion.setItem(ANON_INVITE_KEY_24DD3,JSON.stringify({version:2,code,cachedAt:now,expiresAt:now+ANON_INVITE_TTL_MS_24DD3}));const badVersionValue=getAnonPendingInvite24DD3(badVersion,now);
+    const expired=new MemoryStorage24DD3();expired.setItem(ANON_INVITE_KEY_24DD3,JSON.stringify({version:1,code,cachedAt:now-ANON_INVITE_TTL_MS_24DD3,expiresAt:now}));const expiredValue=getAnonPendingInvite24DD3(expired,now);
+    const malformed=new MemoryStorage24DD3();malformed.setItem(ANON_INVITE_KEY_24DD3,JSON.stringify({version:1,code:'INVALID',cachedAt:now,expiresAt:now+ANON_INVITE_TTL_MS_24DD3}));const malformedValue=getAnonPendingInvite24DD3(malformed,now);
+    let promoted='',promotedIntent=false;const promotedOk=promoteAnonPendingInvite24DD3({storage,now:()=>now,getUid:()=> 'user-a',setPending:value=>{promoted=value},clearAnon:target=>clearAnonPendingInvite24DD3(target),armIntent:()=>{promotedIntent=true},open:false});
+    let routed=false,inspected=false;const previewOpened=await maybeOpenIncomingInvite24DD3({hasIntent:()=>promotedIntent,getUid:()=> 'user-a',getLock:()=> 'unlocked',getPending:()=>promoted,disarm:()=>{promotedIntent=false},route:()=>{routed=true},inspect:async(_value,guard)=>{inspected=guard.isCurrent()}});
+    let switchPending=code,switchClears=0;handleIncomingAuthSession24DD3({user:{id:'user-b'}},{authState:{uid:'user-a'},clearAll:()=>{switchPending=null;switchClears+=1},promote:()=>false});
+    let signOutPending=code,signOutClears=0;handleIncomingAuthSession24DD3(null,{authState:{uid:'user-a'},clearAll:()=>{signOutPending=null;signOutClears+=1},promote:()=>false});
+    deliveryStorage=new MemoryStorage24DD3();deliverySeen=new Map();let closed=0,signedOutNotices=0;
+    const deliveryDeps={storage:deliveryStorage,seen:deliverySeen,now:()=>now,getUid:()=>'',closePreview:()=>{closed+=1},onSignedOut:()=>{signedOutNotices+=1}};
+    const firstDelivery=acceptIncomingInviteCode24DD3(code,'web',deliveryDeps),firstPending=getAnonPendingInvite24DD3(deliveryStorage,now),duplicateDelivery=acceptIncomingInviteCode24DD3(code,'web',deliveryDeps),replacementDelivery=acceptIncomingInviteCode24DD3(codeB,'web',deliveryDeps);
+    let staleUid='user-a',staleRendered=false;const staleOpen=await maybeOpenIncomingInvite24DD3({hasIntent:()=>true,getUid:()=>staleUid,getLock:()=> 'unlocked',getPending:()=>code,disarm:()=>{},route:()=>{},inspect:async(_value,guard)=>{staleUid='user-b';staleRendered=guard.isCurrent()}});
+    const autoStorage=new MemoryStorage24DD3(),autoSeen=new Map(),beforeAutoMoney=JSON.stringify([D.txns,D.incomes,D.cards,D.subs,D.loans,D.goals,D.aaPeople,D.personLedgers]),beforeAutoShared=JSON.stringify([D.groups,D.groupMembers,D.groupSplitItems,D.groupSplitLines,D.groupPayments,D.groupTombstones24B]);let autoUid='',autoPending='',autoIntent=false,autoInspectCalls=0,autoPreviewOpen=false,autoAcceptCalls=0,autoRejectCalls=0,autoRoute=null,autoCapture,autoPromoted=false,autoOpened=false;const acceptBefore=window.acceptInvitation24DD,rejectBefore=window.rejectInvitation24DD;
+    try{
+      window.acceptInvitation24DD=async()=>{autoAcceptCalls+=1;return {ok:true}};window.rejectInvitation24DD=async()=>{autoRejectCalls+=1;return {ok:true}};
+      autoCapture=captureWebInvite24DD3({useDocumentOnce:false,search:'?invite='+code,pathname:'/index.html',hash:'#safe',replaceState:()=>{},storage:autoStorage,seen:autoSeen,now:()=>now,getUid:()=>autoUid,onSignedOut:()=>{}});
+      autoUid='qa-auto-user';autoPromoted=promoteAnonPendingInvite24DD3({storage:autoStorage,now:()=>now,getUid:()=>autoUid,setPending:value=>{autoPending=value},clearAnon:target=>clearAnonPendingInvite24DD3(target),armIntent:()=>{autoIntent=true},open:false});
+      autoOpened=await maybeOpenIncomingInvite24DD3({hasIntent:()=>autoIntent,getUid:()=>autoUid,getLock:()=> 'unlocked',getPending:()=>autoPending,disarm:()=>{autoIntent=false},route:()=>{autoRoute={tab:'aa',segment:'groups',mode:'shared',modal:'incoming'};autoPreviewOpen=true},inspect:async(_value,guard)=>{autoInspectCalls+=1;return guard.isCurrent()}});
+    }finally{window.acceptInvitation24DD=acceptBefore;window.rejectInvitation24DD=rejectBefore;clearAnonPendingInvite24DD3(autoStorage);autoSeen.clear();}
+    const domCorpus=document.body?document.body.innerText||'':'',localCorpus=(()=>{try{return Array.from({length:localStorage.length},(_,index)=>{const key=localStorage.key(index);return String(key)+'\n'+String(localStorage.getItem(key))}).join('\n')}catch(_){return ''}})();
+    out={phase:'24D-D3A-FIX1',webInviteQueryCaptured:capture.captured===true&&capture.valid===true,webInviteRemovedFromAddressBar:!new URLSearchParams((replaced.split('#')[0].split('?')[1]||'')).has('invite'),onlyInviteParamRemoved:scrubCalls===1&&!cleanParams.has('invite'),unrelatedQueryParamsPreserved:(replaced.split('#')[0].split('?')[1]||'')==='quick=1&amount=8&note=tea&other=safe',oauthHashPreservedSafely:replaced.endsWith('#access_token=oauth-token'),rawCodeNotForwardedToOAuth:!oauthBase.includes(code)&&!new URLSearchParams(oauthBase.split('?')[1]||'').has('invite'),invalidWebCodeRejected:invalid.valid===false&&invalidStorage.length===0,invalidInviteStillScrubbed:invalidReplaced==='/index.html?quick=1#keep',signedOutPendingInvitePreservedTemporarily:firstDelivery.ok&&firstDelivery.signedOut&&firstPending===code,anonPendingInviteVersionChecked:badVersionValue===null&&badVersion.length===0,anonPendingInviteTtlChecked:expiredValue===null&&expired.length===0,anonPendingInviteMalformedCleared:malformedValue===null&&malformed.length===0,loginThenInvitePromoted:promotedOk&&promoted===code,anonymousSlotClearedAfterPromotion:storage.length===0,loginThenPreviewOpened:previewOpened&&inspected,previewRoutesToSharedGroups:routed,userSwitchClearsPendingInvite:switchClears===1&&switchPending===null,signOutClearsPendingInvite:signOutClears===1&&signOutPending===null,browserRefreshCannotReviveInvite:!historyEntries[0].includes('invite='),browserBackCannotRestoreInvite:historyEntries.length===1&&!historyEntries.some(url=>url.includes('invite=')),duplicateWebDeliveryDeduped:firstDelivery.ok&&duplicateDelivery.duplicate===true&&signedOutNotices===2,differentInviteReplacesPrevious:replacementDelivery.ok&&closed===1&&getAnonPendingInvite24DD3(deliveryStorage,now)===codeB,staleInspectDroppedAfterUserSwitch:staleOpen===false&&staleRendered===false,noAutomaticAcceptance:!!(autoCapture&&autoCapture.valid)&&autoPromoted&&autoOpened&&autoPreviewOpen&&autoInspectCalls===1&&autoRoute&&autoRoute.tab==='aa'&&autoRoute.segment==='groups'&&autoRoute.mode==='shared'&&autoRoute.modal==='incoming'&&autoAcceptCalls===0&&autoRejectCalls===0&&JSON.stringify([D.txns,D.incomes,D.cards,D.subs,D.loans,D.goals,D.aaPeople,D.personLedgers])===beforeAutoMoney&&JSON.stringify([D.groups,D.groupMembers,D.groupSplitItems,D.groupSplitLines,D.groupPayments,D.groupTombstones24B])===beforeAutoShared,terminalStateGeneric:productError24DDB({category:'unavailable_invitation'})==='这个邀请无法使用。',rawCodeAbsentFromD:!JSON.stringify(D).includes(code)&&!JSON.stringify(D).includes(codeB),rawCodeAbsentFromLocalStorage:!localCorpus.includes(code)&&!localCorpus.includes(codeB),rawCodeAbsentFromVisibleDom:!domCorpus.includes(code)&&!domCorpus.includes(codeB),rawCodeAbsentFromLogs:logs.length===0&&![captureWebInvite24DD3,acceptIncomingInviteCode24DD3,promoteAnonPendingInvite24DD3,maybeOpenIncomingInvite24DD3].some(fn=>/conso\x6ce\./.test(String(fn))),noMoneyMutation:beforeMoney===JSON.stringify([D.txns,D.incomes,D.cards,D.subs,D.loans,D.goals,D.aaPeople,D.personLedgers]),noTelegramMutation:beforeTelegram===JSON.stringify([D.telegramBindings,D.groupTelegramBindings,D.aaTelegramBindings]),qaCleanupRestoresState:false};
+    out.assertionCount=ASSERTION_KEYS_24DD3.length;out.safe=ASSERTION_KEYS_24DD3.every(key=>out[key]===true);
+    }finally{clearAnonPendingInvite24DD3(storage);clearAnonPendingInvite24DD3(deliveryStorage);clearAnonPendingInvite24DD3(invalidStorage);if(deliverySeen)deliverySeen.clear();if(out)out.qaCleanupRestoresState=!!storage&&!!deliveryStorage&&!!invalidStorage&&storage.length===0&&deliveryStorage.length===0&&invalidStorage.length===0&&deliverySeen.size===0;}
+    if(out)out.safe=ASSERTION_KEYS_24DD3.every(key=>out[key]===true);return out;
+  };
 
   const QA_WINDOW_KEYS_24DDB=['generateInviteCode24DD','probeInvitationCapability24DD','createSharedLedger24DD','inviteMember24DD','inspectInvitation24DD','acceptInvitation24DD','rejectInvitation24DD','revokeInvitation24DD','createMemberInvitation24DD','removeUnclaimedMember24DD','loadMySharedLedgers24DD','loadSharedLedgerMembers24DD','loadMyOwnedInvitations24DD','getCurrentAppIdentity24DC'];
   const qaDeferredControls24DDB=new Set();
