@@ -1,3 +1,6 @@
+import { createMoneyEngine } from '../domain/moneyEngine.js';
+import { createCategoryRepository } from '../domain/categoryRepository.js';
+
 // ============================================================
 // RinggitMe 2.0 — demo fixtures (Phase 1 shell only)
 //
@@ -208,7 +211,7 @@ function buildActivities() {
         id: `t-${n}`,
         kind: isTransfer ? 'transfer' : isIncome ? 'income' : 'expense',
         desc: isTransfer ? "转账 · 储蓄 → Touch 'n Go" : isIncome ? (n % 3 === 0 ? '工资 Salary' : 'AA 收回') : names[(n + k) % names.length],
-        catId: isTransfer ? 'bill' : cat.id,
+        catId: isTransfer ? 'transfer-fallback' : isIncome ? (n % 3 === 0 ? 'income-salary' : 'income-aa') : cat.id,
         catLabel: isTransfer ? '转账' : isIncome ? '收入' : cat.label,
         accountId: ACTIVITY_ACCOUNTS[n % ACTIVITY_ACCOUNTS.length],
         amount,
@@ -217,9 +220,7 @@ function buildActivities() {
         shared,
         receipt: n % 12 === 6,
         photo: n % 15 === 10,
-        editHistory: n % 20 === 5
-          ? [{ at: `${iso} 21:14`, from: { amount: amount + 5, desc: '待确认' }, to: { amount, desc: names[(n + k) % names.length] } }]
-          : [],
+        editHistory: [],
       });
       n++;
     }
@@ -229,18 +230,24 @@ function buildActivities() {
 
 // ---- Data source interface (the adapter boundary) ----------
 export function createDemoDataSource() {
-  const activities = buildActivities();
-  const state = { accounts: structuredClone(accounts), commitments: structuredClone(commitments), activities };
-  let captureSeq = 0;
+  const engine = createMoneyEngine({ accounts, transactions: buildActivities(), today: FIXTURE_TODAY });
+  const categoryRepo = createCategoryRepository();
+  let commitmentState = structuredClone(commitments);
 
-  const ofType = (t) => state.accounts.filter((a) => a.type === t);
-  const cash = () => state.accounts.filter((a) => a.type !== 'cc').reduce((s, a) => s + a.balance, 0);
-  const cardSpendDebt = () => ofType('cc').reduce((s, a) => s + a.outstanding, 0);
-  const instRemaining = () => instalments.reduce((s, i) => s + i.remaining, 0);
-  const instMonthly = () => instalments.reduce((s, i) => s + i.monthly, 0);
+  const ofType = (type) => engine.getAccounts().filter((account) => account.type === type);
+  const instalmentRemaining = () => instalments.reduce((sum, item) => sum + item.remaining, 0);
+  const instalmentMonthly = () => instalments.reduce((sum, item) => sum + item.monthly, 0);
   const cardDueThisMonth = () =>
-    ofType('cc').filter((a) => !a.duePaid).reduce((s, a) => s + a.monthlyDue, 0) + instMonthly();
-  const aaReceivable = () => people.reduce((s, p) => s + Math.max(0, p.net), 0);
+    ofType('cc').filter((account) => !account.duePaid).reduce((sum, account) => sum + account.monthlyDue, 0) + instalmentMonthly();
+  const aaReceivable = () => people.reduce((sum, person) => sum + Math.max(0, person.net), 0);
+  const userTransactions = () => engine.getUserTransactions();
+  const decorateTransaction = (transaction) => {
+    if (!transaction) return transaction;
+    const category = categoryRepo.getCategory(transaction.catId);
+    const noPurpose = transaction.kind === 'transfer' && (!transaction.catId || transaction.catId === 'transfer-fallback');
+    const label = noPurpose ? '转账' : category?.name || transaction.catLabel;
+    return { ...transaction, catLabel: label, category: label, categoryArchived: Boolean(category?.isArchived), categoryIcon: category?.icon || null, categoryThemeToken: category?.themeToken || 'slate' };
+  };
 
   return {
     today: FIXTURE_TODAY,
@@ -251,70 +258,111 @@ export function createDemoDataSource() {
     // getPendingCardDue / getAfterCardPaymentCash / getAAReceivables /
     // getFullPayoffPosition) behind this same shape.
     getPulse() {
-      const currentCash = cash();
-      const totalCardDebt = cardSpendDebt() + instRemaining();
-      const monthDue = cardDueThisMonth();
-      const receivable = aaReceivable();
-      const myFixed = state.commitments.reduce((s, c) => s + c.myShare, 0);
-      const totalAssets = currentCash + investments.total + fixedDeposits.total;
-      return {
-        currentCash,
-        myFixed,
-        totalCardDebt,
-        monthCardDue: monthDue,
-        afterCardPayment: currentCash - monthDue,
-        aaReceivable: receivable,
-        afterReceive: currentCash + receivable,
-        totalAssets,
-        totalDebt: totalCardDebt,
-        netDebt: totalCardDebt - currentCash,
-        netAssets: totalAssets - totalCardDebt,
-      };
+      return engine.getDerivedMetrics({
+        investmentTotal: investments.total,
+        fixedDepositTotal: fixedDeposits.total,
+        instalmentRemaining: instalmentRemaining(),
+        monthCardDue: cardDueThisMonth(),
+        aaReceivable: aaReceivable(),
+        myFixed: Math.round(commitmentState.reduce((sum, commitment) => sum + commitment.myShare, 0) * 100) / 100,
+      });
     },
 
-    getAccounts: () => state.accounts,
-    getAccountsByType: (t) => state.accounts.filter((a) => a.type === t),
-    getAccount: (id) => state.accounts.find((a) => a.id === id),
+    subscribe: (listener) => engine.subscribe(listener),
+    getAccounts: () => engine.getAccounts(),
+    getAccountsByType: (type) => ofType(type),
+    getAccount: (id) => engine.getAccount(id),
+    getAccountBalance: (id) => engine.getAccountBalance(id),
     getInstalments: (cardId) => instalments.filter((i) => i.cardId === cardId),
     getInvestments: () => investments,
     getFixedDeposits: () => fixedDeposits,
-    getSavingsFlow: () => savingsFlow,
-    getCommitments: () => state.commitments,
+    getSavingsFlow() {
+      const inflow = userTransactions()
+        .filter((transaction) => !transaction.recordOnly && transaction.kind === 'income' && engine.getAccount(transaction.destinationAccountId)?.type === 'saving')
+        .reduce((sum, transaction) => sum + transaction.amount, savingsFlow.inflow);
+      const outflow = userTransactions()
+        .filter((transaction) => !transaction.recordOnly && transaction.kind === 'expense' && engine.getAccount(transaction.sourceAccountId)?.type === 'saving')
+        .reduce((sum, transaction) => sum + transaction.amount, savingsFlow.outflow);
+      return { inflow, outflow };
+    },
+    getCommitments: () => commitmentState,
     setCommitmentPaid(id, paid) {
-      const c = state.commitments.find((x) => x.id === id);
+      const c = commitmentState.find((x) => x.id === id);
       if (c) c.paid = paid;
     },
-    getBudget: () => ({ month: '2026-07', total: 2500, used: 1684.3 }),
-    getCategories: () => CATS,
-    getRecentCategories: () => [CATS[0], CATS[2], CATS[1], CATS[3], CATS[4]],
-
-    getActivities: () => state.activities,
-    getActivity: (id) => state.activities.find((t) => t.id === id),
-
-    // Capture save — in-memory only (quality gate: no persistence).
-    saveCapture({ mode, amount, catId, accountId, desc }) {
-      const cat = CATS.find((c) => c.id === catId) || CATS[0];
-      const acc = this.getAccount(accountId);
-      const now = new Date();
-      const item = {
-        id: `new-${++captureSeq}`,
-        kind: mode,
-        desc: desc || (mode === 'income' ? '收入' : mode === 'transfer' ? '转账' : cat.label),
-        catId: cat.id,
-        catLabel: mode === 'transfer' ? '转账' : mode === 'income' ? '收入' : cat.label,
-        accountId: acc?.id || 'sv-mbb',
-        amount,
-        date: FIXTURE_TODAY,
-        time: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`,
-        shared: false,
-        receipt: false,
-        photo: false,
-        editHistory: [],
-        justSaved: true,
-      };
-      state.activities.unshift(item);
-      return item;
+    getBudget() {
+      const addedSpend = userTransactions()
+        .filter((transaction) => !transaction.recordOnly && transaction.kind === 'expense' && transaction.date.startsWith('2026-07'))
+        .reduce((sum, transaction) => sum + transaction.amount, 0);
+      return { month: '2026-07', total: 2500, used: 1684.3 + addedSpend };
     },
+    getCategories: (type = 'expense', options) => categoryRepo.getCategories(type, options),
+    getCategory: (id) => categoryRepo.getCategory(id),
+    getQuickCategories: (type) => categoryRepo.getQuickCategories(type),
+    getDefaultCategory: (type) => categoryRepo.getDefault(type),
+    getDefaultCategoryId: (type) => categoryRepo.getDefaultId(type),
+    getCategorySnapshot: () => categoryRepo.getSnapshot(),
+    createCategory: (input) => categoryRepo.create(input),
+    updateCategory: (id, changes) => categoryRepo.update(id, changes),
+    setDefaultCategory: (type, id) => categoryRepo.setDefault(type, id),
+    moveCategory: (id, direction) => categoryRepo.move(id, direction),
+    reorderCategories: (type, orderedIds) => categoryRepo.reorderActive(type, orderedIds),
+    toggleCategoryPin: (id) => categoryRepo.togglePin(id),
+    archiveCategory: (id) => categoryRepo.archive(id),
+    restoreCategory: (id) => categoryRepo.restore(id),
+    removeCategory(id) {
+      const used = engine.getTransactions({ includeReversed: true }).some((transaction) => transaction.catId === id);
+      return categoryRepo.remove(id, used);
+    },
+    resetCategoryType: (type) => categoryRepo.resetType(type),
+    getRecentCategories: () => categoryRepo.getQuickCategories('expense'),
+
+    getActivities: () => engine.getTransactions().map(decorateTransaction),
+    getTransactions: (options) => engine.getTransactions(options).map(decorateTransaction),
+    getActivity: (id) => decorateTransaction(engine.getTransaction(id)),
+    getTransaction: (id) => decorateTransaction(engine.getTransaction(id)),
+    getTransactionMutationPolicy: (transactionOrId) => engine.getTransactionMutationPolicy(transactionOrId),
+    addTransaction(draft) {
+      const cat = categoryRepo.getCategory(draft.catId);
+      const noPurpose = draft.kind === 'transfer' && (!cat || cat.isSystemFallback);
+      return decorateTransaction(engine.addTransaction({
+        ...draft,
+        catId: draft.catId || (draft.kind === 'transfer' ? 'transfer-fallback' : categoryRepo.getDefaultId(draft.kind)),
+        catLabel: noPurpose ? '转账' : draft.catLabel || cat?.name,
+        category: noPurpose ? '转账' : draft.category || cat?.name,
+      }));
+    },
+    editTransaction(id, changes) {
+      const category = categoryRepo.getCategory(changes.catId);
+      const noPurpose = (changes.kind || engine.getTransaction(id)?.kind) === 'transfer' && (!category || category.isSystemFallback);
+      return decorateTransaction(engine.editTransaction(id, {
+        ...changes,
+        ...(changes.catId ? { catLabel: noPurpose ? '转账' : category?.name, category: noPurpose ? '转账' : category?.name } : {}),
+      }));
+    },
+    reverseTransaction: (id) => engine.reverseTransaction(id),
+    deleteTransaction: (id) => engine.deleteTransaction(id),
+    transferFunds: (draft) => engine.transferFunds(draft),
+    getDerivedMetrics() {
+      return this.getPulse();
+    },
+    getTransactionAccountLabel(transaction) {
+      const source = transaction.sourceAccountId ? engine.getAccount(transaction.sourceAccountId) : null;
+      const destination = transaction.destinationAccountId ? engine.getAccount(transaction.destinationAccountId) : null;
+      if (transaction.kind === 'transfer') return `${source?.name || '—'} → ${destination?.name || '—'}`;
+      return (transaction.kind === 'income' ? destination : source)?.name || '—';
+    },
+    getTransactionCategoryLabel: (transaction) => decorateTransaction(transaction)?.catLabel || '—',
+    resetDemoData() {
+      commitmentState = structuredClone(commitments);
+      engine.resetDemoData();
+      categoryRepo.resetAll();
+    },
+    projectAAReceivable: (...args) => engine.projectAAReceivable(...args),
+    settleAAReceivable: (...args) => engine.settleAAReceivable(...args),
+    reverseAAProjection: (...args) => engine.reverseAAProjection(...args),
+    postFixedExpense: (...args) => engine.postFixedExpense(...args),
+    reverseFixedExpense: (...args) => engine.reverseFixedExpense(...args),
 
     getPeople: () => people,
     getPerson: (id) => people.find((p) => p.id === id),
@@ -323,7 +371,7 @@ export function createDemoDataSource() {
     getRecentSettlements: () => recentSettlements,
     getGroups: () => groups,
     getReceiveTargets: () =>
-      state.accounts
+      engine.getAccounts()
         .filter((a) => a.type !== 'cc')
         .map((a) => ({ id: a.id, name: a.name, type: a.type, note: a.type === 'ew' ? '入账 eWallet' : '入账储蓄' }))
         .concat([{ id: 'cash', name: '现金', type: 'cash', note: '只记录，不动余额' }]),

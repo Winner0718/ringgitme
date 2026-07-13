@@ -4,7 +4,7 @@
 // handlers anywhere in the app).
 // ============================================================
 
-import { ui, update, subscribe, dispatchAction, registerAction, applyTheme } from './state.js';
+import { data, ui, update, subscribe, dispatchAction, registerAction, applyTheme } from './state.js';
 import { mountContent, renderCurrentPage, navigate } from './router.js';
 import { renderTabBar, updateTabBar } from '../components/GlassTabBar.js';
 import { mountSheetHost, openSheet, closeSheet, toast } from '../components/AppSheet.js';
@@ -52,6 +52,13 @@ export function mountShell(root) {
   root.addEventListener('click', (e) => {
     const el = e.target.closest('[data-action]');
     if (!el || el.disabled) return;
+    dispatchAction(el.dataset.action, el, e);
+  });
+  root.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const el = e.target.closest('[data-action][role="button"]');
+    if (!el || el.tagName === 'BUTTON' || el.disabled) return;
+    e.preventDefault();
     dispatchAction(el.dataset.action, el, e);
   });
 
@@ -107,6 +114,7 @@ function registerShellActions() {
               </button>`).join('')}
           </div>
         </div>
+        <button class="sheet-secondary" data-action="open-demo-reset">重置示例数据</button>
       `,
     });
   });
@@ -117,6 +125,36 @@ function registerShellActions() {
     applyTheme(el.dataset.themeValue);
     update({});
     closeSheet();
+  });
+
+  registerAction('open-demo-reset', () => {
+    openSheet({
+      title: '重置示例数据',
+      contentHTML: `
+        <div class="detail-hero">
+          <div class="row-title">恢复到最初状态？</div>
+          <div class="caption">你在这次使用中新增、编辑或删除的记录都会清除。</div>
+        </div>
+        <button class="sheet-primary" data-action="confirm-demo-reset">确认重置</button>
+        <button class="sheet-secondary" data-action="sheet-close">取消</button>
+      `,
+    });
+  });
+
+  registerAction('confirm-demo-reset', () => {
+    data.resetDemoData();
+    closeSheet();
+    update({
+      tab: 'today',
+      navDirection: 'back',
+      assetsView: { name: 'overview' },
+      categoryIndex: { saving: 0, cc: 0, ew: 0 },
+      activityFilter: 'all',
+      activityQuery: '',
+      activityMonth: '2026-07',
+      highlightActivityId: null,
+    });
+    toast('示例数据已重置');
   });
 
   registerAction('sheet-close', () => closeSheet());

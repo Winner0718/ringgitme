@@ -25,6 +25,23 @@ export function fmtTimeAMPM(hhmm) {
   return `${h}:${String(m).padStart(2, '0')} ${ap}`;
 }
 
+export function parseDateMY(value) {
+  const match = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(String(value).trim());
+  if (!match) throw new Error('日期格式应为 DD/MM/YYYY');
+  const [, dd, mm, yyyy] = match;
+  const date = new Date(`${yyyy}-${mm}-${dd}T00:00:00`);
+  if (date.getFullYear() !== Number(yyyy) || date.getMonth() + 1 !== Number(mm) || date.getDate() !== Number(dd)) throw new Error('日期无效');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+export function parseTimeAMPM(value) {
+  const match = /^(1[0-2]|[1-9]):([0-5]\d)\s*(AM|PM)$/i.exec(String(value).trim());
+  if (!match) throw new Error('时间格式应为 h:mm AM/PM');
+  let hour = Number(match[1]) % 12;
+  if (match[3].toUpperCase() === 'PM') hour += 12;
+  return `${String(hour).padStart(2, '0')}:${match[2]}`;
+}
+
 // Local-date ISO (never toISOString — that shifts to UTC and
 // moves dates across midnight in MYT).
 export function toLocalISO(d) {

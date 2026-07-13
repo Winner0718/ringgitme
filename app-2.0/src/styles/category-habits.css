@@ -1,0 +1,74 @@
+/* Customizable transaction habits — compact Liquid Glass mobile surfaces. */
+.cap-cat-more { color: var(--accent); }
+.cap-transfer-summary {
+  display: flex; align-items: center; justify-content: center; gap: var(--space-8);
+  min-height: 36px; margin: var(--space-4) 0; padding: 0 var(--space-10);
+  border-radius: var(--r-control); background: var(--accent-soft); color: var(--text-2);
+  font: var(--type-caption);
+}
+.habit-search {
+  height: 38px; display: flex; align-items: center; gap: var(--space-6);
+  padding: 0 var(--space-10); border-radius: var(--r-control); background: var(--s1);
+  box-shadow: 0 0 0 1px var(--line); color: var(--text-3);
+}
+.habit-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text-1); }
+.habit-picker-list { margin-top: var(--space-10); }
+.habit-section-title { padding: var(--space-10) var(--space-6) var(--space-4); }
+.habit-picker-item {
+  width: 100%; min-height: 46px; display: flex; align-items: center; gap: var(--space-10);
+  padding: 0 var(--space-6); border-bottom: 1px solid var(--line); text-align: left;
+}
+.habit-picker-item:last-child { border-bottom: 0; }
+.habit-name { flex: 1; min-width: 0; }
+.habit-check { color: var(--accent); }
+.habit-manage-link {
+  width: 100%; height: 44px; margin-top: var(--space-10); display: flex; align-items: center;
+  justify-content: center; gap: var(--space-4); color: var(--accent); font: var(--type-caption);
+}
+.habit-icon {
+  width: 34px; height: 34px; flex: 0 0 34px; display: grid; place-items: center;
+  border-radius: 12px;
+}
+.theme-green { color: var(--sem-green); background: color-mix(in srgb, var(--sem-green) 12%, transparent); }
+.theme-mint { color: var(--accent); background: var(--accent-soft); }
+.theme-orange { color: var(--sem-orange); background: color-mix(in srgb, var(--sem-orange) 12%, transparent); }
+.theme-blue { color: var(--sem-blue); background: color-mix(in srgb, var(--sem-blue) 12%, transparent); }
+.theme-violet { color: #7666b5; background: color-mix(in srgb, #7666b5 12%, transparent); }
+.theme-rose { color: var(--sem-red); background: color-mix(in srgb, var(--sem-red) 10%, transparent); }
+.theme-slate { color: var(--text-2); background: var(--s2); }
+.habit-type-segments { margin-bottom: var(--space-12); }
+.habit-manager-list { position: relative; border-radius: var(--r-card); background: var(--s1); box-shadow: 0 0 0 1px var(--line); }
+.habit-manage-row {
+  position: relative;
+  min-height: 50px; display: flex; align-items: center; gap: var(--space-8);
+  padding: 0 var(--space-6); border-bottom: 1px solid var(--line);
+  transition: transform 140ms var(--ease-out), box-shadow 140ms var(--ease-out), background 140ms var(--ease-out);
+}
+.habit-manage-row:last-child { border-bottom: 0; }
+.habit-manage-row.archived { opacity: .62; }
+.habit-drag { width: 24px; height: 34px; display: grid; place-items: center; color: var(--text-3); font-size: 20px; cursor: grab; touch-action: pan-y; }
+.habit-drag:focus-visible { color: var(--accent); outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 8px; }
+.habit-drag-spacer { width: 24px; flex: 0 0 24px; }
+.habit-manage-row.drag-active,
+.habit-manage-row.keyboard-reordering { z-index: 4; background: var(--s1); box-shadow: var(--shadow-2); transform: scale(1.015); }
+.habit-manage-row.drag-active .habit-drag { color: var(--accent); cursor: grabbing; }
+.habit-dragging { user-select: none; overscroll-behavior: none; }
+.habit-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; text-align: left; }
+.habit-row-main > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.habit-mini { width: 32px; height: 32px; display: grid; place-items: center; color: var(--text-3); }
+.habit-mini.active { color: var(--accent); }
+.habit-field-title { margin-bottom: var(--space-6); }
+.habit-icon-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: var(--space-4); }
+.habit-icon-choice { aspect-ratio: 1; display: grid; place-items: center; border-radius: 10px; color: var(--text-2); background: var(--s1); box-shadow: 0 0 0 1px var(--line); }
+.habit-icon-choice.active { color: #fff; background: var(--accent); box-shadow: none; }
+.native-picker-wrap { position: relative; }
+.native-picker-display {
+  width: 100%; height: 38px; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 var(--space-12); border: 1px solid var(--line-strong); border-radius: var(--r-control);
+  background: var(--s1); color: var(--text-1); text-align: left;
+}
+.native-picker-display:focus-visible { border-color: var(--accent); outline: 2px solid var(--accent-soft); }
+.native-picker-display .icon { color: var(--accent); }
+.native-picker-input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; inset: auto; }
+[hidden] { display: none !important; }
+@media (max-width: 360px) { .habit-icon-grid { grid-template-columns: repeat(7, 1fr); } }

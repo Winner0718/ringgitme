@@ -24,6 +24,7 @@ export const icons = {
   arrowUp: P('<path d="M12 19V5M6 11l6-6 6 6"/>'),
   transfer: P('<path d="M7 10h11l-3-3M17 14H6l3 3"/>'),
   calendar: P('<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4M16 3v4M4 11h16"/>'),
+  clock: P('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
   note: P('<path d="M5 4h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M8 9h8M8 13h6"/>'),
   camera: P('<path d="M5 8h2l1.5-2.5h7L17 8h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2z"/><circle cx="12" cy="13" r="3.2"/>'),
   moon: P('<path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z"/>'),
@@ -41,6 +42,15 @@ export const icons = {
   ticket: P('<path d="M4 7h16v3a2 2 0 0 0 0 4v3H4v-3a2 2 0 0 0 0-4V7z"/><path d="M13 7v2M13 15v2M13 11v2"/>'),
   receipt: P('<path d="M6 3h12v18l-2-1.5L14 21l-2-1.5L10 21l-2-1.5L6 21V3z"/><path d="M9 8h6M9 12h6"/>'),
   heart: P('<path d="M12 20s-7-4.5-9-9c-1.2-2.8.5-6 3.7-6 2 0 3.6 1.2 4.3 2.7h2C13.7 6.2 15.3 5 17.3 5c3.2 0 4.9 3.2 3.7 6-2 4.5-9 9-9 9z"/>'),
+  home: P('<path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10M9 20v-6h6v6"/>'),
+  salary: P('<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M7 10h10M8 15h3"/>'),
+  gift: P('<rect x="3" y="9" width="18" height="12" rx="2"/><path d="M12 9v12M3 13h18M12 9H7.5a2.5 2.5 0 1 1 2.5-2.5L12 9zm0 0h4.5A2.5 2.5 0 1 0 14 6.5L12 9z"/>'),
+  refund: P('<path d="M4 7v5h5"/><path d="M5.5 12a7 7 0 1 0 2-5"/>'),
+  interest: P('<circle cx="7" cy="7" r="2"/><circle cx="17" cy="17" r="2"/><path d="m18 5-12 14"/>'),
+  aa: P('<circle cx="8" cy="9" r="3"/><circle cx="16" cy="9" r="3"/><path d="M2.5 20c.5-4 2.5-6 5.5-6s5 2 5.5 6M10.5 20c.5-4 2.5-6 5.5-6s5 2 5.5 6"/>'),
+  savings: P('<path d="M4 10h16v9H4zM7 10V7h10v3M8 14h8"/>'),
+  repayment: P('<path d="M4 8h13l-3-3M20 16H7l3 3"/><path d="M17 8v4M7 16v-4"/>'),
+  investment: P('<path d="M4 19V10M10 19V5M16 19v-7M22 19V3"/><path d="M2 19h22"/>'),
 };
 
 export function icon(name, size = 20) {

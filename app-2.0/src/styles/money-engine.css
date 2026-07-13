@@ -1,0 +1,118 @@
+/* Phase 2A operation forms and transaction sheets. */
+
+.cap-account-label {
+  margin: var(--space-4) 0;
+}
+
+.cap-datetime {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-8);
+}
+
+.cap-field select,
+.transaction-form select {
+  width: 100%;
+  height: 38px;
+  border-radius: var(--r-control);
+  border: 1px solid var(--line-strong);
+  background: var(--s1);
+  color: var(--text-1);
+  padding: 0 var(--space-10);
+  outline: none;
+}
+
+.cap-field select:focus,
+.transaction-form select:focus {
+  border-color: var(--accent);
+}
+
+.transaction-field {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  border-bottom: 1px solid var(--line);
+}
+
+.transaction-field:last-child {
+  border-bottom: 0;
+}
+
+.transaction-field > :last-child {
+  text-align: right;
+}
+
+.transaction-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+}
+
+.transaction-form .cap-field input {
+  width: 100%;
+}
+
+.transaction-static {
+  min-height: var(--control-h);
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-10);
+  border: 1px solid var(--line);
+  border-radius: var(--r-control);
+  background: var(--s2);
+  color: var(--text-2);
+}
+
+.transaction-check {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  color: var(--text-2);
+}
+
+.transaction-check input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+.sheet-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-8);
+  margin-top: var(--space-12);
+}
+
+.sheet-actions .sheet-primary,
+.sheet-actions .sheet-danger {
+  margin-top: 0;
+}
+
+.sheet-danger {
+  width: 100%;
+  height: var(--control-h);
+  border-radius: var(--r-control);
+  background: color-mix(in srgb, var(--sem-red) 12%, var(--s1));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--sem-red) 35%, transparent);
+  color: var(--sem-red);
+  font: var(--type-body);
+  font-weight: 600;
+  margin-top: var(--space-8);
+}
+
+.mutation-lock-note {
+  margin: var(--space-10) 0;
+  padding: var(--space-10) var(--space-12);
+  border-radius: var(--r-control);
+  background: color-mix(in srgb, var(--sem-orange) 10%, var(--s1));
+  color: var(--text-2);
+}
+
+@media (max-height: 700px) {
+  .capture-sheet .cap-keypad {
+    grid-template-columns: repeat(6, 1fr);
+  }
+}
