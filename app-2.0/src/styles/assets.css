@@ -380,6 +380,26 @@
   transition: opacity var(--dur-base) var(--ease-out);
 }
 
+/* Only the far outer edge of each neighbour is exposed. This also
+   clips identity baked into card artwork, instead of relying solely
+   on hiding the HTML overlays. */
+.detail-peek .deck-card.before {
+  clip-path: inset(0 calc(100% - 34px) 0 0 round var(--r-card));
+}
+
+.detail-peek .deck-card.after {
+  clip-path: inset(0 0 0 calc(100% - 34px) round var(--r-card));
+}
+
+.detail-peek .deck-card:not(.front) {
+  filter: saturate(0.78) brightness(0.86);
+}
+
+.detail-peek .deck-card.front {
+  clip-path: inset(0 round var(--r-card));
+  filter: none;
+}
+
 .detail-peek .deck-card .face-overlay,
 .detail-peek .deck-card .deck-badge,
 .detail-peek .deck-card .deck-fallback-name,

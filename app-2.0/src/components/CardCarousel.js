@@ -55,16 +55,21 @@ export function renderCarousel(items, index, { selectAction = 'carousel-select',
 }
 
 function layout(stage, pos, count, variant) {
-  const step = variant === 'detail' ? 25 : 18; // % of card width per position
+  const step = variant === 'detail' ? 15 : 18; // % of card width per position
+  const selectedIndex = Math.round(pos);
   stage.querySelectorAll('[data-deck-card]').forEach((el, i) => {
     const d = i - pos;
     const abs = Math.min(Math.abs(d), 3);
     const x = d * step;
-    const scale = 1 - abs * (variant === 'detail' ? 0.11 : 0.09);
+    const scale = 1 - abs * (variant === 'detail' ? 0.06 : 0.09);
     el.style.transform = `translateX(${x}%) scale(${scale})`;
     el.style.zIndex = 100 - Math.round(abs * 10);
-    el.style.opacity = abs >= 2.4 ? 0 : 1 - abs * 0.28;
-    el.classList.toggle('front', Math.round(pos) === i);
+    const hidden = variant === 'detail' ? abs > 1.25 : abs >= 2.4;
+    el.style.opacity = hidden ? 0 : 1 - abs * 0.28;
+    el.style.pointerEvents = hidden ? 'none' : '';
+    el.classList.toggle('front', selectedIndex === i);
+    el.classList.toggle('before', i < selectedIndex);
+    el.classList.toggle('after', i > selectedIndex);
   });
 }
 
@@ -86,36 +91,57 @@ export function activateCarousel(container, index, onChange) {
   layout(stage, index, count, variant);
 
   let startX = null;
+  let startY = null;
+  let activePointerId = null;
   let dragPos = index;
   let dragging = false;
   const width = () => viewport.clientWidth * 0.6;
 
   viewport.addEventListener('pointerdown', (e) => {
+    if (!e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return;
     startX = e.clientX;
+    startY = e.clientY;
+    activePointerId = e.pointerId;
     dragPos = index;
     dragging = false;
-    viewport.setPointerCapture(e.pointerId);
-    stage.classList.add('dragging');
   });
   viewport.addEventListener('pointermove', (e) => {
-    if (startX === null) return;
+    if (startX === null || e.pointerId !== activePointerId) return;
     const dx = e.clientX - startX;
-    if (Math.abs(dx) > DRAG_THRESHOLD) dragging = true;
+    const dy = e.clientY - startY;
+    if (Math.hypot(dx, dy) > DRAG_THRESHOLD && !dragging) {
+      dragging = true;
+      stage.classList.add('dragging');
+      // Capture only after the gesture is known to be a drag. Capturing
+      // on pointerdown retargets a genuine tap's click to the viewport,
+      // so the centred card's delegated data-action never receives it.
+      if (Math.abs(dx) >= Math.abs(dy)) viewport.setPointerCapture(e.pointerId);
+    }
     if (dragging) {
       dragPos = clamp(index - dx / width(), -0.4, count - 0.6);
       layout(stage, dragPos, count, variant);
     }
   });
-  const release = () => {
-    if (startX === null) return;
+  const release = (e) => {
+    if (startX === null || e.pointerId !== activePointerId) return;
     startX = null;
+    startY = null;
+    activePointerId = null;
     stage.classList.remove('dragging');
     const target = clamp(Math.round(dragPos), 0, count - 1);
     if (dragging && target !== index) onChange(target);
     else layout(stage, index, count, variant);
   };
   viewport.addEventListener('pointerup', release);
-  viewport.addEventListener('pointercancel', release);
+  viewport.addEventListener('pointercancel', (e) => {
+    if (e.pointerId !== activePointerId) return;
+    startX = null;
+    startY = null;
+    activePointerId = null;
+    dragging = false;
+    stage.classList.remove('dragging');
+    layout(stage, index, count, variant);
+  });
 
   // A completed drag must not also fire the tap action
   viewport.addEventListener('click', (e) => {
