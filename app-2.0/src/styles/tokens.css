@@ -1,0 +1,140 @@
+/* ============================================================
+   RinggitMe 2.0 — Design Tokens (blueprint §15.1)
+   Single source of truth. No unregistered hex values elsewhere.
+   ============================================================ */
+
+:root {
+  /* ---- Ringgit Jade palette ---- */
+  --jade-600: #0a8a54;
+  --jade-400: #34d27f;
+  --emerald-800: #065f3f;
+  --gold-500: #b8860b;
+
+  /* Neutral mist scale */
+  --mist-50: #f5f5f7;
+  --mist-100: #ebebef;
+  --mist-200: #dcdce2;
+  --mist-300: #c3c3cc;
+  --mist-400: #9a9aa5;
+  --mist-500: #71717d;
+  --mist-600: #52525c;
+  --mist-700: #3a3a42;
+  --mist-800: #232329;
+  --mist-900: #131316;
+
+  /* Semantic (MY convention: expense red / income green) */
+  --sem-red: #dc2626;
+  --sem-green: #0a8a54;
+  --sem-orange: #c2620a;
+  --sem-blue: #0a6ea8;
+
+  /* ---- Typography (SF Pro system stack, tabular numerals) ---- */
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
+    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --type-page-title: 700 28px/1.2 var(--font-ui);
+  --type-section: 650 18px/1.3 var(--font-ui);
+  --type-body: 450 15px/1.4 var(--font-ui);
+  --type-caption: 500 12.5px/1.35 var(--font-ui);
+  --type-amount-hero: 700 40px/1.1 var(--font-ui);
+  --type-amount-row: 600 15px/1.3 var(--font-ui);
+  --type-amount-sub: 600 13px/1.3 var(--font-ui);
+
+  /* ---- Spacing / density ---- */
+  --space-page-x: 16px;
+  --space-section: 20px;
+  --space-2: 2px;
+  --space-4: 4px;
+  --space-6: 6px;
+  --space-8: 8px;
+  --space-10: 10px;
+  --space-12: 12px;
+  --space-16: 16px;
+  --space-20: 20px;
+  --space-24: 24px;
+  --row-h: 48px;
+  --row-h-dense: 40px;
+  --control-h: 44px;
+  --control-h-compact: 32px;
+  --card-pad: 14px;
+
+  /* ---- Radius (only these four steps, blueprint §15.1) ---- */
+  --r-card: 16px;
+  --r-control: 12px;
+  --r-sheet: 24px;
+  --r-pill: 999px;
+
+  /* ---- Motion ---- */
+  --dur-fast: 160ms;
+  --dur-base: 240ms;
+  --dur-slow: 420ms;
+  --dur-amount: 480ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* ---- Shadows ---- */
+  --shadow-1: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.08);
+
+  /* Safe areas */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* ============================================================
+   Light theme surfaces (S0 page / S1 card / S2 raised card)
+   ============================================================ */
+:root,
+:root[data-theme="light"] {
+  color-scheme: light;
+  --accent: var(--jade-600);
+  --accent-soft: rgba(10, 138, 84, 0.1);
+  --s0: var(--mist-50);
+  --s1: #ffffff;
+  --s2: #ffffff;
+  --text-1: #17171a;
+  --text-2: var(--mist-500);
+  --text-3: var(--mist-400);
+  --line: rgba(0, 0, 0, 0.07);
+  --line-strong: rgba(0, 0, 0, 0.12);
+
+  /* Glass materials G3 chrome / G2 sheet / G1 accent (blueprint §11.1) */
+  --glass-chrome-bg: rgba(255, 255, 255, 0.12);
+  --glass-chrome-blur: 28px;
+  --glass-sheet-bg: rgba(250, 250, 252, 0.65);
+  --glass-sheet-blur: 20px;
+  --glass-accent-bg: rgba(255, 255, 255, 0.3);
+  --glass-accent-blur: 10px;
+  --glass-edge: rgba(255, 255, 255, 0.35);
+  --glass-outline: rgba(0, 0, 0, 0.06);
+  --glass-tint: color-mix(in srgb, var(--accent) 6%, transparent);
+  --scrim: rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================================
+   Dark theme (glass +8–10% opacity, halved highlight)
+   ============================================================ */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --accent: var(--jade-400);
+  --accent-soft: rgba(52, 210, 127, 0.14);
+  --s0: #000000;
+  --s1: #17171a;
+  --s2: #202024;
+  --text-1: #f2f2f5;
+  --text-2: var(--mist-400);
+  --text-3: var(--mist-500);
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.16);
+  --sem-red: #f26d6d;
+  --sem-green: #34d27f;
+  --sem-orange: #e8934a;
+  --sem-blue: #58a8dc;
+
+  --glass-chrome-bg: rgba(22, 22, 26, 0.22);
+  --glass-sheet-bg: rgba(24, 24, 28, 0.74);
+  --glass-accent-bg: rgba(40, 40, 46, 0.42);
+  --glass-edge: rgba(255, 255, 255, 0.12);
+  --glass-outline: rgba(255, 255, 255, 0.05);
+  --shadow-1: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --scrim: rgba(0, 0, 0, 0.55);
+}

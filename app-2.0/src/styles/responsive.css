@@ -1,0 +1,45 @@
+/* ============================================================
+   Responsive — mobile-first; wider centered canvas on
+   desktop/iPad (blueprint §4 fallback). No horizontal overflow
+   at any width.
+   ============================================================ */
+
+/* Small phones (iPhone SE class) */
+@media (max-width: 360px) {
+  .pulse-amount {
+    font-size: 38px;
+  }
+
+  .metric-tile {
+    min-width: 118px;
+  }
+
+  .deck-viewport {
+    height: 190px;
+  }
+}
+
+/* Desktop / iPad: wider centered canvas — flat, no fake phone
+   frame. On real mobile/Capacitor viewports the app is always
+   full-screen edge to edge. */
+@media (min-width: 720px) {
+  body {
+    background: var(--mist-100);
+  }
+
+  :root[data-theme='dark'] body {
+    background: #060608;
+  }
+
+  #app {
+    box-shadow: 0 0 0 1px var(--line);
+  }
+}
+
+/* Keyboard-safe sheets: when the visual viewport shrinks the
+   sheet max-height tracks it via dvh; inputs stay visible. */
+@supports (height: 100dvh) {
+  .sheet {
+    max-height: min(88dvh, 760px);
+  }
+}

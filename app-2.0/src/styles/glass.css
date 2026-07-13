@@ -1,0 +1,69 @@
+/* ============================================================
+   RinggitMe 2.0 — Liquid Glass materials (blueprint §11)
+   Glass ONLY on: top chrome, tab bar, sheets, segmented
+   controls, floating controls. All money content stays solid.
+   ============================================================ */
+
+/* G3 — chrome (tab bar, top bar, floating controls) */
+.glass-chrome {
+  background: linear-gradient(var(--glass-tint), var(--glass-tint)),
+    var(--glass-chrome-bg);
+  -webkit-backdrop-filter: blur(var(--glass-chrome-blur)) saturate(1.6);
+  backdrop-filter: blur(var(--glass-chrome-blur)) saturate(1.6);
+  box-shadow: inset 0 1px 0 var(--glass-edge), 0 0 0 1px var(--glass-outline),
+    var(--shadow-2);
+}
+
+/* G2 — sheets, segmented controls, context surfaces */
+.glass-sheet {
+  background: linear-gradient(var(--glass-tint), var(--glass-tint)),
+    var(--glass-sheet-bg);
+  -webkit-backdrop-filter: blur(var(--glass-sheet-blur)) saturate(1.4);
+  backdrop-filter: blur(var(--glass-sheet-blur)) saturate(1.4);
+  box-shadow: inset 0 1px 0 var(--glass-edge), 0 0 0 1px var(--glass-outline),
+    var(--shadow-2);
+}
+
+/* G1 — accent overlays (pinned item, deck selected overlay). No drop shadow. */
+.glass-accent {
+  background: linear-gradient(var(--glass-tint), var(--glass-tint)),
+    var(--glass-accent-bg);
+  -webkit-backdrop-filter: blur(var(--glass-accent-blur));
+  backdrop-filter: blur(var(--glass-accent-blur));
+  box-shadow: inset 0 1px 0 var(--glass-edge), 0 0 0 1px var(--glass-outline);
+}
+
+/* ---- Fallback chain (blueprint §11.2) ---- */
+
+/* No backdrop-filter support → translucent solid */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass-chrome,
+  .glass-sheet,
+  .glass-accent {
+    background: color-mix(in srgb, var(--s1) 92%, transparent);
+  }
+}
+
+/* Reduced transparency → fully solid, keep elevation */
+@media (prefers-reduced-transparency: reduce) {
+  .glass-chrome,
+  .glass-sheet,
+  .glass-accent {
+    background: var(--s1);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* Solid surfaces S1 / S2 (all financial content) */
+.surface {
+  background: var(--s1);
+  border-radius: var(--r-card);
+  box-shadow: 0 0 0 1px var(--line), var(--shadow-1);
+}
+
+.surface-2 {
+  background: var(--s2);
+  border-radius: var(--r-card);
+  box-shadow: 0 0 0 1px var(--line), var(--shadow-2);
+}

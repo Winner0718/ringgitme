@@ -1,0 +1,15 @@
+{
+  "name": "ringgitme-2.0",
+  "private": true,
+  "version": "2.0.0-shell.1",
+  "description": "RinggitMe 2.0 production UI shell (Phase B/C/D-early). Fixture-backed; adapters replace fixtures later.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5173 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 5173 --strictPort"
+  },
+  "devDependencies": {
+    "vite": "^6.3.5"
+  }
+}

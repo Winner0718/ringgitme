@@ -1,0 +1,163 @@
+/* ============================================================
+   RinggitMe 2.0 — Base / reset / app frame
+   ============================================================ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  height: 100%;
+}
+
+body {
+  font: var(--type-body);
+  color: var(--text-1);
+  background: var(--s0);
+  height: 100%;
+  overscroll-behavior-y: none;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+ul,
+ol {
+  list-style: none;
+}
+
+/* Amounts are always tabular */
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- App frame: mobile-first, wider centered canvas on desktop ---- */
+#app {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  max-width: 480px;
+  margin: 0 auto;
+  position: relative;
+  overflow: hidden;
+  background: var(--s0);
+}
+
+.app-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding: calc(var(--safe-top) + 56px) var(--space-page-x)
+    calc(var(--safe-bottom) + 96px);
+  scrollbar-width: none;
+}
+
+.app-content::-webkit-scrollbar {
+  display: none;
+}
+
+/* Page transition */
+.page-enter {
+  animation: page-in var(--dur-base) var(--ease-out);
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.page-enter.page-back {
+  animation-name: page-in-back;
+}
+
+@keyframes page-in-back {
+  from {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Typography helpers */
+.page-title {
+  font: var(--type-page-title);
+  letter-spacing: -0.02em;
+}
+
+.sec-title {
+  font: var(--type-section);
+  letter-spacing: -0.01em;
+  margin-bottom: var(--space-10);
+}
+
+.caption {
+  font: var(--type-caption);
+  color: var(--text-2);
+}
+
+.section {
+  margin-bottom: var(--space-section);
+}
+
+/* Semantic amount colors */
+.amt-neg {
+  color: var(--sem-red);
+}
+.amt-pos {
+  color: var(--sem-green);
+}
+.amt-warn {
+  color: var(--sem-orange);
+}
+
+/* Focus visibility */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-control);
+}
+
+/* ---- Accessibility fallbacks ---- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}

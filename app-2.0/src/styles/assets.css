@@ -1,0 +1,467 @@
+/* ============================================================
+   Assets system — overview header, stacked decks, wallet
+   scroller, 投资/定存, card carousel, category pages, detail.
+   (Split from views.css to keep files under 500 lines.)
+   ============================================================ */
+
+
+/* ---- Assets overview header ---- */
+.assets-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-12);
+  padding-top: var(--space-8);
+}
+
+.assets-net {
+  font: var(--type-amount-hero);
+  font-size: 30px;
+  letter-spacing: -0.02em;
+}
+
+.assets-net-primary {
+  color: var(--accent);
+}
+
+.assets-sub {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-end;
+}
+
+.assets-sub > div {
+  display: flex;
+  gap: var(--space-8);
+  align-items: baseline;
+  font: var(--type-amount-sub);
+}
+
+/* ---- Asset category sections ---- */
+.asset-sec {
+  padding: var(--space-6) var(--card-pad) var(--card-pad);
+}
+
+.asset-sec-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  width: 100%;
+  min-height: var(--row-h-dense);
+  text-align: left;
+  color: var(--text-1);
+}
+
+.asset-sec-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.asset-sec-title {
+  font: var(--type-section);
+  font-size: 16px;
+  flex: 1;
+}
+
+.asset-sec-total {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-6);
+}
+
+.asset-sec-total .num {
+  font: var(--type-amount-row);
+}
+
+/* ---- Stacked deck (vertically layered, every layer readable) ---- */
+.stack-deck {
+  display: flex;
+  flex-direction: column;
+  margin-top: var(--space-6);
+}
+
+.stack-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  min-height: 64px;
+  padding: var(--space-10) 11px var(--space-16);
+  border-radius: var(--r-card);
+  background: linear-gradient(135deg, var(--brand), color-mix(in srgb, var(--brand) 62%, #000));
+  color: #fff;
+  text-align: left;
+  box-shadow: 0 -4px 14px rgba(0, 0, 0, 0.22);
+}
+
+.stack-card + .stack-card {
+  margin-top: -14px;
+}
+
+.stack-card:first-child {
+  min-height: 72px;
+}
+
+.stack-logo {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.92);
+  color: color-mix(in srgb, var(--brand) 80%, #000);
+  font: 700 13.5px/30px var(--font-ui);
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.stack-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.stack-name {
+  font: var(--type-body);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stack-digits {
+  font: var(--type-caption);
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.stack-amt {
+  font: var(--type-amount-row);
+  font-size: 14px;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.stack-card .icon {
+  color: rgba(255, 255, 255, 0.7);
+  flex-shrink: 0;
+}
+
+/* ---- eWallet horizontal tiles (fixed width, snap, peek) ---- */
+.wallet-scroll {
+  display: flex;
+  gap: var(--space-8);
+  overflow-x: auto;
+  scrollbar-width: none;
+  scroll-snap-type: x mandatory;
+  margin: var(--space-6) calc(-1 * var(--card-pad)) 0;
+  padding: 2px var(--card-pad);
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 12px, #000 calc(100% - 24px), transparent);
+  mask-image: linear-gradient(90deg, transparent 0, #000 12px, #000 calc(100% - 24px), transparent);
+}
+
+.wallet-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.wallet-tile {
+  width: 104px;
+  flex-shrink: 0; /* 4+ wallets never shrink — they scroll */
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: var(--space-10);
+  border-radius: var(--r-control);
+  background: var(--s2);
+  box-shadow: 0 0 0 1px var(--line);
+  text-align: left;
+}
+
+.wallet-logo {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--brand);
+  color: #fff;
+  font: 700 14px/30px var(--font-ui);
+  text-align: center;
+}
+
+.wallet-name {
+  font: var(--type-caption);
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.wallet-amt {
+  font: var(--type-amount-sub);
+}
+
+/* ---- 投资 / 定存 ---- */
+.inv-body {
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+  margin-top: var(--space-8);
+  padding: var(--space-10) var(--space-12);
+  border-radius: var(--r-control);
+  background: var(--s2);
+  box-shadow: 0 0 0 1px var(--line);
+}
+
+.inv-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.inv-col-right {
+  align-items: flex-end;
+  text-align: right;
+  flex: 0 0 auto;
+}
+
+.inv-gain {
+  font: var(--type-amount-sub);
+}
+
+.sparkline {
+  flex-shrink: 0;
+}
+
+.fd-date {
+  font: var(--type-body);
+  font-weight: 500;
+}
+
+.fd-expected {
+  font: var(--type-amount-row);
+  color: var(--accent);
+}
+
+.link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font: var(--type-caption);
+  color: var(--accent);
+}
+
+/* ---- Card carousel (category + detail pages) ---- */
+.deck-viewport {
+  height: 200px;
+  position: relative;
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  margin: 0 calc(-1 * var(--space-page-x));
+  overflow: hidden;
+}
+
+.deck-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.deck-card {
+  position: absolute;
+  width: min(72%, 300px);
+  aspect-ratio: 1.586;
+  border-radius: var(--r-card);
+  overflow: hidden;
+  box-shadow: var(--shadow-2);
+  transition: transform var(--dur-slow) var(--ease-out), opacity var(--dur-slow) var(--ease-out);
+  background: var(--s2);
+}
+
+.deck-stage.dragging .deck-card {
+  transition: none;
+}
+
+.deck-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.deck-badge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font: 600 10.5px/1 var(--font-ui);
+  color: #fff;
+  background: rgba(0, 0, 0, 0.45);
+  padding: 4px 7px;
+  border-radius: var(--r-pill);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.deck-fallback {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, var(--brand), color-mix(in srgb, var(--brand) 60%, #000));
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  align-items: flex-start;
+  padding: var(--card-pad);
+  gap: 2px;
+  position: relative;
+}
+
+.deck-fallback-name {
+  font: var(--type-section);
+  font-size: 16px;
+  color: #fff;
+}
+
+.deck-fallback-bank {
+  font: var(--type-caption);
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.face-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 26px var(--card-pad) 12px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.55));
+  color: #fff;
+}
+
+.face-digits {
+  font: var(--type-caption);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.face-amount {
+  font: var(--type-amount-row);
+  font-size: 17px;
+  color: #fff;
+}
+
+.deck-dots {
+  justify-content: center;
+  margin: var(--space-4) 0 var(--space-16);
+}
+
+/* 账户详情 variant: neighbours peek as clean card edges — their
+   overlay text, amounts and badges never intrude on the centred
+   card. Category pages keep the fully exposed neighbour look. */
+.detail-peek .deck-card:not(.front) .face-overlay,
+.detail-peek .deck-card:not(.front) .deck-badge,
+.detail-peek .deck-card:not(.front) .deck-fallback-name,
+.detail-peek .deck-card:not(.front) .deck-fallback-bank {
+  opacity: 0;
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+
+.detail-peek .deck-card .face-overlay,
+.detail-peek .deck-card .deck-badge,
+.detail-peek .deck-card .deck-fallback-name,
+.detail-peek .deck-card .deck-fallback-bank {
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+
+/* ---- Category page summary ---- */
+.cat-summary {
+  padding-top: var(--space-8);
+}
+
+.cat-total {
+  font: var(--type-amount-hero);
+  font-size: 34px;
+  letter-spacing: -0.02em;
+  margin: 2px 0 var(--space-10);
+}
+
+.cat-stats {
+  display: flex;
+  gap: var(--space-16);
+}
+
+.cat-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-right: var(--space-16);
+  border-right: 1px solid var(--line);
+}
+
+.cat-stat:last-child {
+  border-right: 0;
+}
+
+.cat-stat .num {
+  font: var(--type-amount-sub);
+  font-size: 14px;
+}
+
+/* Credit summary strip */
+.cc-strip {
+  display: flex;
+  padding: var(--space-10) var(--card-pad);
+  gap: var(--space-12);
+}
+
+.cc-strip-cell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.cc-strip-cell .num {
+  font: var(--type-amount-sub);
+  white-space: nowrap;
+}
+
+/* ---- Account detail fields ---- */
+.detail-field {
+  min-height: var(--row-h-dense);
+}
+
+.detail-val {
+  font: var(--type-amount-row);
+}
+
+.detail-val.detail-plain {
+  font: var(--type-body);
+  font-weight: 500;
+}
+
+.acc-chip {
+  width: 32px;
+  height: 22px;
+  border-radius: 5px;
+  background: linear-gradient(135deg, var(--brand), color-mix(in srgb, var(--brand) 60%, #000));
+  color: #fff;
+  font: 600 11px/22px var(--font-ui);
+  text-align: center;
+  flex-shrink: 0;
+}

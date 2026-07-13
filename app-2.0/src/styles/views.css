@@ -1,0 +1,170 @@
+/* ============================================================
+   Views — Money Pulse, Metric Strip, Radar, Budget (Today).
+   Assets system styles live in assets.css; Capture/Activity/
+   Ledger/Profile styles live in sheets.css (all under 500 lines).
+   ============================================================ */
+
+/* ---- Money Pulse ---- */
+.pulse {
+  padding-top: var(--space-8);
+  touch-action: pan-y;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.pulse-label {
+  margin-bottom: var(--space-2);
+}
+
+.pulse-amount {
+  font: var(--type-amount-hero);
+  letter-spacing: -0.02em;
+}
+
+.pulse-dots,
+.deck-dots {
+  display: flex;
+  gap: 5px;
+  margin-top: var(--space-8);
+}
+
+.pulse-dots span,
+.deck-dots span {
+  width: 5px;
+  height: 5px;
+  border-radius: var(--r-pill);
+  background: var(--line-strong);
+  transition: background var(--dur-fast) var(--ease-out), width var(--dur-fast) var(--ease-out);
+}
+
+.pulse-dots span.on,
+.deck-dots span.on {
+  background: var(--accent);
+  width: 14px;
+}
+
+/* ---- Metric strip (≤64px tall, horizontal scroll, edge fade) ---- */
+.metric-scroll {
+  display: flex;
+  gap: var(--space-8);
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: 0 calc(-1 * var(--space-page-x));
+  padding: 2px var(--space-page-x) 6px;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 26px), transparent);
+  mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 26px), transparent);
+}
+
+.metric-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.metric-tile {
+  min-width: 128px;
+  height: 60px;
+  padding: 9px var(--space-12);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 3px;
+  flex-shrink: 0;
+  border-radius: var(--r-control);
+  text-align: left;
+}
+
+.metric-val {
+  font: var(--type-amount-sub);
+  font-size: 14px;
+}
+
+/* ---- Pinned item (G1) ---- */
+.pin {
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+  width: 100%;
+  padding: var(--space-10) var(--card-pad);
+  border-radius: var(--r-card);
+  text-align: left;
+  color: var(--text-1);
+}
+
+.pin-icon {
+  color: var(--accent);
+  display: grid;
+  place-items: center;
+}
+
+/* ---- Commitment radar ---- */
+.sec-head {
+  margin-bottom: var(--space-10);
+}
+
+.sec-head .sec-title {
+  margin-bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+}
+
+.commit-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--text-3);
+  flex-shrink: 0;
+}
+
+.commit-row.overdue .commit-dot { background: var(--sem-red); }
+.commit-row.soon .commit-dot { background: var(--sem-orange); }
+.commit-row.paid .commit-dot,
+.commit-row.is-paid .commit-dot { background: var(--sem-green); }
+.commit-row.overdue .caption { color: var(--sem-red); }
+.commit-row.soon .caption { color: var(--sem-orange); }
+
+.commit-row.is-paid .row-title,
+.commit-row.is-paid .row-amt {
+  color: var(--text-3);
+  text-decoration: line-through;
+}
+
+.commit-pay {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-pill);
+  display: grid;
+  place-items: center;
+  color: var(--text-3);
+  box-shadow: 0 0 0 1px var(--line-strong);
+  flex-shrink: 0;
+  transition: all var(--dur-fast) var(--ease-out);
+}
+
+.commit-pay.done {
+  background: var(--sem-green);
+  color: #fff;
+  box-shadow: none;
+}
+
+/* ---- Budget ---- */
+.budget-bar {
+  height: 6px;
+  border-radius: var(--r-pill);
+  background: var(--accent-soft);
+  margin: var(--space-8) 0 var(--space-6);
+  overflow: hidden;
+}
+
+.budget-bar span {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  transition: width var(--dur-slow) var(--ease-out);
+}
+
+.budget-bar span.warn {
+  background: var(--sem-orange);
+}

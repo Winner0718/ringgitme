@@ -1,0 +1,244 @@
+// ============================================================
+// 资产 overview page (approved design).
+// Vertically scrolling: summary → 总览/资产/负债 segmented →
+// 储蓄卡 stacked deck → 信用卡 stacked deck → eWallet
+// horizontal tiles → 投资 → 定存. Category headers push into
+// category pages; cards push into 账户详情.
+// ============================================================
+
+import { registerPage } from '../../app/router.js';
+import { data, ui, update, registerAction } from '../../app/state.js';
+import { fmtRM, fmtDateMY, daysBetween, escapeHTML } from '../../app/format.js';
+import { renderStackedDeck } from '../../components/StackedDeck.js';
+import { openSheet } from '../../components/AppSheet.js';
+import { icon } from '../../components/Icons.js';
+import { renderCategoryPage, activateCategoryPage, registerCategoryActions } from './category.js';
+import { renderDetailPage, activateDetailPage, registerDetailActions } from './detail.js';
+
+function summaryHTML(pulse) {
+  return `
+    <section class="assets-head section">
+      <div>
+        <div class="caption">净资产</div>
+        <div class="num assets-net ${pulse.netAssets < 0 ? 'amt-neg' : 'assets-net-primary'}">${fmtRM(pulse.netAssets, { privacy: ui.privacy })}</div>
+      </div>
+      <div class="assets-sub">
+        <div><span class="caption">总资产</span><span class="num">${fmtRM(pulse.totalAssets, { privacy: ui.privacy })}</span></div>
+        <div><span class="caption">总负债</span><span class="num amt-neg">${fmtRM(pulse.totalDebt, { privacy: ui.privacy })}</span></div>
+      </div>
+    </section>
+  `;
+}
+
+function segmentedHTML() {
+  const segs = [
+    { id: 'all', label: '总览' },
+    { id: 'assets', label: '资产' },
+    { id: 'liab', label: '负债' },
+  ];
+  return `
+    <div class="segmented" role="radiogroup" aria-label="资产分类">
+      ${segs.map((s) => `<button class="seg-item${ui.assetsSegment === s.id ? ' active' : ''}" data-action="assets-segment" data-seg="${s.id}" role="radio" aria-checked="${ui.assetsSegment === s.id}">${s.label}</button>`).join('')}
+    </div>
+  `;
+}
+
+function sectionHeader({ iconName, title, valueLabel, value, valueCls = '', action, count }) {
+  return `
+    <button class="asset-sec-head" data-action="${action}">
+      <span class="asset-sec-icon">${icon(iconName, 18)}</span>
+      <span class="asset-sec-title">${title}${count ? ` <span class="caption">(${count})</span>` : ''}</span>
+      <span class="asset-sec-total"><span class="caption">${valueLabel}</span>
+        <span class="num ${valueCls}">${value}</span></span>
+      ${icon('chevronRight', 15)}
+    </button>
+  `;
+}
+
+function savingsSection() {
+  const list = data.getAccountsByType('saving');
+  const total = list.reduce((s, a) => s + a.balance, 0);
+  return `
+    <section class="section surface asset-sec">
+      ${sectionHeader({ iconName: 'assets', title: '储蓄卡', valueLabel: '总额', value: fmtRM(total, { privacy: ui.privacy }), action: 'assets-open-saving', count: list.length })}
+      ${renderStackedDeck(list)}
+    </section>
+  `;
+}
+
+function creditSection() {
+  const list = data.getAccountsByType('cc');
+  const total = list.reduce((s, a) => s + a.outstanding, 0);
+  return `
+    <section class="section surface asset-sec">
+      ${sectionHeader({ iconName: 'wallet', title: '信用卡', valueLabel: '总欠款', value: fmtRM(total, { privacy: ui.privacy }), valueCls: 'amt-neg', action: 'assets-open-cc', count: list.length })}
+      ${renderStackedDeck(list)}
+    </section>
+  `;
+}
+
+function ewalletSection() {
+  const list = data.getAccountsByType('ew');
+  const total = list.reduce((s, a) => s + a.balance, 0);
+  return `
+    <section class="section surface asset-sec">
+      ${sectionHeader({ iconName: 'wallet', title: 'eWallet', valueLabel: '总余额', value: fmtRM(total, { privacy: ui.privacy }), action: 'assets-open-ew' })}
+      <div class="wallet-scroll">
+        ${list.map((a) => `
+          <button class="wallet-tile" data-action="assets-open-detail" data-acc="${a.id}" aria-label="${escapeHTML(a.name)}">
+            <span class="wallet-logo" style="--brand:${a.brandColor}">${escapeHTML(a.name[0])}</span>
+            <span class="wallet-name">${escapeHTML(a.short)}</span>
+            <span class="num wallet-amt">${fmtRM(a.balance, { privacy: ui.privacy })}</span>
+          </button>`).join('')}
+      </div>
+    </section>
+  `;
+}
+
+function sparklineSVG(points) {
+  const max = Math.max(...points);
+  const min = Math.min(...points);
+  const W = 110;
+  const H = 36;
+  const step = W / (points.length - 1);
+  const pts = points.map((v, i) => `${(i * step).toFixed(1)},${(H - 4 - ((v - min) / (max - min)) * (H - 8)).toFixed(1)}`).join(' ');
+  return `<svg class="sparkline" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" aria-hidden="true">
+    <polyline points="${pts}" fill="none" stroke="var(--sem-green)" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+  </svg>`;
+}
+
+function investmentSection() {
+  const inv = data.getInvestments();
+  return `
+    <section class="section surface asset-sec">
+      ${sectionHeader({ iconName: 'trend', title: '投资', valueLabel: '总市值', value: fmtRM(inv.total, { privacy: ui.privacy }), action: 'assets-open-inv' })}
+      <div class="inv-body">
+        <div class="inv-col">
+          <div class="row-title">投资组合 (${inv.portfolios})</div>
+          <div class="caption">1 日收益</div>
+          <div class="num amt-pos inv-gain">+${fmtRM(inv.dayGain, { privacy: ui.privacy }).replace('RM ', 'RM ')} (+${inv.dayPct}%)</div>
+        </div>
+        ${sparklineSVG(inv.spark)}
+        <div class="inv-col inv-col-right">
+          <div class="caption">月收益</div>
+          <div class="num amt-pos inv-gain">+${fmtRM(inv.monthGain, { privacy: ui.privacy }).replace('RM ', 'RM ')}</div>
+          <div class="num amt-pos caption">(+${inv.monthPct}%)</div>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function fdSection() {
+  const fd = data.getFixedDeposits();
+  const days = daysBetween(data.today, fd.nextMaturity);
+  return `
+    <section class="section surface asset-sec">
+      ${sectionHeader({ iconName: 'lock', title: '定存', valueLabel: '总本金', value: fmtRM(fd.total, { privacy: ui.privacy }), action: 'assets-open-fd' })}
+      <div class="inv-body">
+        <div class="inv-col">
+          <div class="row-title">定期存款 (${fd.count})</div>
+          <div class="caption">下次到期</div>
+          <div class="fd-date">${fmtDateMY(fd.nextMaturity)}（还有 ${days} 天）</div>
+        </div>
+        <div class="inv-col inv-col-right">
+          <div class="caption">到期本息（预计）</div>
+          <div class="num fd-expected">${fmtRM(fd.expectedAtMaturity, { privacy: ui.privacy })}</div>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderOverview(container) {
+  const pulse = data.getPulse();
+  const seg = ui.assetsSegment;
+  const showAssets = seg !== 'liab';
+  const showLiab = seg !== 'assets';
+  container.innerHTML = `
+    ${summaryHTML(pulse)}
+    ${segmentedHTML()}
+    ${showAssets ? savingsSection() : ''}
+    ${showLiab ? creditSection() : ''}
+    ${showAssets ? ewalletSection() : ''}
+    ${showAssets ? investmentSection() : ''}
+    ${showAssets ? fdSection() : ''}
+  `;
+}
+
+function renderAssets(container) {
+  const view = ui.assetsView;
+  if (view.name === 'category') {
+    renderCategoryPage(container, view.type);
+    activateCategoryPage(container, view.type);
+    return;
+  }
+  if (view.name === 'detail') {
+    renderDetailPage(container, view.accountId);
+    activateDetailPage(container, view.accountId);
+    return;
+  }
+  renderOverview(container);
+}
+
+function placeholderSheet(title, rows) {
+  openSheet({
+    title,
+    contentHTML: `
+      <div class="sheet-group">
+        ${rows.map(([k, v]) => `<div class="row row-static"><div class="row-main caption">${k}</div><span class="num">${v}</span></div>`).join('')}
+      </div>
+      <button class="sheet-primary" data-action="sheet-close">好</button>
+    `,
+  });
+}
+
+export function registerAssetsFeature() {
+  registerPage('assets', renderAssets);
+  registerCategoryActions();
+  registerDetailActions();
+
+  registerAction('assets-segment', (el) => update({ assetsSegment: el.dataset.seg }));
+  registerAction('assets-open-saving', () => update({ assetsView: { name: 'category', type: 'saving' }, navDirection: 'forward' }));
+  registerAction('assets-open-cc', () => update({ assetsView: { name: 'category', type: 'cc' }, navDirection: 'forward' }));
+  registerAction('assets-open-ew', () => update({ assetsView: { name: 'category', type: 'ew' }, navDirection: 'forward' }));
+
+  registerAction('assets-open-detail', (el) => {
+    const acc = data.getAccount(el.dataset.acc);
+    if (!acc) return;
+    const from = ui.assetsView.name === 'category' ? 'category' : 'overview';
+    const list = data.getAccountsByType(acc.type);
+    ui.categoryIndex[acc.type] = list.indexOf(acc);
+    update({ assetsView: { name: 'detail', accountId: acc.id, from }, navDirection: 'forward' });
+  });
+
+  registerAction('assets-back', () => {
+    const view = ui.assetsView;
+    if (view.name === 'detail' && view.from === 'category') {
+      const type = data.getAccount(view.accountId)?.type || 'saving';
+      update({ assetsView: { name: 'category', type }, navDirection: 'back' });
+    } else {
+      update({ assetsView: { name: 'overview' }, navDirection: 'back' });
+    }
+  });
+
+  registerAction('assets-open-inv', () => {
+    const inv = data.getInvestments();
+    placeholderSheet('投资', [
+      ['总市值', fmtRM(inv.total, { privacy: ui.privacy })],
+      ['投资组合', `${inv.portfolios} 个`],
+      ['1 日收益', `+${fmtRM(inv.dayGain)} (+${inv.dayPct}%)`],
+      ['月收益', `+${fmtRM(inv.monthGain)} (+${inv.monthPct}%)`],
+    ]);
+  });
+
+  registerAction('assets-open-fd', () => {
+    const fd = data.getFixedDeposits();
+    placeholderSheet('定存', [
+      ['总本金', fmtRM(fd.total, { privacy: ui.privacy })],
+      ['定期存款', `${fd.count} 笔`],
+      ['下次到期', fmtDateMY(fd.nextMaturity)],
+      ['到期本息（预计）', fmtRM(fd.expectedAtMaturity)],
+    ]);
+  });
+}

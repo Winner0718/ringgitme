@@ -1,0 +1,391 @@
+/* ============================================================
+   Feature views — Capture, Activity, Ledger, Profile.
+   (Split from views.css to keep files under 500 lines.)
+   ============================================================ */
+
+
+/* ---- Capture sheet ---- */
+/* The sheet itself scrolls; the save bar stays sticky above the
+   bottom safe area so expanded「更多」content never buries it. */
+.capture-sheet .sheet-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.cap-save-wrap {
+  position: sticky;
+  bottom: calc(-1 * (var(--safe-bottom) + 16px));
+  margin: 0 calc(-1 * var(--space-page-x));
+  padding: var(--space-8) var(--space-page-x) calc(var(--safe-bottom) + 12px);
+  background: linear-gradient(transparent, var(--glass-sheet-bg) 38%);
+  z-index: 3;
+}
+
+.cap-amount {
+  font: var(--type-amount-hero);
+  font-size: 38px;
+  text-align: center;
+  padding: var(--space-8) 0 var(--space-12);
+  letter-spacing: -0.02em;
+}
+
+.cap-cats,
+.cap-accounts {
+  display: flex;
+  gap: var(--space-6);
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: var(--space-6);
+  -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 22px), transparent);
+  mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 22px), transparent);
+}
+
+.cap-cats::-webkit-scrollbar,
+.cap-accounts::-webkit-scrollbar {
+  display: none;
+}
+
+.cap-cat,
+.cap-acc {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  height: var(--control-h-compact);
+  padding: 0 var(--space-12);
+  border-radius: var(--r-pill);
+  background: var(--s1);
+  box-shadow: 0 0 0 1px var(--line);
+  font: var(--type-caption);
+  color: var(--text-2);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.cap-cat.active,
+.cap-acc.active {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: none;
+}
+
+.cap-acc-summary {
+  padding: var(--space-4) 0 var(--space-8);
+}
+
+.cap-more-toggle {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font: var(--type-caption);
+  color: var(--accent);
+  padding: var(--space-4) 0 var(--space-8);
+}
+
+.cap-more {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding-bottom: var(--space-8);
+}
+
+.cap-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cap-field input {
+  height: 38px;
+  border-radius: var(--r-control);
+  border: 1px solid var(--line-strong);
+  background: var(--s1);
+  padding: 0 var(--space-12);
+  outline: none;
+}
+
+.cap-field input:focus {
+  border-color: var(--accent);
+}
+
+.cap-field-row {
+  display: flex;
+  align-items: center;
+}
+
+.cap-flag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  height: 34px;
+  padding: 0 var(--space-12);
+  border-radius: var(--r-control);
+  background: var(--s1);
+  box-shadow: 0 0 0 1px var(--line);
+  font: var(--type-caption);
+  color: var(--text-2);
+  align-self: flex-start;
+}
+
+.cap-flag.on {
+  color: var(--accent);
+  box-shadow: 0 0 0 1.5px var(--accent);
+}
+
+.cap-keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-6);
+  margin: var(--space-8) 0;
+}
+
+.key {
+  height: 46px;
+  border-radius: var(--r-control);
+  background: var(--s1);
+  box-shadow: 0 0 0 1px var(--line);
+  font: 500 22px/1 var(--font-ui);
+  display: grid;
+  place-items: center;
+  transition: transform 80ms var(--ease-out), background 80ms;
+}
+
+.key:active {
+  transform: scale(0.95);
+  background: var(--accent-soft);
+}
+
+.cap-save {
+  width: 100%;
+  height: var(--control-h);
+  border-radius: var(--r-control);
+  background: var(--accent);
+  color: #fff;
+  font: var(--type-amount-row);
+}
+
+.cap-success {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-10);
+  background: var(--s1);
+  opacity: 0;
+  transition: opacity var(--dur-base) var(--ease-out);
+  z-index: 5;
+}
+
+.cap-success.show {
+  opacity: 1;
+}
+
+.cap-success-ring {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--r-pill);
+  background: var(--sem-green);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  animation: pop-in var(--dur-base) var(--ease-out);
+}
+
+@keyframes pop-in {
+  from { transform: scale(0.5); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* ---- Activity ---- */
+.act-day {
+  margin-bottom: var(--space-16);
+}
+
+.act-day-head {
+  padding: 0 var(--space-4) var(--space-6);
+}
+
+.act-row.just-saved {
+  animation: saved-in var(--dur-slow) var(--ease-out);
+}
+
+@keyframes saved-in {
+  from { background: var(--accent-soft); transform: translateY(-4px); opacity: 0.4; }
+  to { background: transparent; transform: none; opacity: 1; }
+}
+
+.cat-food { color: var(--sem-orange); background: color-mix(in srgb, var(--sem-orange) 12%, transparent); }
+.cat-transport { color: var(--sem-blue); background: color-mix(in srgb, var(--sem-blue) 12%, transparent); }
+.cat-health { color: var(--sem-red); background: color-mix(in srgb, var(--sem-red) 10%, transparent); }
+
+/* ---- Detail sheet ---- */
+.detail-hero {
+  text-align: center;
+  padding: var(--space-8) 0 var(--space-12);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: center;
+}
+
+.detail-amt {
+  font: var(--type-amount-hero);
+  font-size: 34px;
+}
+
+.edit-entry {
+  border-left: 2px solid var(--line-strong);
+  padding: var(--space-4) 0 var(--space-4) var(--space-12);
+  margin-bottom: var(--space-8);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* ---- Ledger ---- */
+.ledger-summary {
+  display: flex;
+  gap: var(--space-24);
+}
+
+.ledger-summary > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ledger-summary .num {
+  font: var(--type-amount-row);
+  font-size: 17px;
+}
+
+.avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--r-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font: 600 15px/34px var(--font-ui);
+  text-align: center;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.avatar-lg {
+  width: 48px;
+  height: 48px;
+  font-size: 20px;
+  line-height: 48px;
+}
+
+.group-avatar {
+  display: grid;
+  place-items: center;
+  line-height: 1;
+}
+
+.tg-dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 9px;
+  height: 9px;
+  border-radius: var(--r-pill);
+  background: var(--sem-blue);
+  border: 2px solid var(--s1);
+}
+
+.detail-nav {
+  margin-bottom: var(--space-8);
+}
+
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--accent);
+  font: var(--type-body);
+  font-weight: 500;
+}
+
+.person-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+}
+
+.mini-btn {
+  height: 30px;
+  padding: 0 var(--space-10);
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  color: #fff;
+  font: var(--type-caption);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.partial-bar {
+  height: 4px;
+  border-radius: var(--r-pill);
+  background: var(--accent-soft);
+  margin-top: 5px;
+  max-width: 160px;
+  overflow: hidden;
+}
+
+.partial-bar span {
+  display: block;
+  height: 100%;
+  background: var(--sem-green);
+  border-radius: var(--r-pill);
+}
+
+.load-more {
+  width: 100%;
+  height: var(--control-h);
+  border-radius: var(--r-control);
+  margin-top: var(--space-8);
+  font: var(--type-body);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.load-note {
+  text-align: center;
+  padding-top: var(--space-8);
+}
+
+.target-row {
+  border-radius: var(--r-control);
+  background: var(--s1);
+  box-shadow: 0 0 0 1px var(--line);
+  margin-bottom: var(--space-6);
+  border-bottom: 0;
+}
+
+/* ---- Profile sheet ---- */
+.profile-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  padding-bottom: var(--space-8);
+}
+
+.profile-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--r-pill);
+  background: var(--emerald-800);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font: var(--type-section);
+}
+
+.profile-name {
+  font: var(--type-section);
+}
