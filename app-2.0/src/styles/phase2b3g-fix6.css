@@ -1,0 +1,163 @@
+/* Phase 2B3G-FIX6 — floating glass action docks and custom split affordance. */
+
+.sheet-action-dock {
+  min-width: 0;
+  background: transparent;
+}
+
+.sheet-action-dock-surface {
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--glass-outline) 72%, var(--glass-edge));
+  border-radius: calc(var(--r-card) + 2px);
+  background: color-mix(in srgb, var(--glass-sheet-bg) 82%, transparent);
+  -webkit-backdrop-filter: blur(24px) saturate(135%);
+  backdrop-filter: blur(24px) saturate(135%);
+  box-shadow: 0 12px 30px color-mix(in srgb, var(--shadow-color, #18231d) 13%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--glass-edge) 86%, transparent);
+}
+
+.sheet-action-dock .sheet-primary,
+.sheet-action-dock .sheet-secondary {
+  min-width: 0;
+  min-height: 48px;
+  height: 48px;
+  margin: 0;
+  border-radius: var(--r-control);
+  transition: transform 100ms var(--ease-out), background var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), opacity var(--dur-fast) var(--ease-out);
+}
+
+.sheet-action-dock .sheet-primary {
+  box-shadow: 0 7px 18px color-mix(in srgb, var(--accent) 19%, transparent), inset 0 1px 0 color-mix(in srgb, white 18%, transparent);
+}
+
+.sheet-action-dock .sheet-secondary {
+  color: var(--text-2);
+  background: color-mix(in srgb, var(--glass-accent-bg) 72%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--line-strong) 66%, var(--glass-edge)), inset 0 1px 0 var(--glass-edge);
+}
+
+.sheet-action-dock button:active { transform: scale(.985); }
+.sheet-action-dock button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sheet-action-dock .sheet-action-dock-primary[aria-disabled="true"] { opacity: .48; box-shadow: none; }
+
+.capture-relationship-sheet .sheet-body {
+  scroll-padding-bottom: calc(148px + var(--safe-bottom));
+  padding-bottom: calc(14px + var(--safe-bottom));
+}
+
+.relationship-action-dock {
+  position: sticky;
+  z-index: 6;
+  bottom: max(2px, var(--safe-bottom));
+  margin: 12px 2px max(2px, var(--safe-bottom));
+}
+
+.relationship-action-dock .sheet-action-dock-surface { grid-template-columns: minmax(0, 1fr); }
+
+.capture-relationship-sheet.has-inline-split-drawer .relationship-action-dock { display: none; }
+
+.inline-split-action-dock {
+  flex: 0 0 auto;
+  margin: 2px 4px 0;
+}
+
+.inline-split-action-dock .sheet-action-dock-surface {
+  grid-template-columns: minmax(0, .72fr) minmax(0, 1.28fr);
+  gap: 6px;
+  padding: 6px;
+  border-radius: 16px;
+}
+
+.inline-split-action-dock .sheet-action-dock-primary { grid-column: 2; grid-row: 1; }
+.inline-split-action-dock .sheet-action-dock-secondary { grid-column: 1; grid-row: 1; }
+
+.custom-split-heading-copy { min-width: 0; }
+.custom-split-title-row { min-width: 0; display: flex; align-items: baseline; gap: 8px; }
+.custom-split-helper { color: var(--text-2); font: var(--type-caption); font-weight: 520; }
+
+.relationship-split-page .relationship-amount-row.has-affordance {
+  grid-template-columns: 34px minmax(0, 1fr);
+  grid-template-rows: auto;
+}
+
+.relationship-amount-copy {
+  grid-column: 2;
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.relationship-amount-name-line {
+  min-width: 0;
+  display: block;
+}
+
+.relationship-amount-name-line .relationship-amount-name { min-width: 0; }
+
+.relationship-amount-value-line {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.relationship-amount-value-line > strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); font-size: 13px; }
+.relationship-amount-value-line > strong.is-expression { color: var(--accent); }
+
+.custom-card-affordance {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  color: var(--text-3);
+  font-size: 10px;
+  font-weight: 620;
+  white-space: nowrap;
+}
+
+.split-participant-row.is-editing .custom-card-affordance { color: var(--accent); }
+.split-participant-row.has-committed .custom-card-affordance { color: var(--text-3); }
+.split-participant-row.is-untouched .relationship-amount-row:hover .custom-card-affordance { color: var(--accent); }
+
+.split-state.neutral {
+  color: var(--text-2);
+  background: color-mix(in srgb, var(--glass-accent-bg) 76%, transparent);
+}
+
+.relationship-allocation-status.neutral {
+  background: color-mix(in srgb, var(--glass-accent-bg) 72%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--line) 78%, transparent);
+}
+
+.capture-relationship-sheet.has-inline-split-drawer .custom-split-helper { display: none; }
+.capture-relationship-sheet.has-inline-split-drawer .custom-split-title-row { gap: 6px; }
+.capture-relationship-sheet.has-inline-split-drawer .smart-split-heading > .split-state { display: none; }
+.capture-relationship-sheet.has-inline-split-drawer .relationship-amount-value-line > strong { font-size: 12px; letter-spacing: -.08px; }
+.capture-relationship-sheet.has-inline-split-drawer .custom-card-affordance { font-size: 9px; }
+
+:root[data-theme="dark"] .sheet-action-dock-surface {
+  border-color: color-mix(in srgb, var(--line-strong) 72%, var(--glass-edge));
+  background: color-mix(in srgb, var(--glass-sheet-bg) 88%, transparent);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, .34), inset 0 1px 0 var(--glass-edge);
+}
+
+:root[data-theme="dark"] .sheet-action-dock .sheet-secondary {
+  color: var(--text-2);
+  background: color-mix(in srgb, var(--glass-accent-bg) 82%, transparent);
+}
+
+@media (max-height: 700px) {
+  .inline-split-action-dock .sheet-action-dock-surface { padding-block: 4px; }
+  .inline-split-action-dock .sheet-primary,
+  .inline-split-action-dock .sheet-secondary { min-height: 44px; height: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sheet-action-dock button { transition: none; }
+}
+
+:root[data-reduced-motion="true"] .sheet-action-dock button { transition: none; }

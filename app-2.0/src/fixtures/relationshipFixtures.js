@@ -1,0 +1,39 @@
+const now = '2026-07-13T09:00:00+08:00';
+
+export const RELATIONSHIP_PARTICIPANTS = [
+  { participantId: 'participant-me', displayName: 'Winner', avatar: { initials: 'W' }, manualContactRef: null, channelBindings: [{ channel: 'app', externalId: 'user-winner' }], claimState: 'claimed', notificationPreferences: {}, permissions: [], createdAt: now, updatedAt: now },
+  { participantId: 'participant-abi', displayName: 'Abi', avatar: { initials: 'A' }, manualContactRef: null, channelBindings: [{ channel: 'telegram', externalId: 'tg-abi' }], claimState: 'unclaimed', notificationPreferences: {}, permissions: [], createdAt: now, updatedAt: now },
+  { participantId: 'participant-mei', displayName: 'Mei Ling', avatar: { initials: 'M' }, manualContactRef: 'contact-mei', channelBindings: [{ channel: 'app', externalId: 'user-mei' }], claimState: 'claimed', notificationPreferences: {}, permissions: [], createdAt: now, updatedAt: now },
+  { participantId: 'participant-jason', displayName: 'Jason', avatar: { initials: 'J' }, manualContactRef: null, channelBindings: [{ channel: 'app', externalId: 'user-jason' }, { channel: 'telegram', externalId: 'tg-jason' }], claimState: 'claimed', notificationPreferences: {}, permissions: [], createdAt: now, updatedAt: now },
+  { participantId: 'participant-nana', displayName: 'Nana', avatar: { initials: 'N' }, manualContactRef: 'contact-nana', channelBindings: [], claimState: 'unclaimed', notificationPreferences: {}, permissions: [], createdAt: now, updatedAt: now },
+  { participantId: 'participant-sis', displayName: '姐姐', avatar: { initials: '姐' }, manualContactRef: 'contact-sis', channelBindings: [], claimState: 'unclaimed', notificationPreferences: {}, permissions: [], createdAt: now, updatedAt: now },
+];
+
+export const RELATIONSHIP_LEDGERS = [
+  { ledgerId: 'ledger-abi', title: 'Abi', participantIds: ['participant-me', 'participant-abi'], ownerUserId: 'user-winner', status: 'active', permissions: {}, createdAt: now, updatedAt: now },
+  { ledgerId: 'ledger-mei', title: 'Mei Ling', participantIds: ['participant-me', 'participant-mei'], ownerUserId: 'user-winner', status: 'active', permissions: {}, createdAt: now, updatedAt: now },
+  { ledgerId: 'ledger-jason', title: 'Jason', participantIds: ['participant-me', 'participant-jason'], ownerUserId: 'user-winner', status: 'active', permissions: {}, createdAt: now, updatedAt: now },
+  { ledgerId: 'ledger-japan', title: '日本旅行 2026', participantIds: ['participant-me', 'participant-abi', 'participant-mei', 'participant-jason'], ownerUserId: 'user-winner', status: 'active', permissions: {}, createdAt: now, updatedAt: now },
+  { ledgerId: 'ledger-room', title: '室友账本', participantIds: ['participant-me', 'participant-mei', 'participant-nana'], ownerUserId: 'user-winner', status: 'active', permissions: {}, createdAt: now, updatedAt: now },
+  { ledgerId: 'ledger-sis', title: '姐姐', participantIds: ['participant-me', 'participant-sis'], ownerUserId: 'user-winner', status: 'active', permissions: {}, createdAt: now, updatedAt: now },
+];
+
+const relationshipHistory = Array.from({ length: 65 }, (_, index) => ({
+  entryId: `entry-abi-history-${index + 1}`,
+  ledgerId: 'ledger-abi', entryType: index % 4 === 3 ? 'direct_payable' : 'direct_receivable', transactionId: null,
+  actorParticipantId: 'participant-me', payerParticipantId: index % 4 === 3 ? 'participant-abi' : 'participant-me',
+  creditorParticipantId: index % 4 === 3 ? 'participant-abi' : 'participant-me', debtorParticipantId: index % 4 === 3 ? 'participant-me' : 'participant-abi',
+  participants: ['participant-me', 'participant-abi'], shares: [], amountMinor: 1200 + (index * 137) % 9800, remainingMinor: 0,
+  sourceChannel: index % 5 === 0 ? 'telegram' : 'app', clientEventId: `fixture-history-${index + 1}`,
+  occurredAt: `2026-${String(6 - Math.floor(index / 28)).padStart(2, '0')}-${String(28 - index % 28).padStart(2, '0')}T${String(9 + index % 10).padStart(2, '0')}:00:00+08:00`,
+  description: ['午餐 AA', 'Grab 车费', '电影票', '日用品代买', '水电费平分'][index % 5], attachment: null, revision: 1, history: [], status: 'settled',
+}));
+
+export const RELATIONSHIP_ENTRIES = [
+  { entryId: 'entry-abi-ticket', ledgerId: 'ledger-abi', entryType: 'direct_receivable', transactionId: null, actorParticipantId: 'participant-me', payerParticipantId: 'participant-me', creditorParticipantId: 'participant-me', debtorParticipantId: 'participant-abi', participants: ['participant-me', 'participant-abi'], shares: [], amountMinor: 25000, remainingMinor: 25000, sourceChannel: 'migration', clientEventId: 'fixture-entry-abi', occurredAt: '2026-07-02T13:00:00+08:00', description: '日本机票代付', attachment: null, revision: 1, history: [], status: 'open' },
+  { entryId: 'entry-mei-oil', ledgerId: 'ledger-mei', entryType: 'split_expense', transactionId: null, actorParticipantId: 'participant-me', payerParticipantId: 'participant-me', creditorParticipantId: 'participant-me', debtorParticipantId: 'participant-mei', participants: ['participant-me', 'participant-mei'], shares: [], amountMinor: 13650, remainingMinor: 13650, sourceChannel: 'migration', clientEventId: 'fixture-entry-mei', occurredAt: '2026-07-08T18:00:00+08:00', description: '车油钱 AA', attachment: null, revision: 1, history: [], status: 'open' },
+  { entryId: 'entry-jason-badminton', ledgerId: 'ledger-jason', entryType: 'direct_payable', transactionId: null, actorParticipantId: 'participant-me', payerParticipantId: 'participant-jason', creditorParticipantId: 'participant-jason', debtorParticipantId: 'participant-me', participants: ['participant-me', 'participant-jason'], shares: [], amountMinor: 3200, remainingMinor: 3200, sourceChannel: 'migration', clientEventId: 'fixture-entry-jason', occurredAt: '2026-07-09T20:00:00+08:00', description: '羽球场地费', attachment: null, revision: 1, history: [], status: 'open' },
+  { entryId: 'entry-japan-hotel', ledgerId: 'ledger-japan', entryType: 'split_expense', transactionId: null, actorParticipantId: 'participant-me', payerParticipantId: 'participant-me', creditorParticipantId: 'participant-me', debtorParticipantId: 'participant-abi', participants: ['participant-me', 'participant-abi', 'participant-mei', 'participant-jason'], splitParticipantIds: ['participant-me', 'participant-abi', 'participant-mei', 'participant-jason'], shares: [{ participantId: 'participant-me', amountMinor: 25000 }, { participantId: 'participant-abi', amountMinor: 25000 }, { participantId: 'participant-mei', amountMinor: 25000 }, { participantId: 'participant-jason', amountMinor: 25000 }], memberBreakdown: [{ participantId: 'participant-abi', amountMinor: 25000 }, { participantId: 'participant-mei', amountMinor: 25000 }, { participantId: 'participant-jason', amountMinor: 25000 }], amountMinor: 75000, remainingMinor: 75000, relationshipRatio: 0.75, totalAmountMinor: 100000, sourceChannel: 'migration', clientEventId: 'fixture-entry-japan-hotel', occurredAt: '2026-07-05T21:00:00+08:00', description: '大阪酒店订金 AA', catId: 'fun', attachment: null, attachmentIds: [], revision: 1, history: [], status: 'open' },
+  { entryId: 'entry-japan-jr', ledgerId: 'ledger-japan', entryType: 'direct_payable', transactionId: null, actorParticipantId: 'participant-me', payerParticipantId: 'participant-jason', creditorParticipantId: 'participant-jason', debtorParticipantId: 'participant-me', participants: ['participant-me', 'participant-abi', 'participant-mei', 'participant-jason'], splitParticipantIds: [], shares: [], memberBreakdown: [{ participantId: 'participant-jason', amountMinor: 4000 }], amountMinor: 4000, remainingMinor: 4000, relationshipRatio: 1, totalAmountMinor: 4000, sourceChannel: 'migration', clientEventId: 'fixture-entry-japan-jr', occurredAt: '2026-07-10T10:00:00+08:00', description: 'JR Pass 代购', catId: 'transport', attachment: null, attachmentIds: [], revision: 1, history: [], status: 'open' },
+  ...relationshipHistory,
+];

@@ -1,0 +1,148 @@
+/* Phase 2B3F — contextual Record Detail and grouped Capture material only. */
+
+.modal-portal-root {
+  position: fixed;
+  inset: 0;
+  z-index: 1800;
+  pointer-events: none;
+}
+.modal-portal-root > .modal-layer {
+  position: fixed;
+  inset: 0;
+  isolation: isolate;
+}
+.sheet-layer { position: fixed; inset: 0; pointer-events: none; }
+.sheet-layer > .sheet-scrim,
+.sheet-layer > .sheet { pointer-events: auto; }
+.sheet-layer > .sheet-scrim { position: absolute; inset: 0; }
+.sheet-layer > .sheet {
+  width: min(100%, 480px);
+  margin-inline: auto;
+}
+.sheet-layer-stacked {
+  position: fixed;
+  inset: 0;
+  z-index: calc(1800 + var(--modal-depth, 0) * 20);
+  z-index: var(--modal-layer-z);
+  isolation: isolate;
+}
+.sheet-layer-stacked > .sheet-scrim { position: absolute; z-index: 0; }
+.sheet-layer-stacked > .sheet { position: absolute; z-index: 1; }
+.stacked-sheet-scrim { z-index: 0; }
+.stacked-sheet { z-index: 1; }
+.modal-layer.modal-suspended,
+.modal-layer[aria-hidden="true"] { pointer-events: none !important; }
+.modal-layer.modal-suspended > [data-modal-surface] { filter: saturate(.88) brightness(.94); }
+html.modal-scroll-locked,
+html.modal-scroll-locked body { overflow: hidden; }
+.activity-detail-sheet { max-height: min(88dvh, 760px); }
+
+.motion-recent-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: inherit;
+  background: var(--s1);
+  text-align: left;
+}
+.motion-recent-row:active { background: color-mix(in srgb, var(--accent-soft) 42%, var(--s1)); }
+.motion-recent-row:focus-visible,
+.motion-account-history-actions button:focus-visible,
+.capture-detail-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.advanced-relation { touch-action: pan-y; }
+.motion-recent[data-expanded="true"] .motion-recent-head button .icon { transform: rotate(180deg); }
+.motion-account-history-actions { display: grid; gap: 7px; }
+.motion-account-history-actions button {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--r-control);
+  color: var(--accent);
+  background: var(--accent-soft);
+  text-align: left;
+}
+.motion-account-history-actions span { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.motion-account-history-actions small { color: var(--text-2); }
+.motion-account-history-actions strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+
+.activity-filter-empty { display: grid; justify-items: center; gap: 9px; text-align: center; }
+.activity-filter-empty .link-btn { min-height: 36px; }
+
+.capture-main.details-mode { gap: 10px; }
+.capture-main.details-mode .cap-more-entry {
+  min-height: 30px;
+  margin: -2px 0 0;
+  padding: 0 2px;
+  border: 0;
+  color: var(--accent);
+  background: transparent;
+  box-shadow: none;
+}
+.capture-main.details-mode .cap-more-entry > .icon { transform: rotate(90deg); }
+.advanced-details { display: flex; flex-direction: column; gap: 12px; padding-bottom: 3px; }
+.capture-detail-group {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--line) 86%, transparent);
+  border-radius: var(--r-card);
+  background: color-mix(in srgb, var(--glass-sheet-bg) 78%, transparent);
+  box-shadow: inset 0 1px rgba(255,255,255,.34), 0 8px 22px rgba(14,24,19,.045);
+  backdrop-filter: blur(18px) saturate(135%);
+  -webkit-backdrop-filter: blur(18px) saturate(135%);
+}
+.capture-detail-group h3 { margin: 0 0 7px; color: var(--text-2); font-size: 11px; font-weight: 720; letter-spacing: .02em; }
+.capture-detail-row { width: 100%; min-height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--text-1); text-align: left; }
+.capture-detail-row > span { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.capture-detail-row strong { font-size: 13px; }
+.capture-detail-row small { color: var(--text-2); font-size: 10px; }
+.capture-detail-divider { height: 1px; margin-left: 2px; background: var(--line); }
+.capture-description-row input {
+  min-width: 0;
+  width: min(58%, 240px);
+  height: 38px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 10px;
+  outline: 0;
+  color: var(--text-1);
+  background: color-mix(in srgb, var(--s1) 74%, transparent);
+  text-align: right;
+}
+.capture-description-row input:focus { box-shadow: 0 0 0 2px var(--accent); }
+.capture-detail-datetime .cap-datetime { gap: 8px; padding: 7px 0; }
+.capture-detail-datetime .cap-field { gap: 3px; }
+.capture-detail-datetime .native-picker-display { min-height: 38px; background: color-mix(in srgb, var(--s1) 72%, transparent); }
+.capture-detail-attachment .attachment-field { padding: 3px 0; }
+.capture-detail-attachment .attachment-summary { min-height: 44px; }
+.capture-accounting-method .advanced-relation { margin: 0; padding: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.capture-record-switch { padding: 0; }
+.ringgit-switch {
+  position: relative;
+  width: 46px;
+  height: 28px;
+  flex: 0 0 46px;
+  border-radius: 999px;
+  background: var(--line-strong);
+  transition: background 160ms ease;
+}
+.ringgit-switch b { position: absolute; width: 24px; height: 24px; top: 2px; left: 2px; border-radius: 50%; background: #fff; box-shadow: 0 2px 7px rgba(0,0,0,.18); transition: transform 160ms ease; }
+.capture-record-switch[aria-checked="true"] .ringgit-switch { background: var(--accent); }
+.capture-record-switch[aria-checked="true"] .ringgit-switch b { transform: translateX(18px); }
+
+@media (max-width: 350px) {
+  .capture-detail-datetime .cap-datetime { grid-template-columns: 1fr; }
+  .capture-description-row { align-items: flex-start; flex-direction: column; gap: 7px; padding-block: 7px; }
+  .capture-description-row input { width: 100%; text-align: left; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-recent-row, .ringgit-switch, .ringgit-switch b { transition: none; }
+}
+html[data-reduced-motion="true"] .motion-recent-row,
+html[data-reduced-motion="true"] .ringgit-switch,
+html[data-reduced-motion="true"] .ringgit-switch b { transition: none; }

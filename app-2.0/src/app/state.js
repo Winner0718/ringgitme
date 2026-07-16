@@ -20,16 +20,25 @@ export const ui = {
   assetsView: { name: 'overview' }, // | {name:'category', type} | {name:'detail', accountId, from}
   assetsSegment: 'all', // all | assets | liab
   categoryIndex: { saving: 0, cc: 0, ew: 0 }, // carousel selection per category
+  // Stable identity is authoritative; indexes are only a presentation cache.
+  selectedAccountId: { saving: null, cc: null, ew: null },
   // Activity
   activityFilter: 'all', // all | money | shared | receipts | photos
   activityQuery: '',
+  activityAccountId: null, // optional stable-ID filter opened from an account category
   activityMonth: '2026-07',
   highlightActivityId: null,
   // Ledger
-  ledgerSegment: 'people', // people | groups
-  ledgerPersonId: null, // set → person detail view
+  ledgerSegment: 'personal', // personal | group, derived from participant count
+  ledgerId: null,
+  ledgerPersonId: null,
   ledgerView: 'current', // current | history
   ledgerHistoryLimit: 30,
+  ledgerFocusEntryId: null,
+  ledgerReturnTransactionId: null,
+  pendingActivityDetailId: null,
+  activityDetailId: null,
+  planDetailId: null,
   receivedPaymentDemo: null, // { itemId, targetId, amount } transient
 };
 

@@ -9,6 +9,7 @@ import { fmtRM, fmtDateMY, fmtTimeAMPM, escapeHTML } from '../../app/format.js';
 import { renderCarousel, activateCarousel } from '../../components/CardCarousel.js';
 import { renderActivityRow } from '../../components/ActivityRow.js';
 import { icon } from '../../components/Icons.js';
+import { replaceRoute } from '../../app/router.js';
 
 const TYPE_LABEL = { cc: '信用卡', saving: '储蓄账户', ew: '电子钱包' };
 
@@ -75,14 +76,14 @@ export function renderDetailPage(container, accountId) {
   if (!acc) return;
   const list = data.getAccountsByType(acc.type);
   const index = list.indexOf(acc);
-  const recent = data.getActivities().filter((t) => t.accountId === acc.id).slice(0, 5);
+  const recent = data.getActivities().filter((t) => [t.accountId, t.sourceAccountId, t.destinationAccountId].includes(acc.id)).slice(0, 5);
   container.innerHTML = `
     ${renderCarousel(list, index, { selectAction: 'detail-card-tap', variant: 'detail' })}
     ${acc.type === 'cc' ? ccFields(acc) : savingsFields(acc)}
     <section class="section">
       <div class="row-between sec-head">
         <h2 class="sec-title">${acc.type === 'cc' ? '最近消费' : '最近记录'}</h2>
-        <button class="link-btn" data-action="assets-view-all-activity">查看全部 ${icon('chevronRight', 13)}</button>
+        <button class="link-btn" data-action="assets-view-all-activity" data-acc="${escapeHTML(acc.id)}">查看全部 ${icon('chevronRight', 13)}</button>
       </div>
       <div class="surface"><ul>
         ${recent.length ? recent.map(renderActivityRow).join('') : '<li class="row row-static caption">这个账户还没有记录。</li>'}
@@ -99,7 +100,7 @@ export function activateDetailPage(container, accountId) {
   activateCarousel(container, index, (next) => {
     const target = list[next];
     ui.categoryIndex[acc.type] = next;
-    update({ assetsView: { ...ui.assetsView, accountId: target.id } });
+    replaceRoute({ selectedAccountId: { ...ui.selectedAccountId, [acc.type]: target.id }, assetsView: { ...ui.assetsView, accountId: target.id } });
   });
 }
 
@@ -110,6 +111,6 @@ export function registerDetailActions() {
     const target = data.getAccount(el.dataset.acc);
     if (!target || target.id === ui.assetsView.accountId) return;
     ui.categoryIndex[target.type] = Number(el.dataset.index);
-    update({ assetsView: { ...ui.assetsView, accountId: target.id } });
+    replaceRoute({ selectedAccountId: { ...ui.selectedAccountId, [target.type]: target.id }, assetsView: { ...ui.assetsView, accountId: target.id } });
   });
 }

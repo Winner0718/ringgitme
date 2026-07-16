@@ -1,0 +1,239 @@
+/* Phase 2B3G-FIX4 — continuous split rail and true balance reels. */
+
+.split-allocation-sheet {
+  height: min(72dvh, 620px);
+  min-height: min(600px, calc(100dvh - 24px));
+}
+
+.split-editor-participants,
+.split-editor-participants[data-count="2"],
+.split-editor-participants[data-count="3"],
+.split-editor-participants[data-count="4"],
+.split-editor-participants[data-count="5"] {
+  display: flex;
+  gap: 8px;
+  padding: 2px 1px 5px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-padding-inline: 12px;
+  scroll-snap-type: x proximity;
+  overscroll-behavior-inline: contain;
+  touch-action: pan-x;
+}
+
+.split-editor-participants .split-editor-person,
+.split-editor-participants[data-count="2"] .split-editor-person,
+.split-editor-participants[data-count="3"] .split-editor-person,
+.split-editor-participants[data-count="4"] .split-editor-person,
+.split-editor-participants[data-count="5"] .split-editor-person {
+  width: 132px;
+  min-width: 132px;
+  min-height: 56px;
+  flex: 0 0 132px;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 7px;
+  padding: 6px 8px;
+  scroll-snap-align: center;
+}
+
+.split-editor-participants .split-editor-avatar,
+.split-editor-participants[data-count="2"] .split-editor-avatar,
+.split-editor-participants[data-count="3"] .split-editor-avatar,
+.split-editor-participants[data-count="4"] .split-editor-avatar,
+.split-editor-participants[data-count="5"] .split-editor-avatar {
+  width: 32px;
+  height: 32px;
+}
+
+.split-editor-person > span,
+.split-editor-person strong { font-size: 11px; }
+.split-editor-active { flex-basis: 46px; }
+.split-editor-active small { font-size: 10px; }
+.split-editor-active strong { font-size: 16px; }
+.split-editor-recovery { flex-basis: 34px; }
+.split-editor-recovery button { font-size: 11px; }
+.split-editor-keypad { grid-template-rows: repeat(5, minmax(42px, 1fr)); gap: 6px; }
+.split-editor-key { min-height: 42px; font-size: 18px; }
+.split-editor-actions { flex-basis: 44px; }
+.split-editor-actions .sheet-primary,
+.split-editor-actions .sheet-secondary { min-height: 44px; height: 44px; }
+.split-editor-actions button:disabled { opacity: .42; cursor: default; }
+
+@media (min-width: 720px) {
+  .split-allocation-sheet { height: min(68dvh, 620px); min-height: 600px; }
+}
+
+@media (max-height: 700px) {
+  .split-allocation-sheet { height: calc(100dvh - 24px); min-height: 0; }
+  .split-editor-participants .split-editor-person { min-height: 50px; }
+  .split-editor-keypad { grid-template-rows: repeat(5, minmax(36px, 1fr)); }
+  .split-editor-key { min-height: 36px; }
+}
+
+/* A balance stage owns exactly one visual at a time: before, reel, or after. */
+.money-motion-layer .motion-balance-stage {
+  display: grid;
+  place-items: center;
+  min-height: 76px;
+  overflow: visible;
+  contain: layout;
+}
+.money-motion-layer .motion-balance-hero.compact .motion-balance-stage { min-height: 68px; }
+
+.money-motion-layer.frame-2 .motion-static-balance,
+.money-motion-layer[data-motion-state="balance-rolling"] .motion-static-balance,
+.money-motion-layer[data-motion-state="source-rolling"] .motion-static-balance,
+.money-motion-layer[data-motion-state="destination-rolling"] .motion-static-balance {
+  visibility: visible;
+}
+
+.money-odometer.motion-odometer-overlay {
+  position: static;
+  inset: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: max-content;
+  padding-block: .08em;
+  white-space: nowrap;
+  line-height: 1.16;
+  font-variant-numeric: tabular-nums;
+}
+
+.money-odometer-prefix { flex: 0 0 auto; }
+.money-odometer-number { display: inline-flex; align-items: center; }
+.money-odometer .motion-digit { flex: 0 0 auto; }
+.money-odometer .motion-digit.stable { height: 1.28em; padding: 0; line-height: 1.28em; }
+
+.money-reel-slot.motion-digit.changed {
+  position: relative;
+  display: block;
+  width: .62em;
+  height: 1.28em;
+  padding: 0;
+  overflow: visible;
+  line-height: 1.28em;
+}
+
+.money-reel-slot .money-reel-track {
+  position: absolute;
+  inset: 0;
+  display: block;
+  height: 100%;
+}
+
+.money-reel-slot .money-reel-track > i {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font: inherit;
+  font-style: normal;
+  line-height: 1.28em;
+  will-change: transform, opacity, filter;
+  transition: transform 820ms cubic-bezier(.2,.78,.2,1) var(--money-reel-delay, 0ms), opacity 360ms ease var(--money-reel-delay, 0ms), filter 180ms ease var(--money-reel-delay, 0ms);
+}
+
+.money-reel-old { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+.money-odometer[data-direction="increase"] .money-reel-new { opacity: .28; transform: translateY(82%) scale(.96); filter: blur(.45px); }
+.money-odometer[data-direction="decrease"] .money-reel-new { opacity: .28; transform: translateY(-82%) scale(.96); filter: blur(.45px); }
+.money-motion-layer.odometer-running .money-odometer[data-direction="increase"] .money-reel-old { opacity: .2; transform: translateY(-82%) scale(.96); filter: blur(.65px); }
+.money-motion-layer.odometer-running .money-odometer[data-direction="decrease"] .money-reel-old { opacity: .2; transform: translateY(82%) scale(.96); filter: blur(.65px); }
+.money-motion-layer.odometer-running .money-reel-new { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+
+.money-glyph-transition {
+  position: relative;
+  display: block;
+  width: .62em;
+  height: 1.28em;
+  padding: 0;
+  overflow: hidden;
+}
+
+.money-glyph-transition > i {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font: inherit;
+  font-style: normal;
+  line-height: 1.28em;
+  transition: opacity 520ms ease, transform 760ms cubic-bezier(.2,.78,.2,1);
+}
+.money-glyph-transition > i:first-child { opacity: 1; transform: translateY(0); }
+.money-glyph-transition > i:last-child { opacity: 0; transform: translateY(28%); }
+.odometer-running .money-glyph-transition > i:first-child { opacity: 0; transform: translateY(-28%); }
+.odometer-running .money-glyph-transition > i:last-child { opacity: 1; transform: translateY(0); }
+
+.debug-motion-frame .money-reel-track > i { transition: none; }
+.debug-motion-frame.frame-2 .money-odometer .money-reel-old { opacity: .48 !important; filter: blur(.55px) !important; }
+.debug-motion-frame.frame-2 .money-odometer .money-reel-new { opacity: .9 !important; filter: blur(.25px) !important; }
+.debug-motion-frame .money-odometer[data-direction="increase"] .money-reel-slot[data-reel-order="0"] .money-reel-old { transform: translateY(-62%) scale(.96) !important; }
+.debug-motion-frame .money-odometer[data-direction="increase"] .money-reel-slot[data-reel-order="0"] .money-reel-new { transform: translateY(8%) scale(1) !important; }
+.debug-motion-frame .money-odometer[data-direction="increase"] .money-reel-slot[data-reel-order="1"] .money-reel-old { transform: translateY(-46%) scale(.97) !important; }
+.debug-motion-frame .money-odometer[data-direction="increase"] .money-reel-slot[data-reel-order="1"] .money-reel-new { transform: translateY(20%) scale(.99) !important; }
+.debug-motion-frame .money-odometer[data-direction="increase"] .money-reel-slot[data-reel-order="2"] .money-reel-old { transform: translateY(-30%) scale(.98) !important; }
+.debug-motion-frame .money-odometer[data-direction="increase"] .money-reel-slot[data-reel-order="2"] .money-reel-new { transform: translateY(34%) scale(.98) !important; }
+.debug-motion-frame .money-odometer[data-direction="increase"] .money-reel-slot[data-reel-order="3"] .money-reel-old { transform: translateY(-14%) scale(.99) !important; }
+.debug-motion-frame .money-odometer[data-direction="increase"] .money-reel-slot[data-reel-order="3"] .money-reel-new { transform: translateY(50%) scale(.97) !important; }
+.debug-motion-frame .money-odometer[data-direction="decrease"] .money-reel-slot[data-reel-order="0"] .money-reel-old { transform: translateY(62%) scale(.96) !important; }
+.debug-motion-frame .money-odometer[data-direction="decrease"] .money-reel-slot[data-reel-order="0"] .money-reel-new { transform: translateY(-8%) scale(1) !important; }
+.debug-motion-frame .money-odometer[data-direction="decrease"] .money-reel-slot[data-reel-order="1"] .money-reel-old { transform: translateY(46%) scale(.97) !important; }
+.debug-motion-frame .money-odometer[data-direction="decrease"] .money-reel-slot[data-reel-order="1"] .money-reel-new { transform: translateY(-20%) scale(.99) !important; }
+.debug-motion-frame .money-odometer[data-direction="decrease"] .money-reel-slot[data-reel-order="2"] .money-reel-old { transform: translateY(30%) scale(.98) !important; }
+.debug-motion-frame .money-odometer[data-direction="decrease"] .money-reel-slot[data-reel-order="2"] .money-reel-new { transform: translateY(-34%) scale(.98) !important; }
+.debug-motion-frame .money-odometer[data-direction="decrease"] .money-reel-slot[data-reel-order="3"] .money-reel-old { transform: translateY(14%) scale(.99) !important; }
+.debug-motion-frame .money-odometer[data-direction="decrease"] .money-reel-slot[data-reel-order="3"] .money-reel-new { transform: translateY(-50%) scale(.97) !important; }
+.debug-motion-frame .money-glyph-transition > i { transition: none; opacity: .56; transform: none; }
+
+.motion-static-balance.reduced-crossfade { animation: fix4-balance-crossfade 220ms ease both; }
+@keyframes fix4-balance-crossfade { from { opacity: .18; } to { opacity: 1; } }
+.motion-balance-range { opacity: 0; transition: opacity 180ms ease; }
+.motion-balance-range[data-visible="true"] { opacity: 1; }
+
+.money-motion-layer .motion-transaction-effect,
+.money-motion-layer .motion-recent,
+.money-motion-layer .motion-account-history-actions,
+.money-motion-layer .motion-relationship-card {
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 260ms ease, transform 360ms var(--motion-spring);
+}
+
+.money-motion-layer[data-motion-state="record-motion"] .motion-transaction-effect,
+.money-motion-layer[data-motion-state="record-motion"] .motion-recent,
+.money-motion-layer[data-motion-state="record-motion"] .motion-account-history-actions,
+.money-motion-layer[data-motion-state="relationship-enter"] .motion-transaction-effect,
+.money-motion-layer[data-motion-state="relationship-enter"] .motion-recent,
+.money-motion-layer[data-motion-state="relationship-enter"] .motion-account-history-actions,
+.money-motion-layer[data-motion-state="settled"] .motion-transaction-effect,
+.money-motion-layer[data-motion-state="settled"] .motion-recent,
+.money-motion-layer[data-motion-state="settled"] .motion-account-history-actions,
+.money-motion-layer[data-motion-state="relationship-enter"] .motion-relationship-card,
+.money-motion-layer[data-motion-state="settled"] .motion-relationship-card {
+  opacity: 1;
+  transform: none;
+}
+
+.money-motion-layer[data-motion-state="transfer-cue"] .motion-transfer-arrow { animation: fix4-transfer-cue 300ms ease-out both; }
+@keyframes fix4-transfer-cue { 50% { transform: translateY(4px) scale(1.06); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .money-reel-track,
+  .money-glyph-transition > i { transition: none !important; }
+  .motion-static-balance.reduced-crossfade { animation: fix4-reduced-fade 160ms ease both; }
+  @keyframes fix4-reduced-fade { from { opacity: .35; } to { opacity: 1; } }
+}
+:root[data-reduced-motion="true"] .money-reel-track,
+:root[data-reduced-motion="true"] .money-glyph-transition > i { transition: none !important; }
+
+.split-debug-parent { display: grid; place-items: end center; pointer-events: none; }
+.split-debug-backdrop { position: absolute; inset: 0; background: color-mix(in srgb, var(--s0) 76%, transparent); backdrop-filter: blur(12px); }
+.split-debug-parent-sheet { position: relative; width: min(100%, 520px); height: min(86dvh, 760px); padding: 24px 18px max(20px, env(safe-area-inset-bottom)); border-radius: 32px 32px 0 0; pointer-events: auto; overflow: hidden; }
+.split-debug-parent-sheet header h2 { margin: 3px 0; }
+.split-debug-parent-sheet header p { margin: 0 0 12px; color: var(--text-2); }
+.split-debug-parent-list { max-height: calc(100% - 150px); overflow-y: auto; border-radius: 18px; background: color-mix(in srgb, var(--s1) 74%, transparent); }
+.split-debug-parent-row { min-height: 52px; display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; align-items: center; gap: 9px; padding: 7px 12px; border-bottom: 1px solid var(--line); }
+.split-debug-avatar { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; color: var(--accent); background: var(--accent-soft); font-weight: 760; }
+.split-debug-parent-sheet > .sheet-primary { width: 100%; margin-top: 12px; }
+@media (min-width: 720px) { .split-debug-parent { place-items: center; padding: 18px; } .split-debug-parent-sheet { border-radius: 32px; } }

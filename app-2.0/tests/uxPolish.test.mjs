@@ -94,7 +94,8 @@ test('AV: native picker fields show formatted labels but retain ISO values inter
   const html = nativeDateTimeFieldsHTML({ prefix: 'test', date: '2026-07-13', time: '13:14' });
   assert.equal(html.includes('13/07/2026'), true);
   assert.equal(html.includes('1:14 PM'), true);
-  assert.equal(html.includes('type="date" value="2026-07-13"'), true);
+  assert.equal(html.includes('type="hidden" value="2026-07-13"'), true);
+  assert.equal(html.includes('type="date"'), false);
   assert.equal(html.includes('type="hidden" value="13:14"'), true);
   assert.equal(html.includes('type="time"'), false);
   assert.equal(html.includes('type="text"'), false);

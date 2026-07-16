@@ -1,5 +1,15 @@
 import { createMoneyEngine } from '../domain/moneyEngine.js';
 import { createCategoryRepository } from '../domain/categoryRepository.js';
+import { createParticipantRepository } from '../domain/participantRepository.js';
+import { createRelationshipLedgerRepository } from '../domain/relationshipLedgerRepository.js';
+import { createRelationshipLedgerEngine } from '../domain/relationshipLedgerEngine.js';
+import { memberBalances } from '../domain/relationshipSelectors.js';
+import { createIntegrationOutbox } from '../domain/integrationOutbox.js';
+import { createAttachmentStore } from '../domain/attachmentRepository.js';
+import { createObligationRepository } from '../domain/obligationRepository.js';
+import { createObligationEngine } from '../domain/obligationEngine.js';
+import { RELATIONSHIP_PARTICIPANTS, RELATIONSHIP_LEDGERS, RELATIONSHIP_ENTRIES } from './relationshipFixtures.js';
+import { OBLIGATION_PLANS, OBLIGATION_INSTANCES, OBLIGATION_PAYMENTS } from './obligationFixtures.js';
 
 // ============================================================
 // RinggitMe 2.0 — demo fixtures (Phase 1 shell only)
@@ -20,7 +30,7 @@ const accounts = [
   {
     id: 'sv-mbb', type: 'saving', name: 'Maybank 储蓄卡', short: 'Maybank 储蓄',
     bank: 'Maybank（马来亚银行）', last4: '8888', balance: 6842.15,
-    art: '/assets/cards/maybank-global-access-mastercard-world.png',
+    art: 'assets/cards/maybank-global-access-mastercard-world.png',
     brandColor: '#e8a800', note: 'Emergency Fund',
   },
   {
@@ -41,14 +51,14 @@ const accounts = [
   {
     id: 'cc-mbb-visa', type: 'cc', name: 'Maybank Visa Platinum', short: 'Maybank Visa',
     bank: 'Maybank（马来亚银行）', network: 'Visa', last4: '9910',
-    art: '/assets/cards/maybank-visa-platinum.png', brandColor: '#17191d',
+    art: 'assets/cards/maybank-visa-platinum.png', brandColor: '#17191d',
     limit: 12000, outstanding: 3247.8, monthlyDue: 850, dueDate: '2026-07-26',
     duePaid: false, sharedPool: 'Maybank 共享额度池', sharedPoolTotal: 20000,
   },
   {
     id: 'cc-mbb-ikhwan', type: 'cc', name: 'Maybank Islamic Ikhwan', short: 'Maybank Ikhwan',
     bank: 'Maybank Islamic', network: 'Visa', last4: '4421',
-    art: '/assets/cards/maybank-islamic-petronas-ikhwan-visa-platinum.png', brandColor: '#0c3a2b',
+    art: 'assets/cards/maybank-islamic-petronas-ikhwan-visa-platinum.png', brandColor: '#0c3a2b',
     limit: 8000, outstanding: 1120.45, monthlyDue: 380, dueDate: '2026-08-02',
     duePaid: false, sharedPool: 'Maybank 共享额度池', sharedPoolTotal: 20000,
   },
@@ -184,6 +194,25 @@ const MERCHANTS = {
   health: ['Guardian', 'Klinik Mediviron', 'Watsons'],
 };
 const ACTIVITY_ACCOUNTS = ['sv-mbb', 'cc-mbb-visa', 'ew-tng', 'cc-mbb-ikhwan', 'sv-cimb', 'cc-rhb', 'ew-boost', 'sv-rhb'];
+const FIXTURE_ATTACHMENT_IDS = ['att-fixture-receipt', 'att-fixture-invoice', 'att-fixture-warranty'];
+const ATTACHMENT_FIXTURES = [
+  {
+    attachmentId: FIXTURE_ATTACHMENT_IDS[0], ownerEntityType: 'transaction', ownerEntityId: 't-0', sortOrder: 0,
+    name: 'KFC-receipt.jpg', mimeType: 'image/svg+xml', kind: 'photo', sizeBytes: 48231,
+    localObjectUrl: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="320" height="420"%3E%3Crect width="320" height="420" rx="24" fill="%23f7f3ec"/%3E%3Crect x="30" y="28" width="260" height="72" rx="18" fill="%23c43d35"/%3E%3Ctext x="160" y="74" text-anchor="middle" font-family="Arial" font-size="28" font-weight="700" fill="white"%3EKFC%3C/text%3E%3Ctext x="42" y="145" font-family="Arial" font-size="20" fill="%23222"%3EReceipt%3C/text%3E%3Cpath d="M42 172h236M42 212h236M42 252h236M42 292h236" stroke="%23c9c2b8" stroke-width="3"/%3E%3Ctext x="42" y="345" font-family="Arial" font-size="22" fill="%23222"%3ETotal%3C/text%3E%3Ctext x="278" y="345" text-anchor="end" font-family="Arial" font-size="22" font-weight="700" fill="%23222"%3ERM 6.00%3C/text%3E%3C/svg%3E',
+    thumbnail: { kind: 'image', url: '' }, source: 'migration', clientEventId: 'fixture-att-receipt', createdAt: '2026-07-13T09:00:00+08:00', updatedAt: '2026-07-13T09:00:00+08:00',
+  },
+  {
+    attachmentId: FIXTURE_ATTACHMENT_IDS[1], ownerEntityType: 'transaction', ownerEntityId: 't-0', sortOrder: 1,
+    name: 'order-confirmation.pdf', mimeType: 'application/pdf', kind: 'pdf', sizeBytes: 118204,
+    localObjectUrl: '', thumbnail: { kind: 'tile', label: 'PDF' }, source: 'migration', clientEventId: 'fixture-att-invoice', createdAt: '2026-07-13T09:00:00+08:00', updatedAt: '2026-07-13T09:00:00+08:00',
+  },
+  {
+    attachmentId: FIXTURE_ATTACHMENT_IDS[2], ownerEntityType: 'transaction', ownerEntityId: 't-0', sortOrder: 2,
+    name: 'KFC-Sunway-Pyramid-purchase-warranty-and-itemised-order-details-2026-07-13.txt', mimeType: 'text/plain', kind: 'file', sizeBytes: 7741,
+    localObjectUrl: '', thumbnail: { kind: 'tile', label: 'TXT' }, source: 'migration', clientEventId: 'fixture-att-warranty', createdAt: '2026-07-13T09:00:00+08:00', updatedAt: '2026-07-13T09:00:00+08:00',
+  },
+];
 
 function localISO(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -225,6 +254,8 @@ function buildActivities() {
       n++;
     }
   }
+  const attachmentTransaction = rows.find((row) => row.id === 't-0');
+  if (attachmentTransaction) attachmentTransaction.attachmentIds = [...FIXTURE_ATTACHMENT_IDS];
   return rows;
 }
 
@@ -232,6 +263,32 @@ function buildActivities() {
 export function createDemoDataSource() {
   const engine = createMoneyEngine({ accounts, transactions: buildActivities(), today: FIXTURE_TODAY });
   const categoryRepo = createCategoryRepository();
+  const participantRepo = createParticipantRepository(RELATIONSHIP_PARTICIPANTS);
+  const ledgerRepo = createRelationshipLedgerRepository({ ledgers: RELATIONSHIP_LEDGERS, entries: RELATIONSHIP_ENTRIES });
+  const outbox = createIntegrationOutbox();
+  const attachmentStore = createAttachmentStore({ initialAttachments: ATTACHMENT_FIXTURES });
+  const relationshipLinks = new Map();
+  const relationship = createRelationshipLedgerEngine({ participants: participantRepo, repository: ledgerRepo, outbox, financial: {
+    addTransaction: (draft) => engine.addTransaction(draft),
+    assertTransactionCapacity: (draft, options) => engine.assertTransactionCapacity(draft, options),
+    reverseTransaction: (id) => engine.reverseTransaction(id, { force: true }),
+    defaultAccountId: () => engine.getAccounts().find((account) => account.type !== 'cc')?.id,
+    linkTransaction: (transactionId, entityId) => { if (transactionId) relationshipLinks.set(transactionId, entityId); },
+  } });
+  const obligationRepo = createObligationRepository({ plans: OBLIGATION_PLANS, instances: OBLIGATION_INSTANCES, payments: OBLIGATION_PAYMENTS });
+  const obligationLinks = new Map();
+  const obligations = createObligationEngine({ repository: obligationRepo, getLedger: (id) => ledgerRepo.getLedger(id), outbox, today: () => FIXTURE_TODAY, financial: {
+    addTransaction: (draft) => engine.addTransaction(draft),
+    assertTransactionCapacity: (draft, options) => engine.assertTransactionCapacity(draft, options),
+    reverseTransaction: (id) => engine.reverseTransaction(id, { force: true }),
+    defaultAccountId: () => engine.getAccounts().find((account) => account.type !== 'cc')?.id,
+    linkTransaction: (transactionId, paymentId) => { if (transactionId) obligationLinks.set(transactionId, paymentId); },
+  } });
+  const emitAttachmentEvent = (eventType, attachment, clientEventId, payload = {}) => outbox.emit({
+    clientEventId, eventType, sourceChannel: 'app', actorUserId: 'user-winner', participantId: null,
+    ledgerId: null, entityId: attachment?.attachmentId || payload.entityId || null, revision: 1,
+    occurredAt: new Date().toISOString(), payload: { ownerEntityType: attachment?.ownerEntityType, ownerEntityId: attachment?.ownerEntityId, ...payload },
+  });
   let commitmentState = structuredClone(commitments);
 
   const ofType = (type) => engine.getAccounts().filter((account) => account.type === type);
@@ -239,14 +296,16 @@ export function createDemoDataSource() {
   const instalmentMonthly = () => instalments.reduce((sum, item) => sum + item.monthly, 0);
   const cardDueThisMonth = () =>
     ofType('cc').filter((account) => !account.duePaid).reduce((sum, account) => sum + account.monthlyDue, 0) + instalmentMonthly();
-  const aaReceivable = () => people.reduce((sum, person) => sum + Math.max(0, person.net), 0);
+  const aaReceivable = () => relationship.getOverview().totals.receivableMinor / 100;
   const userTransactions = () => engine.getUserTransactions();
   const decorateTransaction = (transaction) => {
     if (!transaction) return transaction;
     const category = categoryRepo.getCategory(transaction.catId);
     const noPurpose = transaction.kind === 'transfer' && (!transaction.catId || transaction.catId === 'transfer-fallback');
     const label = noPurpose ? '转账' : category?.name || transaction.catLabel;
-    return { ...transaction, catLabel: label, category: label, categoryArchived: Boolean(category?.isArchived), categoryIcon: category?.icon || null, categoryThemeToken: category?.themeToken || 'slate' };
+    const attachments = attachmentStore.getMany(transaction.attachmentIds || []);
+    const attachmentCount = attachments.length || (transaction.attachment || transaction.receipt || transaction.photo ? 1 : 0);
+    return { ...transaction, catLabel: label, category: label, categoryArchived: Boolean(category?.isArchived && !category?.isSystemFallback), categoryIcon: category?.icon || null, categoryThemeToken: category?.themeToken || 'slate', attachments, attachmentCount };
   };
 
   return {
@@ -278,10 +337,10 @@ export function createDemoDataSource() {
     getFixedDeposits: () => fixedDeposits,
     getSavingsFlow() {
       const inflow = userTransactions()
-        .filter((transaction) => !transaction.recordOnly && transaction.kind === 'income' && engine.getAccount(transaction.destinationAccountId)?.type === 'saving')
+        .filter((transaction) => transaction.accountEffect === 'posted' && transaction.kind === 'income' && engine.getAccount(transaction.destinationAccountId)?.type === 'saving')
         .reduce((sum, transaction) => sum + transaction.amount, savingsFlow.inflow);
       const outflow = userTransactions()
-        .filter((transaction) => !transaction.recordOnly && transaction.kind === 'expense' && engine.getAccount(transaction.sourceAccountId)?.type === 'saving')
+        .filter((transaction) => transaction.accountEffect === 'posted' && transaction.kind === 'expense' && engine.getAccount(transaction.sourceAccountId)?.type === 'saving')
         .reduce((sum, transaction) => sum + transaction.amount, savingsFlow.outflow);
       return { inflow, outflow };
     },
@@ -292,7 +351,7 @@ export function createDemoDataSource() {
     },
     getBudget() {
       const addedSpend = userTransactions()
-        .filter((transaction) => !transaction.recordOnly && transaction.kind === 'expense' && transaction.date.startsWith('2026-07'))
+        .filter((transaction) => transaction.accountEffect === 'posted' && transaction.kind === 'expense' && transaction.date.startsWith('2026-07'))
         .reduce((sum, transaction) => sum + transaction.amount, 0);
       return { month: '2026-07', total: 2500, used: 1684.3 + addedSpend };
     },
@@ -321,7 +380,14 @@ export function createDemoDataSource() {
     getTransactions: (options) => engine.getTransactions(options).map(decorateTransaction),
     getActivity: (id) => decorateTransaction(engine.getTransaction(id)),
     getTransaction: (id) => decorateTransaction(engine.getTransaction(id)),
+    recordTransactionConfirmationPresented(transactionOrId) {
+      const transaction = typeof transactionOrId === 'string' ? engine.getTransaction(transactionOrId) : transactionOrId;
+      if (!transaction) return null;
+      return outbox.emit({ clientEventId: `confirmation-${transaction.id}-${transaction.revision}`, eventType: 'transaction.confirmation.presented', sourceChannel: 'app', actorUserId: 'user-winner', participantId: null, ledgerId: null, entityId: transaction.id, revision: transaction.revision, occurredAt: new Date().toISOString(), payload: { confirmationId: transaction.confirmation?.confirmationId || null } });
+    },
     getTransactionMutationPolicy: (transactionOrId) => engine.getTransactionMutationPolicy(transactionOrId),
+    inspectTransactionCapacity: (draft, options) => engine.inspectTransactionCapacity(draft, options),
+    assertTransactionCapacity: (draft, options) => engine.assertTransactionCapacity(draft, options),
     addTransaction(draft) {
       const cat = categoryRepo.getCategory(draft.catId);
       const noPurpose = draft.kind === 'transfer' && (!cat || cat.isSystemFallback);
@@ -335,13 +401,31 @@ export function createDemoDataSource() {
     editTransaction(id, changes) {
       const category = categoryRepo.getCategory(changes.catId);
       const noPurpose = (changes.kind || engine.getTransaction(id)?.kind) === 'transfer' && (!category || category.isSystemFallback);
-      return decorateTransaction(engine.editTransaction(id, {
+      const linkedId = relationshipLinks.get(id);
+      const currentLinkedTransaction = engine.getTransaction(id);
+      if (linkedId?.startsWith('rel-entry-') && changes.kind && changes.kind !== currentLinkedTransaction.kind) throw new Error('关系账类型请从关系账详情修改');
+      if (linkedId?.startsWith('rel-entry-') && Object.hasOwn(changes, 'amount')) {
+        const linked = ledgerRepo.getEntry(linkedId);
+        const settledMinor = linked.amountMinor - linked.remainingMinor;
+        const nextRelationshipMinor = Math.round(Number(changes.amount) * 100 * (linked.relationshipRatio || 1));
+        if (nextRelationshipMinor < settledMinor) throw new Error('金额不能低于已结算部分');
+      }
+      const edited = engine.editTransaction(id, {
         ...changes,
         ...(changes.catId ? { catLabel: noPurpose ? '转账' : category?.name, category: noPurpose ? '转账' : category?.name } : {}),
-      }));
+      });
+      if (linkedId?.startsWith('rel-entry-')) {
+        const entry = ledgerRepo.getEntry(linkedId);
+        relationship.updateFromTransaction(edited, { ledgerId: entry.ledgerId, clientEventId: `transaction-edit-${id}-${edited.revision}`, sourceChannel: 'app', occurredAt: edited.updatedAt });
+      }
+      return decorateTransaction(edited);
     },
-    reverseTransaction: (id) => engine.reverseTransaction(id),
-    deleteTransaction: (id) => engine.deleteTransaction(id),
+    reverseTransaction(id) {
+      const linkedId = relationshipLinks.get(id);
+      if (linkedId?.startsWith('rel-entry-')) return relationship.reverseEntry(linkedId, { clientEventId: `transaction-reverse-${id}`, sourceChannel: 'app', ledgerId: ledgerRepo.getEntry(linkedId).ledgerId });
+      return engine.reverseTransaction(id);
+    },
+    deleteTransaction(id) { return this.reverseTransaction(id); },
     transferFunds: (draft) => engine.transferFunds(draft),
     getDerivedMetrics() {
       return this.getPulse();
@@ -357,6 +441,11 @@ export function createDemoDataSource() {
       commitmentState = structuredClone(commitments);
       engine.resetDemoData();
       categoryRepo.resetAll();
+      relationship.reset();
+      relationshipLinks.clear();
+      obligations.reset();
+      obligationLinks.clear();
+      attachmentStore.reset();
     },
     projectAAReceivable: (...args) => engine.projectAAReceivable(...args),
     settleAAReceivable: (...args) => engine.settleAAReceivable(...args),
@@ -369,11 +458,114 @@ export function createDemoDataSource() {
     getPersonCurrent: (id) => personCurrent[id] || [],
     getPersonHistory: (id) => personHistory[id] || [],
     getRecentSettlements: () => recentSettlements,
-    getGroups: () => groups,
+    getGroups: () => relationship.getLedgers('group').map((ledger) => {
+      const summary = relationship.getSummary(ledger.ledgerId);
+      return { id: ledger.ledgerId, name: ledger.title, members: ledger.participantIds.length, myNet: summary.netMinor / 100, lastActivity: relationship.getEntries(ledger.ledgerId)[0]?.occurredAt.slice(0, 10) || FIXTURE_TODAY };
+    }),
     getReceiveTargets: () =>
       engine.getAccounts()
         .filter((a) => a.type !== 'cc')
         .map((a) => ({ id: a.id, name: a.name, type: a.type, note: a.type === 'ew' ? '入账 eWallet' : '入账储蓄' }))
         .concat([{ id: 'cash', name: '现金', type: 'cash', note: '只记录，不动余额' }]),
+
+    getRelationshipLedgers: (filter) => relationship.getLedgers(filter),
+    getRelationshipLedger: (id) => relationship.getLedger(id),
+    getRelationshipEntry: (id) => relationship.getEntry(id),
+    getRelationshipEntries: (id, options) => relationship.getEntries(id, options),
+    getRelationshipSettlements: (id) => relationship.getSettlements(id),
+    getRelationshipSummary: (id) => relationship.getSummary(id),
+    getRelationshipOverview: () => relationship.getOverview(),
+    getParticipants: () => relationship.getParticipants(),
+    getParticipant: (id) => relationship.getParticipant(id),
+    createManualParticipant: (input) => relationship.createManualParticipant(input),
+    createRelationshipLedger: (input) => relationship.createLedger(input),
+    recordRelationshipEntry: (command) => relationship.record(command),
+    settleRelationship: (command) => relationship.settle(command),
+    reverseRelationshipSettlement: (id, command) => relationship.reverseSettlement(id, command),
+    reverseRelationshipEntry: (id, command) => relationship.reverseEntry(id, command),
+    prepareParticipantClaim: (...args) => relationship.prepareClaim(...args),
+    completeParticipantClaim: (...args) => relationship.completeClaim(...args),
+    cancelParticipantClaim: (id) => relationship.cancelClaim(id),
+    getIntegrationOutbox: () => relationship.getOutbox(),
+    getRelationshipEntityForTransaction: (id) => relationshipLinks.get(id) || null,
+    getObligationEntityForTransaction: (id) => obligationLinks.get(id) || null,
+    getRelationshipMemberBalances: (ledgerId) => memberBalances(ledgerRepo.getEntries(ledgerId), 'participant-me'),
+
+    // ---- Attachments (session-local collection) -------------
+    getAttachmentLimit: () => attachmentStore.maxPerOwner,
+    getAttachment: (id) => attachmentStore.get(id),
+    getAttachments: (ownerEntityType, ownerEntityId) => attachmentStore.listFor(ownerEntityType, ownerEntityId),
+    getAttachmentsByIds: (ids) => attachmentStore.getMany(ids),
+    addAttachment(input) {
+      const attachment = attachmentStore.add(input);
+      emitAttachmentEvent('attachment.added', attachment, `${input.clientEventId}:attachment.added`);
+      return attachment;
+    },
+    removeAttachment(attachmentId, clientEventId = `attachment-remove-${attachmentId}`) {
+      const attachment = attachmentStore.get(attachmentId);
+      const removed = attachmentStore.remove(attachmentId);
+      if (removed) {
+        engine.getTransactions({ includeReversed: true }).filter((transaction) => transaction.attachmentIds?.includes(attachmentId)).forEach((transaction) => engine.setTransactionAttachments(transaction.id, transaction.attachmentIds.filter((id) => id !== attachmentId)));
+        ledgerRepo.getLedgers().forEach((ledger) => {
+          ledgerRepo.getEntries(ledger.ledgerId, { includeReversed: true }).filter((entry) => entry.attachmentIds?.includes(attachmentId)).forEach((entry) => ledgerRepo.updateEntry(entry.entryId, { attachmentIds: entry.attachmentIds.filter((id) => id !== attachmentId) }));
+          ledgerRepo.getSettlements(ledger.ledgerId).filter((settlement) => settlement.attachmentIds?.includes(attachmentId)).forEach((settlement) => ledgerRepo.updateSettlement(settlement.settlementId, { attachmentIds: settlement.attachmentIds.filter((id) => id !== attachmentId) }));
+        });
+        obligationRepo.getPlans().filter((plan) => plan.attachmentIds?.includes(attachmentId)).forEach((plan) => obligationRepo.updatePlan(plan.planId, { attachmentIds: plan.attachmentIds.filter((id) => id !== attachmentId) }));
+        obligationRepo.getPlans().forEach((plan) => obligationRepo.getPayments(plan.planId).filter((payment) => payment.attachmentIds?.includes(attachmentId)).forEach((payment) => obligationRepo.updatePayment(payment.paymentId, { attachmentIds: payment.attachmentIds.filter((id) => id !== attachmentId) })));
+        emitAttachmentEvent('attachment.removed', attachment, `${clientEventId}:attachment.removed`, { entityId: attachmentId });
+      }
+      return removed;
+    },
+    renameAttachment(attachmentId, requestedName, clientEventId = `attachment-rename-${attachmentId}-${Date.now()}`) {
+      const renamed = attachmentStore.rename(attachmentId, requestedName);
+      emitAttachmentEvent('attachment.renamed', renamed, `${clientEventId}:attachment.renamed`, { name: renamed.name });
+      return renamed;
+    },
+    recordAttachmentDownloaded(attachmentId) {
+      const attachment = attachmentStore.get(attachmentId);
+      if (attachment) emitAttachmentEvent('attachment.downloaded', attachment, `attachment-download-${attachmentId}-${Date.now()}`);
+    },
+    recordAttachmentShared(attachmentId) {
+      const attachment = attachmentStore.get(attachmentId);
+      if (attachment) emitAttachmentEvent('attachment.shared', attachment, `attachment-share-${attachmentId}-${Date.now()}`);
+    },
+    replaceAttachment(attachmentId, input, clientEventId) {
+      const replaced = attachmentStore.replace(attachmentId, input, clientEventId);
+      emitAttachmentEvent('attachment.added', replaced, `${clientEventId}:attachment.replaced`, { replacedAttachmentId: attachmentId });
+      return replaced;
+    },
+    reorderAttachments(ownerEntityType, ownerEntityId, orderedIds, clientEventId = `attachment-reorder-${ownerEntityId}-${orderedIds.join('.')}`) {
+      const ordered = attachmentStore.reorder(ownerEntityType, ownerEntityId, orderedIds);
+      emitAttachmentEvent('attachment.reordered', ordered[0] || null, `${clientEventId}:attachment.reordered`, { ownerEntityType, ownerEntityId, orderedIds });
+      return ordered;
+    },
+    assignAttachmentOwner: (fromType, fromId, toType, toId) => attachmentStore.assignOwner(fromType, fromId, toType, toId),
+    discardDraftAttachments: (draftId) => attachmentStore.removeFor('draft', draftId),
+    setTransactionAttachments: (id, attachmentIds) => decorateTransaction(engine.setTransactionAttachments(id, attachmentIds)),
+    getTransactionAttachments(id) {
+      const transaction = engine.getTransaction(id);
+      return transaction ? attachmentStore.getMany(transaction.attachmentIds || []) : [];
+    },
+
+    // ---- Obligations: monthly relationship accounts + interpersonal
+    // instalments (one canonical plan; projections only elsewhere) ----
+    getObligationPlans: (filter) => obligations.getPlans(filter).filter((plan) => !plan.archived),
+    getObligationPlan: (id) => obligations.getPlan(id),
+    getObligationInstances: (planId) => obligations.getInstances(planId),
+    getObligationPayments: (planId) => obligations.getPayments(planId),
+    recordPlanDetailOpened(planId) {
+      const plan = obligations.getPlan(planId);
+      if (plan) outbox.emit({ clientEventId: `plan-detail-${planId}-${Date.now()}`, eventType: 'plan.detail.opened', sourceChannel: 'app', actorUserId: 'user-winner', participantId: null, ledgerId: plan.ledgerId, entityId: planId, revision: plan.revision || 1, occurredAt: new Date().toISOString(), payload: {} });
+    },
+    createObligationPlan: (command) => obligations.createPlan(command),
+    updateObligationPlan: (planId, changes, command) => obligations.updatePlan(planId, changes, command),
+    generateObligationInstance: (planId, command) => obligations.generateInstance(planId, command),
+    recordObligationPayment: (command) => obligations.recordPayment(command),
+    reverseObligationPayment: (paymentId, command) => obligations.reversePayment(paymentId, command),
+    earlySettleInstallment: (command) => obligations.earlySettle(command),
+    pauseObligationPlan: (planId, command) => obligations.pausePlan(planId, command),
+    resumeObligationPlan: (planId, command) => obligations.resumePlan(planId, command),
+    stopObligationPlan: (planId, command) => obligations.stopPlan(planId, command),
+    discardObligationPlan: (planId, command) => obligations.discardPlan(planId, command),
   };
 }

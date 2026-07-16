@@ -151,8 +151,13 @@ function registerShellActions() {
       categoryIndex: { saving: 0, cc: 0, ew: 0 },
       activityFilter: 'all',
       activityQuery: '',
+      activityAccountId: null,
       activityMonth: '2026-07',
       highlightActivityId: null,
+      ledgerSegment: 'personal',
+      ledgerId: null,
+      ledgerView: 'current',
+      ledgerHistoryLimit: 30,
     });
     toast('示例数据已重置');
   });

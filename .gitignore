@@ -11,3 +11,6 @@ ios/App/*.xcworkspace/xcuserdata/
 ios/App/*.xcodeproj/xcuserdata/
 *.xcuserstate
 
+# Local checkpoint backups and generated verification evidence.
+work/backups/
+work/reports/

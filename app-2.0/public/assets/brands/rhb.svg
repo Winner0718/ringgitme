@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <circle cx="32" cy="32" r="30" fill="#fff"/>
+  <text x="29" y="37" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" font-weight="800" font-style="italic" fill="#165aa7">RHB</text>
+  <path d="m48 22 8 8-8 8-8-8z" fill="#e5252a"/>
+</svg>

@@ -1,0 +1,87 @@
+// Demo fixtures for the unified obligation domain. Historical months arrive
+// as migration-sourced payment records so plan totals always derive from the
+// same payment ledger new payments use. In-memory only.
+
+const created = '2026-05-01T09:00:00+08:00';
+
+export const OBLIGATION_PLANS = [
+  {
+    planId: 'plan-rent-sis',
+    planType: 'recurring_monthly',
+    ledgerId: 'ledger-sis',
+    creditorParticipantId: 'participant-sis',
+    debtorParticipantId: 'participant-me',
+    direction: 'payable',
+    title: 'Kampung 房租',
+    description: '每月替家里付给姐姐的房租',
+    currency: 'MYR',
+    amountMinor: 85000,
+    dueDay: 7,
+    startDate: '2026-05-01',
+    endDate: null,
+    status: 'active',
+    defaultAccountId: 'sv-mbb',
+    attachmentIds: [],
+    reminder: null,
+    sourceChannel: 'migration',
+    clientEventId: 'fixture-plan-rent',
+    createdAt: created,
+    updatedAt: created,
+    totalPaidMinor: 170000,
+    projection: { surfaces: ['relationship_ledger', 'activity', 'fixed_center'], fixedCenterEligible: true },
+    revision: 1,
+    history: [],
+  },
+  {
+    planId: 'plan-shopee-sis',
+    planType: 'installment',
+    ledgerId: 'ledger-sis',
+    creditorParticipantId: 'participant-sis',
+    debtorParticipantId: 'participant-me',
+    direction: 'payable',
+    title: 'Shopee 手机分期',
+    description: '用姐姐的 Shopee LatePay 额度买手机',
+    merchant: 'Shopee LatePay',
+    currency: 'MYR',
+    principalMinor: 120000,
+    feeMinor: 0,
+    totalRepayableMinor: 120000,
+    termCount: 6,
+    amountPerTermMinor: 20000,
+    currentTerm: 2,
+    totalPaidMinor: 20000,
+    remainingBalanceMinor: 100000,
+    dueDay: 15,
+    startDate: '2026-06-01',
+    endDate: null,
+    status: 'active',
+    defaultAccountId: 'sv-mbb',
+    attachmentIds: [],
+    reminder: null,
+    sourceChannel: 'migration',
+    clientEventId: 'fixture-plan-shopee',
+    createdAt: '2026-06-01T09:00:00+08:00',
+    updatedAt: '2026-06-01T09:00:00+08:00',
+    projection: { surfaces: ['relationship_ledger', 'activity', 'fixed_center'], fixedCenterEligible: true },
+    revision: 1,
+    history: [],
+  },
+];
+
+export const OBLIGATION_INSTANCES = [
+  { instanceId: 'inst-rent-2026-05', planId: 'plan-rent-sis', periodKey: '2026-05', dueDate: '2026-05-07', amountDueMinor: 85000, amountPaidMinor: 85000, status: 'paid', settlementIds: ['fixture-rent-pay-05'], generatedAt: created, revision: 1 },
+  { instanceId: 'inst-rent-2026-06', planId: 'plan-rent-sis', periodKey: '2026-06', dueDate: '2026-06-07', amountDueMinor: 85000, amountPaidMinor: 85000, status: 'paid', settlementIds: ['fixture-rent-pay-06'], generatedAt: created, revision: 1 },
+  { instanceId: 'inst-rent-2026-07', planId: 'plan-rent-sis', periodKey: '2026-07', dueDate: '2026-07-07', amountDueMinor: 85000, amountPaidMinor: 0, status: 'scheduled', settlementIds: [], generatedAt: created, revision: 1 },
+  { instanceId: 'inst-shopee-1', planId: 'plan-shopee-sis', termNumber: 1, periodKey: '2026-06', dueDate: '2026-06-15', amountDueMinor: 20000, amountPaidMinor: 20000, status: 'paid', settlementIds: ['fixture-shopee-pay-1'], generatedAt: '2026-06-01T09:00:00+08:00', revision: 1 },
+  { instanceId: 'inst-shopee-2', planId: 'plan-shopee-sis', termNumber: 2, periodKey: '2026-07', dueDate: '2026-07-15', amountDueMinor: 20000, amountPaidMinor: 0, status: 'scheduled', settlementIds: [], generatedAt: '2026-06-01T09:00:00+08:00', revision: 1 },
+  { instanceId: 'inst-shopee-3', planId: 'plan-shopee-sis', termNumber: 3, periodKey: '2026-08', dueDate: '2026-08-15', amountDueMinor: 20000, amountPaidMinor: 0, status: 'scheduled', settlementIds: [], generatedAt: '2026-06-01T09:00:00+08:00', revision: 1 },
+  { instanceId: 'inst-shopee-4', planId: 'plan-shopee-sis', termNumber: 4, periodKey: '2026-09', dueDate: '2026-09-15', amountDueMinor: 20000, amountPaidMinor: 0, status: 'scheduled', settlementIds: [], generatedAt: '2026-06-01T09:00:00+08:00', revision: 1 },
+  { instanceId: 'inst-shopee-5', planId: 'plan-shopee-sis', termNumber: 5, periodKey: '2026-10', dueDate: '2026-10-15', amountDueMinor: 20000, amountPaidMinor: 0, status: 'scheduled', settlementIds: [], generatedAt: '2026-06-01T09:00:00+08:00', revision: 1 },
+  { instanceId: 'inst-shopee-6', planId: 'plan-shopee-sis', termNumber: 6, periodKey: '2026-11', dueDate: '2026-11-15', amountDueMinor: 20000, amountPaidMinor: 0, status: 'scheduled', settlementIds: [], generatedAt: '2026-06-01T09:00:00+08:00', revision: 1 },
+];
+
+export const OBLIGATION_PAYMENTS = [
+  { paymentId: 'oblpay-rent-05', planId: 'plan-rent-sis', amountMinor: 85000, allocations: [{ instanceId: 'inst-rent-2026-05', periodKey: '2026-05', appliedMinor: 85000 }], transactionId: null, recordOnly: false, sourceChannel: 'migration', clientEventId: 'fixture-rent-pay-05', occurredAt: '2026-05-06T10:00:00+08:00', attachmentIds: [], status: 'active' },
+  { paymentId: 'oblpay-rent-06', planId: 'plan-rent-sis', amountMinor: 85000, allocations: [{ instanceId: 'inst-rent-2026-06', periodKey: '2026-06', appliedMinor: 85000 }], transactionId: null, recordOnly: false, sourceChannel: 'migration', clientEventId: 'fixture-rent-pay-06', occurredAt: '2026-06-06T10:00:00+08:00', attachmentIds: [], status: 'active' },
+  { paymentId: 'oblpay-shopee-1', planId: 'plan-shopee-sis', amountMinor: 20000, allocations: [{ instanceId: 'inst-shopee-1', periodKey: '2026-06', appliedMinor: 20000 }], transactionId: null, recordOnly: false, sourceChannel: 'migration', clientEventId: 'fixture-shopee-pay-1', occurredAt: '2026-06-14T10:00:00+08:00', attachmentIds: [], status: 'active' },
+];

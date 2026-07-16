@@ -1,0 +1,247 @@
+/* Phase 2B3C — browser-native card scrolling and premium money surfaces. */
+
+/* Native Scroll Snap owns card movement. No track transform, pointer capture,
+   touch suppression, or JavaScript momentum is used. */
+.native-carousel-shell.deck-viewport {
+  --snap-gutter: max(9%, calc((100% - 360px) / 2));
+  --snap-card-width: min(calc(100vw - var(--snap-gutter) - var(--snap-gutter)), 360px);
+  height: auto;
+  min-height: 0;
+  margin: 0 calc(-1 * var(--space-page-x));
+  overflow: visible;
+  touch-action: pan-x pan-y pinch-zoom;
+  cursor: auto;
+  opacity: 0;
+}
+.native-carousel-shell.is-ready { opacity: 1; }
+.native-carousel-scroller {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 12px var(--snap-gutter) 14px;
+  scroll-padding-inline: var(--snap-gutter);
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: none;
+}
+.native-carousel-scroller::-webkit-scrollbar { display: none; }
+.native-carousel-shell.debug-scroll-position .native-carousel-scroller { scroll-snap-type: none; }
+.native-snap-card.deck-card {
+  position: relative;
+  inset: auto;
+  flex: 0 0 var(--snap-card-width);
+  width: var(--snap-card-width);
+  max-width: 360px;
+  aspect-ratio: 1.586;
+  padding: 0;
+  scroll-snap-align: center;
+  scroll-snap-stop: normal;
+  opacity: .82;
+  transform: scale(.955);
+  transition: opacity 120ms linear, box-shadow 150ms ease;
+  will-change: opacity;
+  contain: layout paint;
+  background: transparent;
+}
+.native-snap-card.is-centered { box-shadow: 0 15px 34px rgba(0,0,0,.17); }
+.detail-peek .native-snap-card.deck-card { filter: none; }
+.native-snap-card:active { filter: brightness(.97); }
+.native-carousel-shell + .deck-dots { justify-content: center; margin: 0 0 var(--space-16); }
+
+/* Shared account identity visual. */
+.account-visual {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: inherit;
+  color: #fff;
+  background: color-mix(in srgb, var(--brand, var(--emerald-800)) 88%, #101412);
+  isolation: isolate;
+}
+.account-visual-art,
+.account-visual-fallback,
+.account-wallet-brand { position: absolute; inset: 0; width: 100%; height: 100%; }
+.account-visual-art { z-index: 1; object-fit: cover; pointer-events: none; }
+.account-visual-fallback {
+  z-index: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 18px;
+  background: linear-gradient(145deg, var(--brand), color-mix(in srgb, var(--brand) 66%, #09100d));
+}
+.account-visual.image-failed .account-visual-art { display: none; }
+.account-visual-name { max-width: 75%; font-size: 17px; font-weight: 750; text-align: left; }
+.account-visual-bank { color: rgba(255,255,255,.72); font-size: 12px; }
+.account-visual-badge {
+  position: absolute;
+  z-index: 3;
+  top: 11px;
+  right: 11px;
+  padding: 5px 8px;
+  border-radius: var(--r-pill);
+  background: rgba(7,9,8,.48);
+  color: #fff;
+  font: 650 10px/1 var(--font-ui);
+  backdrop-filter: blur(8px);
+}
+.account-visual-overlay {
+  position: absolute;
+  z-index: 3;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  min-height: 60px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 24px 15px 13px;
+  background: linear-gradient(transparent, rgba(0,0,0,.58));
+}
+.account-visual-digits { color: rgba(255,255,255,.86); font-size: 12px; white-space: nowrap; }
+.account-visual-amount { min-width: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+.account-visual-amount small { color: rgba(255,255,255,.7); font-size: 9px; }
+.account-visual-amount strong { color: #fff; font-size: clamp(15px, 4.8vw, 20px); white-space: nowrap; }
+.account-wallet-brand {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px;
+  background: color-mix(in srgb, var(--brand) 90%, #0d1512);
+}
+.account-wallet-logo { width: 48px; height: 48px; flex: 0 0 48px; display: grid; place-items: center; overflow: hidden; border-radius: 15px; background: #fff; color: #101310; font-weight: 800; }
+.account-wallet-logo img { width: 100%; height: 100%; object-fit: contain; }
+.account-wallet-brand > span:last-child { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+.account-wallet-brand strong { font-size: 17px; }
+.account-wallet-brand small { color: rgba(255,255,255,.72); }
+.account-visual-confirmation { height: auto; min-height: 0; aspect-ratio: 1.586; border-radius: 22px; }
+.account-visual-confirmation .account-visual-overlay { min-height: 50px; }
+.account-visual-compact { border-radius: var(--r-card); }
+
+/* Capture hierarchy: one amount hero, inline details, then keypad. */
+.cap-amount { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 4px 0 8px; }
+.cap-amount-value { font-size: 38px; font-weight: 760; letter-spacing: -.035em; }
+.cap-amount-value b { font: inherit; }
+.cap-expression-line { min-height: 17px; color: var(--text-2); font-size: 13px; font-weight: 620; }
+.cap-expression-line.error,
+.cap-amount.has-expression-error em { color: var(--sem-red); }
+.cap-amount em { min-height: 14px; color: var(--text-3); font: normal 11px/1.2 var(--font-ui); }
+.cap-more-entry { margin: 2px 0 0; }
+.cap-more-entry > .icon { transition: transform 160ms ease; }
+.cap-more-entry.open > .icon { transform: rotate(90deg); }
+.capture-inline-details {
+  gap: 10px;
+  padding: 11px;
+  border-radius: var(--r-card);
+  background: color-mix(in srgb, var(--s1) 72%, transparent);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.capture-inline-details .attachment-section { margin: 0; }
+.capture-calculator { margin: 4px 0 6px; }
+.capture-calculator-keys { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: 48px; gap: 7px; }
+.capture-calculator-key {
+  min-width: 0;
+  min-height: 48px;
+  border-radius: 16px;
+  color: var(--text-1);
+  background: color-mix(in srgb, var(--s1) 86%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--line) 82%, transparent), 0 5px 14px rgba(15,25,20,.035);
+  font: 620 20px/1 var(--font-ui);
+  transition: transform 90ms ease, filter 90ms ease, background 120ms ease;
+}
+.capture-calculator-key.operator { color: var(--accent); background: color-mix(in srgb, var(--accent-soft) 75%, var(--s1)); }
+.capture-calculator-key.equals { grid-column: 4; grid-row: 4 / span 2; color: #fff; background: var(--accent); box-shadow: 0 8px 20px color-mix(in srgb, var(--accent) 20%, transparent); }
+.capture-calculator-key.zero { grid-column: 1 / span 2; }
+.capture-calculator-key:active { transform: scale(.955); filter: brightness(.96); }
+.capture-direct-keypad.has-error { border-radius: var(--r-card); animation: rm-error-shake 320ms ease; box-shadow: 0 0 0 2px color-mix(in srgb, var(--sem-red) 48%, transparent); }
+
+/* Confirmation: one Liquid Glass canvas with the real account as hero. */
+.money-motion-layer { background: color-mix(in srgb, var(--s0) 88%, transparent); }
+.money-motion-card {
+  width: min(100%, 480px);
+  max-height: min(94dvh, 820px);
+  gap: 10px;
+  padding: 14px;
+  overflow-y: auto;
+  background: color-mix(in srgb, var(--glass-sheet-bg) 92%, transparent);
+}
+.money-motion-header { justify-content: flex-start; margin-bottom: 1px; }
+.money-motion-status { padding: 0 10px; background: var(--accent-soft); color: var(--accent); }
+.motion-account-list { display: grid; gap: 8px; }
+.motion-account-list.dual { grid-template-columns: 1fr; gap: 6px; }
+.motion-transfer-arrow { width: 30px; height: 30px; display: grid; place-items: center; justify-self: center; margin: -2px 0; border-radius: 50%; color: var(--accent); background: var(--accent-soft); }
+.motion-balance-hero { position: relative; padding: 0; border-radius: 24px; overflow: hidden; background: transparent; box-shadow: var(--shadow-2); }
+.motion-account-role { position: absolute; z-index: 6; top: 11px; left: 11px; padding: 5px 8px; border-radius: var(--r-pill); color: #fff; background: rgba(7,9,8,.5); font-size: 10px; font-weight: 700; backdrop-filter: blur(8px); }
+.motion-balance-copy {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  padding: 10px 12px 11px;
+  color: var(--text-1);
+  background: color-mix(in srgb, var(--s1) 94%, transparent);
+}
+.motion-balance-copy > span:first-child { color: var(--text-2); font-size: 11px; }
+.motion-balance-stage {
+  position: relative;
+  min-width: min(100%, 280px);
+  min-height: 48px;
+  display: grid;
+  place-items: center;
+  padding: 5px 8px;
+  font-size: clamp(30px, 9vw, 42px);
+  font-weight: 780;
+  line-height: 1.16;
+  letter-spacing: -.035em;
+  font-variant-numeric: tabular-nums;
+}
+.motion-balance-hero.compact .account-visual-confirmation { min-height: 0; }
+.motion-balance-hero.compact .motion-balance-stage { min-height: 40px; font-size: clamp(24px, 7.4vw, 34px); }
+.motion-static-balance { display: block; padding-block: .08em; line-height: 1.16; transform: none; overflow: visible; font-variant-numeric: tabular-nums; }
+.frame-2 .motion-static-balance { visibility: hidden; }
+.motion-odometer-overlay { position: absolute; inset: 5px 8px; display: inline-flex; align-items: center; justify-content: center; white-space: pre; line-height: 1.16; font-variant-numeric: tabular-nums; }
+.motion-digit { display: inline-grid; place-items: center; width: .62em; height: 1.34em; padding-block: .08em; line-height: 1.18em; overflow: hidden; }
+.motion-digit.stable { width: auto; }
+.motion-digit.stable.space { width: .28em; }
+.motion-digit.changed { position: relative; }
+.motion-digit.changed i { position: absolute; inset: .08em 0; display: grid; place-items: center; font: inherit; font-style: normal; line-height: 1.18em; transition: transform 760ms var(--motion-spring), opacity 520ms ease; }
+.motion-digit.changed i:first-child { transform: translateY(0); opacity: 1; }
+.motion-digit.changed i:last-child { transform: translateY(112%); opacity: .25; }
+.frame-2:not(.odometer-running) .motion-digit.changed i:first-child { transform: translateY(0); opacity: 1; }
+.frame-2:not(.odometer-running) .motion-digit.changed i:last-child { transform: translateY(112%); opacity: .25; }
+.frame-2.odometer-running .motion-digit.changed i:first-child { transform: translateY(-112%); opacity: .12; }
+.frame-2.odometer-running .motion-digit.changed i:last-child { transform: translateY(0); opacity: 1; }
+.debug-motion-frame.frame-2 .motion-digit.changed i { transition: none; }
+.debug-motion-frame.frame-2 .motion-digit.changed i:first-child { transform: translateY(-112%); opacity: 0; }
+.debug-motion-frame.frame-2 .motion-digit.changed i:last-child { transform: translateY(0); opacity: .72; }
+.motion-balance-range { color: var(--text-3); font-size: 10px; }
+.motion-balance-delta { font-size: 12px; font-weight: 720; }
+.motion-balance-delta.positive { color: var(--sem-green); }
+.motion-balance-delta.negative { color: var(--sem-red); }
+.motion-transaction-effect { min-height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 11px; border-radius: var(--r-control); background: color-mix(in srgb, var(--s2) 72%, transparent); }
+.motion-transaction-effect > span { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.motion-transaction-effect small { color: var(--text-2); }
+.motion-transaction-effect strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.motion-transaction-effect > b { white-space: nowrap; }
+.motion-recent { border-radius: var(--r-card); background: color-mix(in srgb, var(--s1) 70%, transparent); }
+.motion-recent-row.newest { background: var(--accent-soft); }
+.money-motion-actions { grid-template-columns: repeat(3, minmax(0,1fr)); }
+
+@media (min-width: 720px) {
+  .native-carousel-shell.deck-viewport { --snap-card-width: 360px; --snap-gutter: calc((100% - 360px) / 2); }
+  .account-visual-amount strong { font-size: 19px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .native-snap-card.deck-card { transform: none; transition: none; }
+  .native-carousel-shell { transition: none; }
+  .motion-odometer-overlay { display: none; }
+  .motion-static-balance { visibility: visible !important; }
+  .capture-calculator-key { transition: none; }
+}

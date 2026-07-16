@@ -22,7 +22,9 @@ test('BD: picker exposes AM/PM, current time, cancel, complete, and all minutes'
   assert.equal((html.match(/data-time-minute/g) || []).length >= 1, true);
   assert.equal(html.includes('value="59"'), true);
   assert.equal(html.includes('2:56 PM'), true);
-  assert.equal(html.includes('<option value="2" selected>02</option>'), true);
+  // Phase 2B1A: the picker is a fully custom listbox — no native <select>.
+  assert.equal(html.includes('data-value="2"') && html.includes('aria-selected="true"'), true);
+  assert.equal(html.includes('<select'), false);
   assert.equal(currentLocalTime(new Date(2026, 6, 13, 5, 7)), '05:07');
 });
 
@@ -32,7 +34,8 @@ test('BE: Create and Edit share the custom picker generator and never expose nat
   assert.equal(create.replace('capture', 'shared'), edit.replace('edit', 'shared'));
   assert.equal(create.includes('2:56 PM'), true);
   assert.equal(create.includes('type="time"'), false);
-  assert.equal(create.includes('type="date"'), true);
+  assert.equal(create.includes('type="date"'), false);
+  assert.equal(create.includes('data-ringgit-date-trigger'), true);
 });
 
 test('BF: attachment metadata preserves local preview facts and can be removed', () => {
@@ -47,7 +50,7 @@ test('BG: Capture exposes one Advanced Details entry and no inert AA/attachment/
   const source = fs.readFileSync(new URL('../src/components/CaptureSheet.js', import.meta.url), 'utf8');
   assert.equal(source.includes('data-action="cap-open-details"'), true);
   ['data-action="cap-aa"', 'data-action="cap-attach"', 'data-action="cap-record-only"'].forEach((needle) => assert.equal(source.includes(needle), false));
-  assert.equal(source.includes('只记录，不影响账户余额'), true);
+  assert.equal(source.includes('CAPTURE_DETAIL_COPY.balanceNeutral'), true);
 });
 
 test('BH: record-only from Advanced Details stays balance neutral for every core type', () => {

@@ -1,0 +1,293 @@
+/* Phase 2B3G-FIX5 — inline split drawer and continuous balance count. */
+
+.capture-relationship-sheet.has-inline-split-drawer .sheet-body {
+  scroll-padding-bottom: min(340px, calc(100dvh - 380px));
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+  overflow-y: hidden;
+  overscroll-behavior-y: none;
+}
+
+.capture-relationship-sheet.has-inline-split-drawer .relationship-footer { display: none; }
+
+.capture-relationship-sheet.has-inline-split-drawer .relationship-split-group {
+  margin-bottom: 0;
+}
+
+.capture-relationship-sheet.has-inline-split-drawer .smart-split-progress,
+.capture-relationship-sheet.has-inline-split-drawer .relationship-allocation-status,
+.capture-relationship-sheet.has-inline-split-drawer .relationship-allocation-error,
+.capture-relationship-sheet.has-inline-split-drawer .smart-split-suggestion,
+.capture-relationship-sheet.has-inline-split-drawer .smart-split-actions {
+  display: none;
+}
+
+.capture-relationship-sheet.has-inline-split-drawer .smart-split-heading {
+  min-height: 24px;
+  margin-top: 0;
+  align-items: center;
+}
+
+.capture-relationship-sheet.has-inline-split-drawer .smart-split-heading > div {
+  min-width: 0;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.capture-relationship-sheet.has-inline-split-drawer .smart-split-heading .caption {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The locked composer can show six people as three compact rows without the
+   keypad covering the final row. Closed/equal pages keep the roomier cards. */
+.capture-relationship-sheet.has-inline-split-drawer .relationship-split-page .split-participant-row,
+.capture-relationship-sheet.has-inline-split-drawer .relationship-split-page .relationship-amount-row,
+.split-debug-parent-sheet.has-inline-split-drawer .relationship-split-page .split-participant-row,
+.split-debug-parent-sheet.has-inline-split-drawer .relationship-split-page .relationship-amount-row {
+  min-height: 44px;
+}
+
+.capture-relationship-sheet.has-inline-split-drawer .relationship-split-page .relationship-amount-row,
+.split-debug-parent-sheet.has-inline-split-drawer .relationship-split-page .relationship-amount-row {
+  grid-template-columns: 32px minmax(0, 1fr);
+  padding: 4px 8px;
+}
+
+.capture-relationship-sheet.has-inline-split-drawer .relationship-split-page .relationship-row-avatar,
+.split-debug-parent-sheet.has-inline-split-drawer .relationship-split-page .relationship-row-avatar {
+  width: 32px;
+  height: 32px;
+  flex-basis: 32px;
+}
+
+.relationship-split-pages {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  padding: 1px 1px 7px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: none;
+  overscroll-behavior-inline: contain;
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.relationship-split-pages::-webkit-scrollbar { display: none; }
+
+.relationship-split-page {
+  flex: 0 0 100%;
+  min-width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  scroll-snap-align: none;
+}
+
+.relationship-split-page .split-participant-row {
+  min-width: 0;
+  min-height: 58px;
+  padding: 0;
+  display: block;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 17px;
+  background: color-mix(in srgb, var(--s1) 70%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--line) 74%, transparent);
+}
+
+.relationship-split-page .split-participant-row.is-editing {
+  background: color-mix(in srgb, var(--accent-soft) 72%, var(--s1));
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.relationship-split-page .relationship-amount-row {
+  min-height: 58px;
+  box-sizing: border-box;
+  grid-template-columns: 38px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  row-gap: 1px;
+  padding: 6px 9px;
+}
+
+.relationship-split-page .relationship-row-avatar { grid-row: 1 / span 2; }
+.relationship-split-page .relationship-amount-name,
+.relationship-split-page .relationship-amount-row > strong { grid-column: 2; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.relationship-split-page .relationship-amount-row > strong { color: var(--text-2); font-size: 13px; }
+.relationship-split-page .relationship-amount-row > strong.is-expression {
+  color: var(--accent);
+  letter-spacing: 0;
+}
+.relationship-split-page .relationship-amount-row > .icon { display: none; }
+.relationship-split-page .split-participant-row.is-readonly .relationship-amount-row { cursor: default; }
+
+/* Equal and custom allocations deliberately share the same two-column,
+   up-to-three-row geometry. These selectors outrank legacy equal-list rows. */
+.relationship-equal-list.relationship-split-pages {
+  flex-direction: row;
+  gap: 10px;
+  margin: 0;
+  border: 0;
+}
+
+.relationship-equal-list > .relationship-split-page {
+  flex: 0 0 100%;
+  min-width: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+}
+
+.relationship-equal-list > .relationship-split-page + .relationship-split-page { border-top: 0; }
+.relationship-equal-list .relationship-row-avatar {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  flex: 0 0 38px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+}
+.relationship-equal-list .relationship-amount-name {
+  padding: 0;
+  display: block;
+  border-radius: 0;
+  background: transparent;
+}
+
+.inline-split-drawer {
+  position: sticky;
+  z-index: 8;
+  bottom: 0;
+  width: 100%;
+  height: min(340px, calc(100dvh - 380px));
+  min-height: 340px;
+  margin: 10px 0 0;
+  padding: 0 0 max(8px, env(safe-area-inset-bottom));
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-radius: 0;
+  background: var(--s0);
+  box-shadow: none;
+}
+
+.inline-split-drawer.is-opening { animation: inline-split-drawer-enter 220ms var(--motion-spring) both; }
+
+@keyframes inline-split-drawer-enter {
+  from { transform: translateY(44px); opacity: .72; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.inline-split-drawer .split-editor-feedback { flex: 0 0 14px; min-height: 14px; font-size: 11px; line-height: 14px; }
+
+.inline-split-drawer .split-editor-keypad {
+  min-height: 0;
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: repeat(5, minmax(48px, 1fr));
+  gap: 4px;
+}
+
+.inline-split-drawer .split-editor-key {
+  min-width: 0;
+  min-height: 48px;
+  height: auto;
+  border-radius: 14px;
+  font-size: 18px;
+}
+
+.inline-split-drawer .split-editor-key.zero { grid-column: span 2; }
+.inline-split-drawer .split-editor-key.operator.is-selected {
+  color: var(--accent-contrast);
+  background: var(--accent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 80%, var(--glass-edge));
+}
+.inline-split-drawer .split-editor-actions { flex: 0 0 46px; }
+.inline-split-drawer .split-editor-actions .sheet-primary,
+.inline-split-drawer .split-editor-actions .sheet-secondary { min-height: 46px; height: 46px; }
+
+.inline-split-drawer .split-editor-key:focus-visible,
+.inline-split-drawer .split-editor-actions button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+:root[data-theme="dark"] .inline-split-drawer {
+  background: var(--s0);
+}
+
+@media (min-width: 720px) {
+  .inline-split-drawer {
+    height: min(340px, calc(100dvh - 380px));
+    min-height: 340px;
+  }
+}
+
+@media (max-height: 700px) {
+  .inline-split-drawer {
+    height: min(310px, calc(100dvh - 350px));
+    min-height: 0;
+  }
+  .inline-split-drawer .split-editor-keypad { grid-template-rows: repeat(5, minmax(42px, 1fr)); }
+  .inline-split-drawer .split-editor-key { min-height: 42px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inline-split-drawer.is-opening { animation: none; }
+}
+
+:root[data-reduced-motion="true"] .inline-split-drawer.is-opening { animation: none; }
+
+.split-debug-parent-sheet .inline-split-drawer {
+  position: absolute;
+  inset: auto 0 0;
+  width: calc(100% - 24px);
+  margin: 0 12px;
+}
+
+/* One text node owns the readable balance throughout the count. */
+.continuous-balance-count {
+  position: relative;
+  display: inline-block;
+  min-width: max-content;
+  padding-block: .08em;
+  overflow: visible;
+  white-space: nowrap;
+  line-height: 1.16;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  transform: translateY(0);
+  opacity: 1;
+  will-change: transform, opacity;
+}
+
+.money-motion-layer[data-motion-state="balance-rolling"] .continuous-balance-count,
+.money-motion-layer[data-motion-state="source-rolling"] .continuous-balance-count,
+.money-motion-layer[data-motion-state="destination-rolling"] .continuous-balance-count {
+  visibility: visible;
+  opacity: 1;
+}
+
+.money-motion-layer .motion-balance-stage:has(.continuous-balance-count) {
+  overflow: visible;
+  contain: layout;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .continuous-balance-count { animation: none !important; transform: none !important; }
+}
+
+:root[data-reduced-motion="true"] .continuous-balance-count { animation: none !important; transform: none !important; }

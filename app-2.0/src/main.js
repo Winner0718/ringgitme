@@ -7,16 +7,22 @@
 // ============================================================
 
 import { mountShell } from './app/shell.js';
-import { renderCurrentPage } from './app/router.js';
-import { ui, applyTheme, watchSystemTheme, dispatchAction } from './app/state.js';
+import { initializeNavigationHistory, renderCurrentPage } from './app/router.js';
+import { data, ui, applyTheme, watchSystemTheme, dispatchAction } from './app/state.js';
 import { registerTodayFeature } from './features/today/index.js';
 import { registerAssetsFeature } from './features/assets/index.js';
 import { registerCaptureFeature } from './features/capture/index.js';
 import { registerActivityFeature } from './features/activity/index.js';
 import { registerLedgerFeature } from './features/ledger/index.js';
 import { openCaptureSheet } from './components/CaptureSheet.js';
+import { openMoneyFlowConfirmation } from './components/MoneyFlowConfirmation.js';
+import { buildConfirmationDebugPreview } from './components/ConfirmationDebugPreview.js';
+import { openSplitComposerDebugPreview } from './components/SplitComposerDebugPreview.js';
 
 const params = new URLSearchParams(location.search);
+
+// Screenshot-only deterministic override; no production control is exposed.
+if (params.get('reducedMotion') === '1') document.documentElement.dataset.reducedMotion = 'true';
 
 applyTheme(['light', 'dark'].includes(params.get('theme')) ? params.get('theme') : 'auto');
 watchSystemTheme();
@@ -34,15 +40,25 @@ if (['saving', 'cc', 'ew'].includes(view)) {
   ui.assetsView = { name: 'detail', accountId: params.get('acc'), from: 'category' };
 }
 
-// Ledger sub-views: ?ledger=groups or ?person=<id>
-if (params.get('ledger') === 'groups') {
+// Ledger sub-views: ?ledger=group or ?ledgerId=<id>
+if (['group', 'groups'].includes(params.get('ledger'))) {
   ui.tab = 'ledger';
-  ui.ledgerSegment = 'groups';
+  ui.ledgerSegment = 'group';
 }
-if (params.get('person')) {
+if (params.get('ledgerId')) {
   ui.tab = 'ledger';
-  ui.ledgerPersonId = params.get('person');
+  ui.ledgerId = params.get('ledgerId');
 }
+if (params.get('transaction')) {
+  ui.tab = 'activity';
+  ui.activityDetailId = params.get('transaction');
+}
+if (params.get('plan')) {
+  ui.tab = 'ledger';
+  ui.planDetailId = params.get('plan');
+}
+
+initializeNavigationHistory();
 
 mountShell(document.getElementById('app'));
 
@@ -56,6 +72,12 @@ renderCurrentPage();
 
 if (params.get('capture') === '1') {
   openCaptureSheet();
-  if (params.get('more') === '1') dispatchAction('cap-more', document.body, null);
+  if (params.get('more') === '1') dispatchAction('cap-open-details', document.body, null);
 }
 if (params.get('profile') === '1') dispatchAction('open-profile', document.body, null);
+
+const confirmationDemo = params.get('confirmationDemo');
+if (['expense', 'income', 'transfer', 'credit', 'ewallet', 'grabpay', 'record', 'otherpayer', 'userpaid', 'directdebt', 'received', 'repayment', 'monthly', 'instalment'].includes(confirmationDemo)) {
+  openMoneyFlowConfirmation({ confirmation: buildConfirmationDebugPreview(data, confirmationDemo) });
+}
+if (params.get('splitComposerDemo')) openSplitComposerDebugPreview(params.get('splitComposerDemo'));

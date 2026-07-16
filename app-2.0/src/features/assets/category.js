@@ -1,146 +1,193 @@
-// ============================================================
-// Category pages — 储蓄卡页面 / 信用卡页面 / eWallet 页面.
-// Summary header → same-type card carousel → (credit summary
-// strip) → 最近记录/最近消费 → 全部账户 rows.
-// ============================================================
+// Category pages have a browsing responsibility distinct from Account Detail.
+// Savings/Credit use a tap-driven vertical Wallet stack; eWallet keeps its
+// existing category carousel. Account Detail remains the horizontal carousel.
 
 import { data, ui, update, registerAction, dispatchAction } from '../../app/state.js';
-import { fmtRM, fmtDateMY, escapeHTML } from '../../app/format.js';
+import { ASSET_CATEGORY_COPY } from '../../app/copy.js';
+import { fmtRM, fmtDateMY, fmtTimeAMPM, escapeHTML } from '../../app/format.js';
 import { renderCarousel, activateCarousel } from '../../components/CardCarousel.js';
+import { walletStackCategoryDeckHTML } from '../../components/WalletStackCategoryDeck.js';
 import { renderActivityRow } from '../../components/ActivityRow.js';
 import { icon } from '../../components/Icons.js';
+import { pushRoute } from '../../app/router.js';
 
-const COPY = {
-  saving: { totalLabel: '储蓄卡总额', listTitle: '全部账户', recentTitle: '最近记录' },
-  cc: { totalLabel: '信用卡总欠款', listTitle: '全部信用卡', recentTitle: '最近消费' },
-  ew: { totalLabel: 'eWallet 总余额', listTitle: '全部钱包', recentTitle: '最近记录' },
-};
+const EW_COPY = { totalLabel: 'eWallet 总余额', listTitle: '全部钱包', recentTitle: '最近记录' };
 
-function statsHTML(type, list) {
-  if (type === 'cc') {
-    const due = list.filter((a) => !a.duePaid).reduce((s, a) => s + a.monthlyDue, 0)
-      + list.reduce((s, a) => s + data.getInstalments(a.id).reduce((x, i) => x + i.monthly, 0), 0);
-    const avail = list.reduce((s, a) => s + (a.limit - a.outstanding), 0);
-    return [
-      ['卡片数量', String(list.length), ''],
-      ['本月应还', fmtRM(due, { privacy: ui.privacy }), 'amt-neg'],
-      ['总可用额度', fmtRM(avail, { privacy: ui.privacy }), ''],
-    ];
-  }
-  const flow = data.getSavingsFlow();
+export function transactionTouchesAccount(transaction, accountId) {
+  return Boolean(accountId) && [transaction.accountId, transaction.sourceAccountId, transaction.destinationAccountId].includes(accountId);
+}
+
+export function selectedAccountRecords(activities, accountId, limit = 3) {
+  const seen = new Set();
+  return activities.filter((transaction) => transactionTouchesAccount(transaction, accountId) && transaction.id && !seen.has(transaction.id) && seen.add(transaction.id)).slice(0, limit);
+}
+
+export function selectedSavingsFlow(activities, accountId) {
+  return activities.filter((transaction) => transaction.accountEffect === 'posted').reduce((flow, transaction) => {
+    if (transaction.kind === 'income' && transaction.destinationAccountId === accountId) flow.inflow += transaction.amount;
+    if (transaction.kind === 'expense' && transaction.sourceAccountId === accountId) flow.outflow += transaction.amount;
+    if (transaction.kind === 'transfer' && transaction.destinationAccountId === accountId) flow.inflow += transaction.amount;
+    if (transaction.kind === 'transfer' && transaction.sourceAccountId === accountId) flow.outflow += transaction.amount;
+    return flow;
+  }, { inflow: 0, outflow: 0 });
+}
+
+export function creditMonthStats(activities, accountIds, month = '2026-07') {
+  const ids = new Set(accountIds);
+  return activities.filter((transaction) => transaction.accountEffect === 'posted' && transaction.date?.startsWith(month)).reduce((stats, transaction) => {
+    if (transaction.kind === 'expense' && ids.has(transaction.sourceAccountId || transaction.accountId)) stats.spent += transaction.amount;
+    if (transaction.kind === 'income' && ids.has(transaction.destinationAccountId || transaction.accountId)) stats.paid += transaction.amount;
+    return stats;
+  }, { spent: 0, paid: 0 });
+}
+
+export function availableCreditForAccount(account, accounts) {
+  if (!account) return 0;
+  if (!account.sharedPool) return Math.max(0, Number(account.limit || 0) - Number(account.outstanding || 0));
+  const poolOutstanding = accounts.filter((candidate) => candidate.sharedPool === account.sharedPool).reduce((sum, candidate) => sum + Number(candidate.outstanding || 0), 0);
+  return Math.max(0, Number(account.sharedPoolTotal || 0) - poolOutstanding);
+}
+
+function categoryStatsHTML(type, list, activities) {
+  const copy = ASSET_CATEGORY_COPY[type];
   if (type === 'saving') {
+    const flow = data.getSavingsFlow();
     return [
-      ['账户数量', String(list.length), ''],
-      ['本月流入', `+${fmtRM(flow.inflow, { privacy: ui.privacy }).replace('RM ', 'RM ')}`, 'amt-pos'],
-      ['本月流出', `−${fmtRM(flow.outflow, { privacy: ui.privacy }).replace('RM ', 'RM ')}`, 'amt-neg'],
+      [copy.countLabel, String(list.length), ''],
+      [copy.inflowLabel, `+${fmtRM(flow.inflow, { privacy: ui.privacy })}`, 'amt-pos'],
+      [copy.outflowLabel, `−${fmtRM(flow.outflow, { privacy: ui.privacy })}`, 'amt-neg'],
     ];
   }
-  return [['钱包数量', String(list.length), '']];
+  const monthly = creditMonthStats(activities, list.map((account) => account.id));
+  return [
+    [copy.countLabel, String(list.length), ''],
+    [copy.spendLabel, fmtRM(monthly.spent, { privacy: ui.privacy }), 'amt-neg'],
+    [copy.paidLabel, fmtRM(monthly.paid, { privacy: ui.privacy }), 'amt-pos'],
+  ];
 }
 
-function ccStripHTML(selected) {
-  const inst = data.getInstalments(selected.id);
-  const due = (selected.duePaid ? 0 : selected.monthlyDue) + inst.reduce((s, i) => s + i.monthly, 0);
-  return `
-    <section class="section surface cc-strip">
-      <div class="cc-strip-cell">
-        <span class="caption">本月应还</span>
-        <span class="num amt-neg">${fmtRM(due, { privacy: ui.privacy })}</span>
+function selectedSummaryHTML(type, selected, list, activities) {
+  const copy = ASSET_CATEGORY_COPY[type];
+  const records = selectedAccountRecords(activities, selected.id);
+  const recent = records[0];
+  if (type === 'saving') {
+    const flow = selectedSavingsFlow(activities, selected.id);
+    const lastChange = recent ? `${fmtDateMY(recent.date)} · ${fmtTimeAMPM(recent.time)}` : '—';
+    return `<section class="section surface wallet-selected-summary" data-summary-account-id="${escapeHTML(selected.id)}">
+      <div class="wallet-selected-heading"><span class="caption">${copy.currentLabel}</span><strong>${escapeHTML(selected.name)}</strong></div>
+      <div class="wallet-selected-grid">
+        <span>${copy.balanceLabel}<strong class="num">${fmtRM(selected.balance, { privacy: ui.privacy })}</strong></span>
+        <span>${copy.inflowLabel}<strong class="num amt-pos">+${fmtRM(flow.inflow, { privacy: ui.privacy })}</strong></span>
+        <span>${copy.outflowLabel}<strong class="num amt-neg">−${fmtRM(flow.outflow, { privacy: ui.privacy })}</strong></span>
+        <span>${copy.recentChangeLabel}<strong class="num">${lastChange}</strong></span>
       </div>
-      <div class="cc-strip-cell">
-        <span class="caption">下个到期日</span>
-        <span class="num">${fmtDateMY(selected.dueDate)}</span>
-      </div>
-      <div class="cc-strip-cell">
-        <span class="caption">共享额度池</span>
-        <span class="num">${selected.sharedPool ? fmtRM(selected.sharedPoolTotal, { privacy: ui.privacy }) : '—'}</span>
-      </div>
-    </section>
-  `;
+      <button type="button" class="wallet-detail-cta" data-action="assets-open-detail" data-acc="${escapeHTML(selected.id)}">${copy.detailPrefix}${escapeHTML(selected.name)}${copy.detailSuffix} ${icon('chevronRight', 14)}</button>
+    </section>`;
+  }
+  const instalmentDue = data.getInstalments(selected.id).reduce((sum, item) => sum + item.monthly, 0);
+  const monthlyDue = (selected.duePaid ? 0 : Number(selected.monthlyDue || 0)) + instalmentDue;
+  return `<section class="section surface wallet-selected-summary" data-summary-account-id="${escapeHTML(selected.id)}">
+    <div class="wallet-selected-heading"><span class="caption">${copy.currentLabel}</span><strong>${escapeHTML(selected.name)}</strong></div>
+    <div class="wallet-selected-grid">
+      <span>${copy.balanceLabel}<strong class="num amt-neg">${fmtRM(selected.outstanding, { privacy: ui.privacy })}</strong></span>
+      <span>${copy.dueLabel}<strong class="num amt-neg">${fmtRM(monthlyDue, { privacy: ui.privacy })}</strong></span>
+      <span>${copy.dueDateLabel}<strong class="num">${selected.dueDate ? fmtDateMY(selected.dueDate) : '暂无到期日'}</strong></span>
+      <span>${copy.availableLabel}<strong class="num">${fmtRM(availableCreditForAccount(selected, list), { privacy: ui.privacy })}</strong></span>
+    </div>
+    <button type="button" class="wallet-detail-cta" data-action="assets-open-detail" data-acc="${escapeHTML(selected.id)}">${copy.detailPrefix}${escapeHTML(selected.name)}${copy.detailSuffix} ${icon('chevronRight', 14)}</button>
+  </section>`;
 }
 
-function recentHTML(type, selected, copy) {
-  const ids = new Set(data.getAccountsByType(type).map((a) => a.id));
-  const rows = data.getActivities().filter((t) => (selected ? t.accountId === selected.id : ids.has(t.accountId))).slice(0, 3);
-  return `
-    <section class="section">
-      <div class="row-between sec-head">
-        <h2 class="sec-title">${copy.recentTitle}</h2>
-        <button class="link-btn" data-action="assets-view-all-activity">查看全部 ${icon('chevronRight', 13)}</button>
-      </div>
-      <div class="surface"><ul>
-        ${rows.length ? rows.map(renderActivityRow).join('') : '<li class="row row-static caption">还没有记录。</li>'}
-      </ul></div>
-    </section>
-  `;
+function recentHTML(type, selected, title, activities) {
+  const matchingActivities = selected ? activities.filter((t) => t.accountId === selected.id || t.sourceAccountId === selected.id || t.destinationAccountId === selected.id) : [];
+  const rows = selectedAccountRecords(matchingActivities, selected?.id);
+  return `<section class="section wallet-category-recent" data-recent-account-id="${escapeHTML(selected?.id || '')}">
+    <div class="row-between sec-head"><h2 class="sec-title">${title}</h2><button class="link-btn" data-action="assets-view-all-activity" data-acc="${escapeHTML(selected?.id || '')}">${ASSET_CATEGORY_COPY.action.viewAll} ${icon('chevronRight', 13)}</button></div>
+    <div class="surface"><ul>${rows.length ? rows.map(renderActivityRow).join('') : '<li class="row row-static caption">还没有记录。</li>'}</ul></div>
+  </section>`;
 }
 
-function allRowsHTML(type, list, copy) {
-  return `
-    <section class="section">
-      <h2 class="sec-title">${copy.listTitle} (${list.length})</h2>
-      <div class="surface"><ul>
-        ${list.map((a) => `
-          <li class="row" data-action="assets-open-detail" data-acc="${a.id}">
-            <span class="acc-chip" style="--brand:${a.brandColor}">${escapeHTML(a.name[0])}</span>
-            <div class="row-main">
-              <div class="row-title">${escapeHTML(a.name)}</div>
-              <div class="caption num">${a.last4 ? `•••• ${a.last4}` : escapeHTML(a.bank)}</div>
-            </div>
-            <span class="num row-amt ${a.type === 'cc' ? 'amt-neg' : ''}">${fmtRM(a.type === 'cc' ? a.outstanding : a.balance, { privacy: ui.privacy })}</span>
-            ${icon('chevronRight', 15)}
-          </li>`).join('')}
-      </ul></div>
+function renderWalletCategory(container, type, list) {
+  const activities = data.getActivities();
+  const requestedId = ui.selectedAccountId[type];
+  const selected = list.find((account) => account.id === requestedId) || list[0];
+  if (!selected) return;
+  const selectedId = selected.id;
+  ui.selectedAccountId[type] = selected.id;
+  ui.categoryIndex[type] = list.findIndex((account) => account.id === selectedId);
+  const copy = ASSET_CATEGORY_COPY[type];
+  const total = list.reduce((sum, account) => sum + (type === 'cc' ? account.outstanding : account.balance), 0);
+  container.innerHTML = `<section class="section cat-summary wallet-category-summary">
+      <div class="caption">${copy.totalLabel}</div>
+      <div class="num cat-total ${type === 'cc' ? 'amt-neg' : 'assets-net-primary'}">${fmtRM(total, { privacy: ui.privacy })}</div>
+      <div class="cat-stats">${categoryStatsHTML(type, list, activities).map(([label, value, cls]) => `<div class="cat-stat"><span class="caption">${label}</span><span class="num ${cls}">${value}</span></div>`).join('')}</div>
     </section>
-  `;
+    <section class="section wallet-stack-section">${walletStackCategoryDeckHTML(list, selected.id, { type })}</section>
+    ${selectedSummaryHTML(type, selected, list, activities)}
+    ${recentHTML(type, selected, copy.recentTitle, activities)}`;
+}
+
+function allRowsHTML(list) {
+  return `<section class="section"><h2 class="sec-title">${EW_COPY.listTitle} (${list.length})</h2><div class="surface"><ul>${list.map((account) => `<li class="row" data-action="assets-open-detail" data-acc="${account.id}"><span class="acc-chip" style="--brand:${account.brandColor}">${escapeHTML(account.name[0])}</span><div class="row-main"><div class="row-title">${escapeHTML(account.name)}</div><div class="caption num">${account.last4 ? `•••• ${account.last4}` : escapeHTML(account.bank)}</div></div><span class="num row-amt">${fmtRM(account.balance, { privacy: ui.privacy })}</span>${icon('chevronRight', 15)}</li>`).join('')}</ul></div></section>`;
+}
+
+function renderEWalletCategory(container, list) {
+  const requestedId = ui.selectedAccountId.ew;
+  const index = Math.max(0, list.findIndex((account) => account.id === requestedId));
+  const selected = list[index];
+  if (selected) ui.selectedAccountId.ew = selected.id;
+  const total = list.reduce((sum, account) => sum + account.balance, 0);
+  container.innerHTML = `<section class="section cat-summary"><div class="caption">${EW_COPY.totalLabel}</div><div class="num cat-total assets-net-primary">${fmtRM(total, { privacy: ui.privacy })}</div><div class="cat-stats"><div class="cat-stat"><span class="caption">钱包数量</span><span class="num">${list.length}</span></div></div></section>${renderCarousel(list, index, { selectAction: 'category-card-tap' })}${recentHTML('ew', selected, EW_COPY.recentTitle, data.getActivities())}${allRowsHTML(list)}`;
 }
 
 export function renderCategoryPage(container, type) {
   const list = data.getAccountsByType(type);
-  const copy = COPY[type];
-  const index = Math.min(ui.categoryIndex[type] || 0, list.length - 1);
-  const selected = list[index];
-  const total = type === 'cc'
-    ? list.reduce((s, a) => s + a.outstanding, 0)
-    : list.reduce((s, a) => s + a.balance, 0);
-  container.innerHTML = `
-    <section class="section cat-summary">
-      <div class="caption">${copy.totalLabel}</div>
-      <div class="num cat-total ${type === 'cc' ? 'amt-neg' : 'assets-net-primary'}">${fmtRM(total, { privacy: ui.privacy })}</div>
-      <div class="cat-stats">
-        ${statsHTML(type, list).map(([k, v, cls]) => `<div class="cat-stat"><span class="caption">${k}</span><span class="num ${cls}">${v}</span></div>`).join('')}
-      </div>
-    </section>
-    ${renderCarousel(list, index, { selectAction: 'category-card-tap' })}
-    ${type === 'cc' && selected ? ccStripHTML(selected) : ''}
-    ${recentHTML(type, selected, copy)}
-    ${allRowsHTML(type, list, copy)}
-  `;
+  if (type === 'saving' || type === 'cc') renderWalletCategory(container, type, list);
+  else renderEWalletCategory(container, list);
 }
 
 export function activateCategoryPage(container, type) {
+  if (type === 'saving' || type === 'cc') return;
   const list = data.getAccountsByType(type);
-  const index = Math.min(ui.categoryIndex[type] || 0, list.length - 1);
+  const index = Math.max(0, list.findIndex((account) => account.id === ui.selectedAccountId[type]));
   activateCarousel(container, index, (next) => {
     ui.categoryIndex[type] = next;
-    update({});
+    update({ selectedAccountId: { ...ui.selectedAccountId, [type]: list[next]?.id || null } });
   });
 }
 
 export function registerCategoryActions() {
-  // Tap on the front card opens its detail; tapping a side card selects it.
-  registerAction('category-card-tap', (el, e) => {
-    const i = Number(el.dataset.index);
+  registerAction('wallet-stack-account', (el, event) => {
     const type = ui.assetsView.type;
-    if (ui.assetsView.name === 'category' && i !== (ui.categoryIndex[type] || 0)) {
-      ui.categoryIndex[type] = i;
-      update({});
+    const accountId = el.dataset.acc;
+    if (ui.assetsView.name !== 'category' || !['saving', 'cc'].includes(type)) return;
+    if (accountId !== ui.selectedAccountId[type]) {
+      const list = data.getAccountsByType(type);
+      ui.categoryIndex[type] = list.findIndex((account) => account.id === accountId);
+      update({ selectedAccountId: { ...ui.selectedAccountId, [type]: el.dataset.acc } });
       return;
     }
-    dispatchAction('assets-open-detail', el, e);
+    dispatchAction('assets-open-detail', el, event);
   });
 
-  registerAction('assets-view-all-activity', () => {
-    update({ tab: 'activity', navDirection: 'forward' });
+  registerAction('category-card-tap', (element, event) => {
+    const index = Number(element.dataset.index);
+    const type = ui.assetsView.type;
+    if (ui.assetsView.name === 'category' && element.dataset.acc !== ui.selectedAccountId[type]) {
+      ui.categoryIndex[type] = index;
+      update({ selectedAccountId: { ...ui.selectedAccountId, [type]: element.dataset.acc } });
+      return;
+    }
+    dispatchAction('assets-open-detail', element, event);
+  });
+
+  registerAction('assets-view-all-activity', (element) => {
+    pushRoute({
+      tab: 'activity',
+      activityDetailId: null,
+      activityAccountId: element.dataset.acc || null,
+      activityQuery: '',
+      activityFilter: 'all',
+    }, { direction: 'forward' });
   });
 }

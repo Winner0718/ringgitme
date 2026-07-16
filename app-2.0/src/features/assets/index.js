@@ -6,14 +6,15 @@
 // category pages; cards push into 账户详情.
 // ============================================================
 
-import { registerPage } from '../../app/router.js';
+import { backOr, pushRoute, registerPage } from '../../app/router.js';
 import { data, ui, update, registerAction } from '../../app/state.js';
 import { fmtRM, fmtDateMY, daysBetween, escapeHTML } from '../../app/format.js';
-import { renderStackedDeck } from '../../components/StackedDeck.js';
 import { openSheet } from '../../components/AppSheet.js';
 import { icon } from '../../components/Icons.js';
+import { resolveAccountBrand } from '../../domain/brandRegistry.js';
 import { renderCategoryPage, activateCategoryPage, registerCategoryActions } from './category.js';
 import { renderDetailPage, activateDetailPage, registerDetailActions } from './detail.js';
+import { runSharedCardTransition } from '../../app/motion.js';
 
 function summaryHTML(pulse) {
   return `
@@ -55,13 +56,26 @@ function sectionHeader({ iconName, title, valueLabel, value, valueCls = '', acti
   `;
 }
 
+function brandTileHTML(account) {
+  const brand = resolveAccountBrand(account);
+  const fallback = escapeHTML((brand?.name || account.bank || account.name || '?').slice(0, 1));
+  return `<span class="asset-brand-tile" style="--brand:${account.brandColor || brand?.fallback || 'var(--accent)'}">${brand?.logoURL ? `<img src="${brand.logoURL}" alt="" draggable="false" />` : fallback}</span>`;
+}
+
+function compactAccountRows(list, { debt = false } = {}) {
+  return `<ul class="asset-account-list asset-card-stack">${list.map((account, index) => `<li class="asset-account-row asset-stack-row" style="--account-brand:${account.brandColor || 'var(--accent)'};--stack-index:${index}" data-action="assets-open-detail" data-acc="${escapeHTML(account.id)}" role="button" tabindex="0">
+    ${brandTileHTML(account)}<span class="asset-account-copy"><strong>${escapeHTML(account.name)}</strong><small class="num">${account.last4 ? `•••• •••• ${escapeHTML(account.last4)}` : escapeHTML(account.bank)}</small></span>
+    <span class="asset-account-amount num${debt ? ' debt' : ''}">${fmtRM(debt ? account.outstanding : account.balance, { privacy: ui.privacy })}</span>${icon('chevronRight', 15)}
+  </li>`).join('')}</ul>`;
+}
+
 function savingsSection() {
   const list = data.getAccountsByType('saving');
   const total = list.reduce((s, a) => s + a.balance, 0);
   return `
     <section class="section surface asset-sec">
       ${sectionHeader({ iconName: 'assets', title: '储蓄卡', valueLabel: '总额', value: fmtRM(total, { privacy: ui.privacy }), action: 'assets-open-saving', count: list.length })}
-      ${renderStackedDeck(list)}
+      ${compactAccountRows(list)}
     </section>
   `;
 }
@@ -72,7 +86,7 @@ function creditSection() {
   return `
     <section class="section surface asset-sec">
       ${sectionHeader({ iconName: 'wallet', title: '信用卡', valueLabel: '总欠款', value: fmtRM(total, { privacy: ui.privacy }), valueCls: 'amt-neg', action: 'assets-open-cc', count: list.length })}
-      ${renderStackedDeck(list)}
+      ${compactAccountRows(list, { debt: true })}
     </section>
   `;
 }
@@ -83,14 +97,7 @@ function ewalletSection() {
   return `
     <section class="section surface asset-sec">
       ${sectionHeader({ iconName: 'wallet', title: 'eWallet', valueLabel: '总余额', value: fmtRM(total, { privacy: ui.privacy }), action: 'assets-open-ew' })}
-      <div class="wallet-scroll">
-        ${list.map((a) => `
-          <button class="wallet-tile" data-action="assets-open-detail" data-acc="${a.id}" aria-label="${escapeHTML(a.name)}">
-            <span class="wallet-logo" style="--brand:${a.brandColor}">${escapeHTML(a.name[0])}</span>
-            <span class="wallet-name">${escapeHTML(a.short)}</span>
-            <span class="num wallet-amt">${fmtRM(a.balance, { privacy: ui.privacy })}</span>
-          </button>`).join('')}
-      </div>
+      <div class="wallet-scroll asset-wallet-scroll" aria-label="eWallet 账户">${list.map((account) => `<button type="button" class="wallet-tile asset-wallet-tile" data-action="assets-open-detail" data-acc="${escapeHTML(account.id)}">${brandTileHTML(account)}<span class="wallet-tile-copy"><strong>${escapeHTML(account.name)}</strong><span class="num">${fmtRM(account.balance, { privacy: ui.privacy })}</span></span></button>`).join('')}</div>
     </section>
   `;
 }
@@ -199,26 +206,27 @@ export function registerAssetsFeature() {
   registerDetailActions();
 
   registerAction('assets-segment', (el) => update({ assetsSegment: el.dataset.seg }));
-  registerAction('assets-open-saving', () => update({ assetsView: { name: 'category', type: 'saving' }, navDirection: 'forward' }));
-  registerAction('assets-open-cc', () => update({ assetsView: { name: 'category', type: 'cc' }, navDirection: 'forward' }));
-  registerAction('assets-open-ew', () => update({ assetsView: { name: 'category', type: 'ew' }, navDirection: 'forward' }));
+  registerAction('assets-open-saving', () => pushRoute({ assetsView: { name: 'category', type: 'saving' } }));
+  registerAction('assets-open-cc', () => pushRoute({ assetsView: { name: 'category', type: 'cc' } }));
+  registerAction('assets-open-ew', () => pushRoute({ assetsView: { name: 'category', type: 'ew' } }));
 
   registerAction('assets-open-detail', (el) => {
     const acc = data.getAccount(el.dataset.acc);
     if (!acc) return;
+    runSharedCardTransition(el.closest('.deck-card, .asset-account-row, .wallet-tile'));
     const from = ui.assetsView.name === 'category' ? 'category' : 'overview';
     const list = data.getAccountsByType(acc.type);
     ui.categoryIndex[acc.type] = list.indexOf(acc);
-    update({ assetsView: { name: 'detail', accountId: acc.id, from }, navDirection: 'forward' });
+    pushRoute({ selectedAccountId: { ...ui.selectedAccountId, [acc.type]: acc.id }, assetsView: { name: 'detail', accountId: acc.id, from } });
   });
 
   registerAction('assets-back', () => {
     const view = ui.assetsView;
     if (view.name === 'detail' && view.from === 'category') {
       const type = data.getAccount(view.accountId)?.type || 'saving';
-      update({ assetsView: { name: 'category', type }, navDirection: 'back' });
+      backOr({ tab: 'assets', assetsView: { name: 'category', type } });
     } else {
-      update({ assetsView: { name: 'overview' }, navDirection: 'back' });
+      backOr({ tab: 'assets', assetsView: { name: 'overview' } });
     }
   });
 

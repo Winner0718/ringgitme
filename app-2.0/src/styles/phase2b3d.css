@@ -1,0 +1,257 @@
+/* Phase 2B3D — compact Capture sheet, compact Assets overview, native card
+   touch surface, and confirmation account identity. Loaded last by design. */
+
+/* Capture is a content-height bottom sheet on ordinary mobile viewports. Its
+   body and footer own their scroll/safe-area responsibilities; the page behind
+   it stays still. Very short screens may still use the guarded compact fallback
+   below so the Save action remains reachable. */
+#app.capture-open .app-content { overflow: hidden; }
+#app.capture-open .tabbar { opacity: .18; pointer-events: none; }
+.capture-sheet {
+  position: fixed;
+  width: min(100%, 480px);
+  margin-inline: auto;
+  top: auto;
+  bottom: 0;
+  height: auto;
+  max-height: min(calc(100dvh - var(--safe-top) - 10px), 760px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 0 var(--space-page-x);
+  border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+}
+@supports not (height: 100dvh) {
+  .capture-sheet { max-height: min(calc(100vh - var(--safe-top) - 10px), 760px); }
+}
+.capture-sheet .sheet-grabber { position: relative; flex: 0 0 auto; z-index: 5; padding: 8px 0 4px; }
+.capture-sheet .sheet-body {
+  flex: 0 1 auto;
+  min-height: 0;
+  display: flex;
+  gap: 0;
+  overflow: hidden;
+  padding-bottom: 0;
+}
+.capture-main {
+  flex: 0 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.capture-main::-webkit-scrollbar { display: none; }
+.capture-main.calculator-mode { overflow-y: hidden; }
+.capture-main.calculator-mode .capture-modes { margin: 0 0 2px; }
+.capture-main.details-mode { overflow-y: auto; padding-bottom: 8px; }
+.capture-modes { flex: 0 0 auto; min-height: 36px; margin: 0 0 2px; }
+.capture-modes .seg-item { min-height: 32px; }
+.cap-amount { flex: 0 0 auto; min-height: 70px; justify-content: center; padding: 0 0 3px; }
+.cap-amount-value {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: clamp(29px, 9.4vw, 40px);
+}
+.cap-amount.formula-active .cap-amount-value { color: var(--text-1); font-size: clamp(27px, 8.5vw, 37px); }
+.cap-amount.formula-long .cap-amount-value { font-size: clamp(22px, 6.9vw, 31px); }
+.cap-expression-line { min-height: 15px; font-size: 11px; }
+.cap-amount em { min-height: 12px; font-size: 10px; }
+.cap-amount em.error { color: var(--sem-red); }
+.cap-amount:has(em.error) { animation: rm-error-shake 320ms ease; }
+.cap-account-label { flex: 0 0 auto; margin: 1px 0; line-height: 15px; }
+.cap-cats, .cap-accounts { flex: 0 0 auto; min-height: 31px; padding: 1px 0 3px; gap: 5px; }
+.cap-cat, .cap-acc { height: 29px; padding: 0 10px; }
+.cap-acc-summary { flex: 0 0 auto; padding: 0 0 2px; line-height: 15px; }
+.cap-transfer-summary { flex: 0 0 auto; min-height: 28px; margin: 0; }
+.cap-more-entry { flex: 0 0 auto; min-height: 36px; margin: 1px 0; padding: 0 10px; }
+.cap-more-entry small { font-size: 10px; }
+.capture-calculator {
+  flex: 0 0 clamp(294px, 39dvh, 334px);
+  min-height: 0;
+  margin: 8px 0 0;
+}
+.capture-calculator-keys {
+  height: 100%;
+  min-height: 0;
+  grid-template-rows: repeat(5, minmax(38px, 1fr));
+  grid-auto-rows: minmax(38px, 1fr);
+  gap: 5px;
+}
+.capture-calculator-key { min-height: 0; height: auto; border-radius: 14px; font-size: 18px; }
+.capture-direct-keypad.has-error { box-shadow: none; border: 0; }
+.capture-form-error { flex: 0 0 auto; min-height: 30px; padding: 5px 8px; }
+.cap-save-wrap {
+  position: relative;
+  flex: 0 0 auto;
+  bottom: auto;
+  z-index: 5;
+  margin: 0 calc(-1 * var(--space-page-x));
+  padding: 6px var(--space-page-x) max(calc(var(--safe-bottom) + 8px), 12px);
+  background: color-mix(in srgb, var(--glass-sheet-bg) 94%, transparent);
+  border-top: 1px solid var(--line);
+}
+.cap-save { min-height: 44px; }
+.cap-compact-amount {
+  flex: 0 0 auto;
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: var(--r-card);
+  color: var(--text-1);
+  background: var(--s1);
+  box-shadow: 0 0 0 1px var(--line);
+}
+.cap-compact-amount > span { display: flex; flex-direction: column; gap: 1px; }
+.cap-compact-amount small { color: var(--text-2); }
+.cap-compact-amount strong { font-size: 22px; }
+.cap-compact-amount button { display: inline-flex; align-items: center; gap: 2px; color: var(--accent); font-weight: 700; }
+.advanced-details { flex: 0 0 auto; gap: 9px; }
+
+/* Overview cards are information-dense rows. Large cards are reserved for
+   category/detail, where comparison and swipe are the primary task. */
+.asset-account-list { margin-top: 2px; }
+.asset-card-stack { margin-inline: -6px; padding: 5px 0 2px; }
+.asset-account-row {
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 1px;
+  border-top: 1px solid var(--line);
+}
+.asset-stack-row {
+  position: relative;
+  z-index: calc(1 + var(--stack-index));
+  min-height: 76px;
+  margin-top: -19px;
+  gap: 7px;
+  padding: 10px;
+  border: 0;
+  border-radius: 18px 18px 12px 12px;
+  color: #fff;
+  background: color-mix(in srgb, var(--account-brand) 88%, #101613);
+  box-shadow: 0 8px 18px rgba(13,22,18,.14), inset 0 1px 0 rgba(255,255,255,.18);
+}
+.asset-stack-row:first-child { margin-top: 0; }
+.asset-stack-row:last-child { border-radius: 18px; }
+.asset-stack-row .asset-brand-tile { border-radius: 50%; background: #fff; box-shadow: 0 1px 0 rgba(255,255,255,.35); }
+.asset-stack-row .asset-account-copy strong { color: #fff; font-size: 13px; }
+.asset-stack-row .asset-account-copy small { color: rgba(255,255,255,.74); }
+.asset-stack-row .asset-account-amount,
+.asset-stack-row .asset-account-amount.debt { color: #fff; font-size: 13px; }
+.asset-stack-row > .icon { color: rgba(255,255,255,.9); }
+.asset-stack-row:active { filter: brightness(.96); }
+.asset-brand-tile {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 12px;
+  color: #fff;
+  background: var(--brand, var(--accent));
+  font-weight: 800;
+}
+.asset-brand-tile img { width: 100%; height: 100%; object-fit: contain; background: #fff; pointer-events: none; user-select: none; -webkit-user-drag: none; }
+.asset-account-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.asset-account-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.asset-account-copy small { color: var(--text-2); }
+.asset-account-amount { white-space: nowrap; font-weight: 720; }
+.asset-account-amount.debt { color: var(--sem-red); }
+.asset-wallet-scroll { margin: 2px calc(-1 * var(--card-pad)) 0; padding: 5px var(--card-pad) 3px; gap: 8px; }
+.asset-wallet-tile {
+  width: clamp(145px, 43vw, 164px);
+  min-height: 66px;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 8px;
+  padding: 8px;
+}
+.asset-wallet-tile .asset-brand-tile { width: 38px; height: 38px; }
+.wallet-tile-copy { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+.wallet-tile-copy strong { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+.wallet-tile-copy .num { white-space: nowrap; color: var(--text-2); font-size: 12px; }
+.app-content { padding-bottom: calc(var(--safe-bottom) + 124px); }
+
+/* The native scroller is the physical touch surface. Card content is
+   decorative; it cannot steal a drag or trigger image ghost dragging. */
+.native-carousel-shell.deck-viewport { touch-action: auto; pointer-events: auto; }
+.native-carousel-scroller { touch-action: pan-x pan-y pinch-zoom; pointer-events: auto; }
+.native-snap-card.deck-card {
+  transform: none;
+  touch-action: manipulation;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: opacity 120ms linear, box-shadow 150ms ease;
+}
+.native-snap-card .account-visual,
+.native-snap-card .account-visual * { pointer-events: none; user-select: none; -webkit-user-select: none; }
+.native-snap-card img { draggable: false; -webkit-user-drag: none; }
+
+/* Confirmation account identity is visually separate from the real card but
+   shares the same stable account ID in its markup. */
+.motion-balance-hero { overflow: visible; box-shadow: none; }
+.account-identity-bar {
+  position: relative;
+  z-index: 4;
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border-radius: 18px;
+}
+.account-identity-logo {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--brand, var(--accent));
+  color: #fff;
+  font-weight: 800;
+}
+.account-identity-logo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #fff; }
+.account-identity-logo.image-failed img { display: none; }
+.account-identity-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 1px; }
+.account-identity-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-identity-copy small { color: var(--text-2); font-size: 10px; }
+.account-identity-status { flex: 0 0 auto; padding: 5px 8px; border-radius: var(--r-pill); color: var(--accent); background: var(--accent-soft); font-size: 10px; font-weight: 750; white-space: nowrap; }
+.motion-balance-hero > .account-visual-confirmation { width: 90%; margin: 0 auto; border-radius: 22px; box-shadow: 0 14px 34px rgba(0,0,0,.16); }
+.motion-balance-copy { width: 90%; margin: 0 auto; border-radius: 0 0 22px 22px; box-shadow: var(--shadow-1); }
+.account-wallet-logo { position: relative; }
+.account-wallet-logo > i { position: absolute; inset: 0; display: grid; place-items: center; }
+.account-wallet-logo img { position: relative; z-index: 1; }
+.account-wallet-logo.image-failed img { display: none; }
+.account-visual-monogram { margin: auto; align-self: center; color: rgba(255,255,255,.9); font-size: 44px; font-weight: 800; }
+.account-visual-confirmation .account-wallet-brand { align-items: center; justify-content: center; }
+.motion-account-list.dual .account-identity-bar { min-height: 52px; }
+
+.page-enter.page-back { animation-name: page-back-in; }
+@keyframes page-back-in {
+  from { opacity: 0; transform: translateX(-14px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .capture-sheet, .native-snap-card.deck-card, .account-identity-bar { transition: none; animation: none; }
+}
+@media (max-height: 720px) {
+  .capture-sheet { top: 4px; height: calc(100dvh - 4px); }
+  .cap-amount { min-height: 60px; }
+  .cap-amount-value { font-size: 29px; }
+  .capture-calculator { flex-basis: 280px; }
+}
