@@ -4,8 +4,10 @@ import { data, registerAction, ui, update } from '../../app/state.js';
 import { deriveMonthlyWorkspace, filterHistoryRows, filterPlanLibrary } from '../../domain/fixedCenterWorkspace.js';
 import { derivePlanVisualPresentation } from '../../domain/planVisualPresentation.js';
 import { deriveRecurringOccurrencePresentation } from '../../domain/recurringOccurrencePresentation.js';
+import { deriveRecurringOccurrenceActions } from '../../domain/recurringOccurrenceActions.js';
 import { addMonths } from '../../domain/scheduleGenerator.js';
 import { icon } from '../../components/Icons.js';
+import { renderRecurringActionCard } from '../../components/RecurringActionCard.js';
 import { registerRecurringPlanManagement } from './RecurringPlanSheets.js';
 
 const WORKSPACES = [['month', '本月'], ['plans', '计划'], ['history', '历史']];
@@ -64,6 +66,51 @@ function secondaryHTML(presentation, { compact = false } = {}) {
   return items.join('');
 }
 
+function quickActionLabel(action) {
+  if (!action) return '';
+  if (action.actionType === 'fill_occurrence_amount') return '填写本期金额';
+  if (action.actionType === 'prepare_shared_front_payment') return '支付并记录分摊';
+  if (['prepare_counterparty_repayment', 'prepare_subscription_repayment'].includes(action.actionType)) {
+    return `还给${data.getParticipant(action.counterpartyId)?.displayName || '对方'}`;
+  }
+  if (action.actionType === 'prepare_installment_repayment') return action.expectedMoneyDirection === 'inflow' ? '记录收到还款' : '记录本期还款';
+  if (action.actionType === 'prepare_member_receipt') return '记录成员付款';
+  if (action.actionType === 'prepare_central_outward_payment') return '统一付款';
+  if (action.actionType === 'prepare_owned_payment') return action.label;
+  return action.label;
+}
+
+function occurrenceQuickAction(row) {
+  const actions = deriveRecurringOccurrenceActions({
+    plan: row.plan,
+    occurrence: row,
+    actorId: 'participant-me',
+    participantName: (id) => data.getParticipant(id)?.displayName,
+  });
+  const action = actions.find((item) => item.enabled && item.actionType === 'fill_occurrence_amount')
+    || actions.find((item) => item.enabled && item.actionType !== 'preview_skip_occurrence');
+  if (!action) return '';
+  const label = quickActionLabel(action);
+  const context = action.actionType === 'fill_occurrence_amount' ? '确认本期实际金额'
+    : action.expectedMoneyDirection === 'inflow' ? '记录到账与关系变化'
+      : action.actionType === 'preview_skip_occurrence' ? '本期不产生金额变化'
+        : '核对后再确认记账';
+  const actionIcon = action.expectedMoneyDirection === 'inflow' ? 'arrowDown'
+    : action.actionType === 'fill_occurrence_amount' ? 'note'
+      : action.actionType === 'preview_skip_occurrence' ? 'calendar' : 'arrowUp';
+  return renderRecurringActionCard({
+    title: label,
+    subtitle: context,
+    iconName: actionIcon,
+    tone: row.status === 'overdue' ? 'overdue' : 'accent',
+    attributes: {
+      'data-source': canonicalData(row.plan),
+      'data-occurrence-id': row.id,
+      'data-action-id': action.actionId,
+    },
+  });
+}
+
 function occurrenceCard(row, context = 'month', { dense = false } = {}) {
   const presentation = derivePlanVisualPresentation(row.plan, row, presentationContext(context));
   const semantic = `<span class="semantic-status tone-${presentation.tone}">${escapeHTML(presentation.statusLabel)}</span>`;
@@ -76,6 +123,7 @@ function occurrenceCard(row, context = 'month', { dense = false } = {}) {
       ${amountHTML(presentation)}
     </div>
     ${dense ? '' : `<div class="fixed-plan-context">${secondaryHTML(presentation)}${contextBits.length ? `<span>${escapeHTML(contextBits.join(' · '))}</span>` : ''}</div>`}
+    ${dense ? '' : occurrenceQuickAction(row)}
   </article>`;
 }
 
@@ -156,11 +204,12 @@ function planLibraryCard(plan, occurrences) {
 
 function renderPlansWorkspace() {
   const plans = data.getCanonicalRecurringPlans();
+  const recentlyDeletedCount = data.getRecentlyDeletedRecurringPlans().length;
   const occurrences = allPlanOccurrences(plans);
   const counts = { active: 0, paused: 0, stopped: 0, archived: 0 };
   plans.forEach((plan) => { counts[plan.archivedAt ? 'archived' : plan.status] += 1; });
   const visible = filterPlanLibrary(plans, { status: ui.fixedPlanStatus, type: ui.fixedPlanType, occurrencesByPlan: occurrences, referenceDate: data.today });
-  return `<div class="fixed-plans-toolbar"><button class="fixed-plan-new" data-action="fixed-plan-new">${icon('plus', 18)}<span>新增计划</span></button></div>${filterRail(STATUS_FILTERS, ui.fixedPlanStatus, 'fixed-plan-status', 'status', counts, '计划状态')}${filterRail(TYPE_FILTERS, ui.fixedPlanType, 'fixed-plan-type', 'type', null, '计划类型')}<section class="fixed-library-list" data-plan-result-count="${visible.length}">${visible.map((plan) => planLibraryCard(plan, occurrences.get(plan.id) || [])).join('') || `<div class="fixed-empty surface">${icon('calendar', 24)}<strong>这里还没有计划</strong><p>切换筛选或建立一项新计划。</p></div>`}</section><p class="fixed-readonly-note">管理计划只会影响未来账期，不会自动记账。</p>`;
+  return `<div class="fixed-plans-toolbar"><button class="fixed-plan-new" data-action="fixed-plan-new">${icon('plus', 18)}<span>新增计划</span></button></div>${filterRail(STATUS_FILTERS, ui.fixedPlanStatus, 'fixed-plan-status', 'status', counts, '计划状态')}<button type="button" class="fixed-recently-deleted-link surface" data-action="fixed-plan-recently-deleted"><span>${icon('calendar', 18)}<strong>最近删除</strong></span><b>${recentlyDeletedCount}</b>${icon('chevronRight', 16)}</button>${filterRail(TYPE_FILTERS, ui.fixedPlanType, 'fixed-plan-type', 'type', null, '计划类型')}<section class="fixed-library-list" data-plan-result-count="${visible.length}">${visible.map((plan) => planLibraryCard(plan, occurrences.get(plan.id) || [])).join('') || `<div class="fixed-empty surface">${icon('calendar', 24)}<strong>这里还没有计划</strong><p>切换筛选或建立一项新计划。</p></div>`}</section><p class="fixed-readonly-note">管理计划只会影响未来账期，不会自动记账。</p>`;
 }
 
 function historyCard(row) {
@@ -214,4 +263,4 @@ export function registerFixedCenterFeature() {
   registerAction('fixed-history-filter', (el) => replaceRoute({ fixedHistoryFilter: el.dataset.history }, { direction: 'forward' }));
 }
 
-export const fixedCenterViewTestHooks = Object.freeze({ occurrenceCard, overviewHTML, planLibraryCard, historyCard, workspaceNav });
+export const fixedCenterViewTestHooks = Object.freeze({ occurrenceCard, overviewHTML, planLibraryCard, historyCard, workspaceNav, quickActionLabel, occurrenceQuickAction });

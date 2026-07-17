@@ -83,7 +83,7 @@ function groupByDay(rows) {
 }
 
 function dayTotal(rows) {
-  const spend = rows.filter((t) => t.kind === 'expense' && t.accountEffect === 'posted').reduce((s, t) => s + t.amount, 0);
+  const spend = rows.filter((t) => t.kind === 'expense' && t.accountEffect === 'posted' && t.status !== 'reversed').reduce((s, t) => s + t.amount, 0);
   return spend > 0 ? `支出 ${fmtRM(spend, { privacy: ui.privacy })}` : '';
 }
 
@@ -307,7 +307,8 @@ export function detailSheet(t, { stacked = false, onClose = null } = {}) {
   const linkedEntry = linkedEntity?.startsWith('rel-entry-') ? data.getRelationshipEntry(linkedEntity) : null;
   const linkedSettlement = linkedEntity?.startsWith('settlement-') ? linkedEntity : null;
   const linkedPayment = data.getObligationEntityForTransaction(t.id);
-  openSheet({
+  const recurringPosting = data.getRecurringPostingForTransaction(t.id);
+  const sheet = openSheet({
     title: '记录详情',
     className: 'activity-detail-sheet',
     stacked,
@@ -318,6 +319,7 @@ export function detailSheet(t, { stacked = false, onClose = null } = {}) {
         <div class="row-title">${escapeHTML(t.desc)}</div>
         <div class="caption">${escapeHTML(data.getTransactionCategoryLabel(t))}${t.categoryArchived ? ' · 已隐藏' : ''} · ${escapeHTML(data.getTransactionAccountLabel(t))}</div>
         <div class="caption">${fmtDateMY(t.date)} · ${fmtTimeAMPM(t.time)}</div>
+        ${recurringPosting ? `<div class="posting-reversal-badge">${recurringPosting.status === 'reversed' ? '已撤销 · 原记录保留' : '固定计划本期记账'}</div>` : ''}
       </div>
       <div class="sheet-group">
         ${detailRow('类型', typeLabel(t.kind))}
@@ -332,14 +334,19 @@ export function detailSheet(t, { stacked = false, onClose = null } = {}) {
       </div>
       ${linkedEntry ? relationshipSummaryHTML(linkedEntry, t.attachmentIds || [], t.id) : ''}
       ${linkedPayment ? obligationSummaryHTML(linkedPayment) : ''}
+      ${recurringPosting ? `<section class="sheet-group attachment-section posting-evidence-detail"><div class="caption sheet-group-label">附件 / 凭证</div>${attachmentSummaryHTML('transaction', t.id, { label: '付款凭证', evidenceOnly: true })}<small class="caption">可补充付款凭证；不会修改金额、余额或关系账。</small></section>` : ''}
       ${historyHTML(t)}
-      ${mutation.canEdit && mutation.canDelete ? `<div class="sheet-actions">
+      ${recurringPosting ? `<div class="sheet-actions recurring-posting-detail-actions">
+        ${recurringPosting.status === 'posted' ? `<button class="sheet-danger" data-action="activity-recurring-reverse-request" data-posting-id="${escapeHTML(recurringPosting.postingId)}">撤销这次记账</button>` : ''}
+        <button class="sheet-primary" data-action="sheet-close">完成</button>
+      </div>` : mutation.canEdit && mutation.canDelete ? `<div class="sheet-actions">
         <button class="sheet-primary" data-action="activity-edit" data-txn="${t.id}">编辑</button>
         <button class="sheet-danger" data-action="activity-delete" data-txn="${t.id}">删除记录</button>
       </div>` : `<div class="mutation-lock-note caption">${escapeHTML(mutation.reason)}</div>
         <button class="sheet-primary" data-action="sheet-close">完成</button>`}
     `,
   });
+  if (recurringPosting) bindAttachmentField(sheet, { onChange: () => data.setTransactionAttachments(t.id, data.getAttachments('transaction', t.id).map((attachment) => attachment.attachmentId)) });
 }
 
 function accountPickerOptions(includeCredit = true) {
@@ -549,6 +556,25 @@ export function registerActivityFeature() {
       toast('记录已删除，账户金额已还原');
     } catch (error) {
       toast(error.message || '无法删除记录');
+    }
+  });
+  registerAction('activity-recurring-reverse-request', (el) => {
+    const posting = data.getRecurringOccurrencePosting(el.dataset.postingId);
+    if (!posting || posting.status !== 'posted') return;
+    openSheet({
+      title: '撤销这次记账？', stacked: true, className: 'recurring-posting-reverse-sheet',
+      contentHTML: `<div class="recurring-posting-reverse-copy"><p>账户、关系账、分期与本期状态会完整恢复。原记录与附件会保留，并明确标记为已撤销。</p><button class="sheet-danger" data-action="activity-recurring-reverse-confirm" data-posting-id="${escapeHTML(posting.postingId)}">确认撤销</button><button class="sheet-secondary" data-action="sheet-close">取消</button></div>`,
+    });
+  });
+  registerAction('activity-recurring-reverse-confirm', (el) => {
+    try {
+      data.reverseRecurringOccurrencePosting(el.dataset.postingId, { reason: '用户从记录详情撤销', reversedAt: `${data.today}T09:05:00+08:00` });
+      closeSheet(true);
+      closeSheet(true);
+      update({});
+      toast('已安全撤销，原记录与附件继续保留');
+    } catch (error) {
+      toast(error.message || '当前状态无法安全撤销。');
     }
   });
 }

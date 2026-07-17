@@ -5,6 +5,12 @@
 import { canonicalSourceKey, normalizeRecurringPlan, RecurringPlanError, recurringError } from './recurringPlanModel.js';
 import { buildOccurrenceSnapshot, occurrenceStatus } from './recurringSchedule.js';
 import { getRecurringRemovalEligibility } from './recurringPlanUsability.js';
+import {
+  createRecurringPlanTombstone,
+  frozenDeletedPlanHistory,
+  isHistoricalRecurringOccurrence,
+  restorePlanFromTombstone,
+} from './recurringPlanDeletionLifecycle.js';
 
 function sameFinancialSnapshot(a, b) {
   return ['dueDate', 'amountMode', 'amountState', 'fixedPlannedAmountMinor', 'estimatedAmountMinor', 'amountPending', 'totalAmountMinor', 'ownShareMinor', 'cashOutflowMinor', 'receivableMinor', 'payableMinor']
@@ -35,12 +41,15 @@ export function createRecurringPlanRepository({
     if (occurrenceIds.has(occurrence.id)) recurringError('duplicate_occurrence_identity', '账期 ID 重复', { occurrenceId: occurrence.id });
     occurrenceIds.add(occurrence.id);
   });
-  const seed = structuredClone({ plans: normalizedPlans, occurrences });
+  const seed = structuredClone({ plans: normalizedPlans, occurrences, deletedPlans: [], preservedDeletedHistory: [] });
   let state = structuredClone(seed);
 
   const findPlan = (id) => state.plans.find((plan) => plan.id === id);
   const findOccurrence = (id) => state.occurrences.find((occurrence) => occurrence.id === id);
-  const planSourceTaken = (source, exceptId = null) => state.plans.some((plan) => plan.id !== exceptId && canonicalSourceKey(plan.canonicalSource) === canonicalSourceKey(source));
+  const planSourceTaken = (source, exceptId = null) => [
+    ...state.plans,
+    ...state.deletedPlans.map((entry) => entry.plan),
+  ].some((plan) => plan.id !== exceptId && canonicalSourceKey(plan.canonicalSource) === canonicalSourceKey(source));
 
   function createPlan(input) {
     if (findPlan(input.id)) recurringError('duplicate_plan_id', '计划 ID 已存在', { planId: input.id });
@@ -143,6 +152,67 @@ export function createRecurringPlanRepository({
     return { removed: true, planId: id, removedOccurrenceIds, eligibility };
   }
 
+  function softDeletePlan(id, {
+    deletedAt = clock(),
+    deletedByActorId = 'participant-me',
+  } = {}) {
+    const existing = state.deletedPlans.find((entry) => entry.plan.id === id);
+    if (existing) return structuredClone(existing);
+    const index = state.plans.findIndex((plan) => plan.id === id);
+    if (index < 0) recurringError('unknown_plan', '计划不存在', { planId: id });
+    const plan = state.plans[index];
+    const tombstone = createRecurringPlanTombstone(plan, {
+      deletedAt,
+      deletedByActorId,
+      deletionRevision: 1,
+    });
+    const entry = {
+      plan: structuredClone(plan),
+      tombstone: structuredClone(tombstone),
+      occurrenceSnapshot: structuredClone(state.occurrences.filter((row) => row.planId === id)),
+    };
+    state.plans.splice(index, 1);
+    state.deletedPlans.push(entry);
+    return structuredClone(entry);
+  }
+
+  function restoreDeletedPlan(id, { restoredAt = clock() } = {}) {
+    const index = state.deletedPlans.findIndex((entry) => entry.plan.id === id);
+    if (index < 0) recurringError('deleted_plan_not_found', '最近删除中没有这项计划', { planId: id });
+    const entry = state.deletedPlans[index];
+    if (findPlan(id)) recurringError('duplicate_plan_id', '计划 ID 已存在', { planId: id });
+    const restored = normalizeRecurringPlan(
+      restorePlanFromTombstone(entry, { restoredAt }),
+      validation,
+    );
+    state.plans.push(restored);
+    state.deletedPlans.splice(index, 1);
+    return structuredClone(restored);
+  }
+
+  function permanentlyDeletePlan(id) {
+    const index = state.deletedPlans.findIndex((entry) => entry.plan.id === id);
+    if (index < 0) recurringError('deleted_plan_not_found', '最近删除中没有这项计划', { planId: id });
+    const [entry] = state.deletedPlans.splice(index, 1);
+    const rows = state.occurrences.filter((row) => row.planId === id);
+    const preserved = frozenDeletedPlanHistory(entry.plan, rows);
+    const preservedIds = new Set(preserved.map((snapshot) => snapshot.occurrence.id));
+    state.preservedDeletedHistory.push(...preserved.filter((snapshot) => !state.preservedDeletedHistory.some((existing) => existing.occurrence.id === snapshot.occurrence.id)));
+    state.occurrences = state.occurrences.filter((row) => row.planId !== id || preservedIds.has(row.id) || isHistoricalRecurringOccurrence(row));
+    return {
+      planId: id,
+      permanentlyDeleted: true,
+      preservedHistoryCount: preserved.length,
+      removedUnresolvedOccurrenceIds: rows.filter((row) => !isHistoricalRecurringOccurrence(row)).map((row) => row.id),
+    };
+  }
+
+  function clearRecentlyDeleted() {
+    const ids = state.deletedPlans.map((entry) => entry.plan.id);
+    const results = ids.map((id) => permanentlyDeletePlan(id));
+    return { clearedCount: results.length, planIds: ids, results };
+  }
+
   function generateOccurrence(planId, monthKey, options = {}) {
     const plan = findPlan(planId);
     if (!plan) recurringError('unknown_plan', '计划不存在', { planId });
@@ -179,6 +249,18 @@ export function createRecurringPlanRepository({
       .sort((a, b) => a.dueDate.localeCompare(b.dueDate) || a.id.localeCompare(b.id));
   }
 
+  function updateOccurrence(id, changes, { expectedRevision = null, occurredAt = clock() } = {}) {
+    const index = state.occurrences.findIndex((occurrence) => occurrence.id === id);
+    if (index < 0) recurringError('unknown_occurrence', '本期账期不存在', { occurrenceId: id });
+    const previous = state.occurrences[index];
+    if (expectedRevision != null && previous.revision !== expectedRevision) recurringError('stale_occurrence', '本期资料已经更新', { occurrenceId: id });
+    const protectedKeys = new Set(['id', 'planId', 'canonicalSource', 'periodKey', 'monthKey', 'generatedAt']);
+    const safe = Object.fromEntries(Object.entries(changes || {}).filter(([key]) => !protectedKeys.has(key)));
+    const next = { ...previous, ...structuredClone(safe), revision: previous.revision + 1, updatedAt: occurredAt };
+    state.occurrences[index] = next;
+    return structuredClone(next);
+  }
+
   return Object.freeze({
     createPlan,
     updatePlan,
@@ -187,6 +269,13 @@ export function createRecurringPlanRepository({
     stopPlan: (id, options) => transition(id, 'stopped', options),
     archivePlan,
     unarchivePlan,
+    softDeletePlan,
+    restoreDeletedPlan,
+    permanentlyDeletePlan,
+    clearRecentlyDeleted,
+    listRecentlyDeleted: () => structuredClone(state.deletedPlans)
+      .sort((a, b) => b.tombstone.deletedAt.localeCompare(a.tombstone.deletedAt)),
+    getPreservedDeletedHistory: () => structuredClone(state.preservedDeletedHistory),
     removeUnusedPlan,
     getDeleteEligibility: (id) => {
       const plan = findPlan(id);
@@ -196,12 +285,21 @@ export function createRecurringPlanRepository({
     listPlans: () => structuredClone(state.plans),
     generateOccurrence,
     getOccurrence: (id) => structuredClone(findOccurrence(id) || null),
+    updateOccurrence,
     listOccurrencesForMonth,
     listOccurrencesForPlan: (planId, referenceDate) => state.occurrences
       .filter((occurrence) => occurrence.planId === planId)
-      .map((occurrence) => ({ ...structuredClone(occurrence), status: occurrenceStatus(occurrence, findPlan(planId), referenceDate) }))
+      .map((occurrence) => {
+        const plan = findPlan(planId);
+        return { ...structuredClone(occurrence), status: plan ? occurrenceStatus(occurrence, plan, referenceDate) : occurrence.recordedStatus || occurrence.status };
+      })
       .sort((a, b) => a.dueDate.localeCompare(b.dueDate)),
     getSnapshot: () => structuredClone(state),
+    createCheckpoint: () => structuredClone(state),
+    restoreCheckpoint(checkpoint) {
+      if (!checkpoint?.plans || !checkpoint?.occurrences) throw new Error('无效的固定计划检查点');
+      state = structuredClone(checkpoint);
+    },
     reset() { state = structuredClone(seed); },
   });
 }

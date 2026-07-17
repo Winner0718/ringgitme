@@ -1,8 +1,9 @@
 import { escapeHTML } from '../app/format.js';
 import { icon } from './Icons.js';
-import { data } from '../app/state.js';
+import { data, ui } from '../app/state.js';
 import { toast } from './AppSheet.js';
 import { attachmentSizeLabel } from '../domain/attachmentSession.js';
+import { MAX_POSTING_EVIDENCE_ATTACHMENTS, validateAttachmentFile, validatePostingEvidenceFile } from '../domain/attachmentRepository.js';
 import { isTopModal, mountModalLayer, pushModalLayer } from '../app/modalStack.js';
 
 // Shared multi-attachment control. The attachment store is authoritative;
@@ -14,24 +15,28 @@ import { isTopModal, mountModalLayer, pushModalLayer } from '../app/modalStack.j
 const STRIP_LIMIT = 3;
 let activeAttachmentManagerClose = null;
 
+function attachmentDisplayName(item, index = 0) {
+  return ui.privacy ? `附件 ${index + 1}` : item.name;
+}
+
 function thumbHTML(item) {
-  if (item.kind === 'photo' && item.localObjectUrl) return `<span class="attachment-thumb"><img src="${escapeHTML(item.localObjectUrl)}" alt="${escapeHTML(item.name)}" /></span>`;
+  if (item.kind === 'photo' && item.localObjectUrl) return `<span class="attachment-thumb${ui.privacy ? ' is-private' : ''}"><img src="${escapeHTML(item.localObjectUrl)}" alt="${ui.privacy ? '附件' : escapeHTML(item.name)}" /></span>`;
   return `<span class="attachment-thumb attachment-thumb-file"><span>${escapeHTML(item.thumbnail?.label || 'FILE')}</span></span>`;
 }
 
-export function attachmentSummaryHTML(ownerType, ownerId) {
+export function attachmentSummaryHTML(ownerType, ownerId, { label = '附件', evidenceOnly = false } = {}) {
   const items = data.getAttachments(ownerType, ownerId);
-  return `<div class="attachment-field" data-attachment-field data-owner-type="${escapeHTML(ownerType)}" data-owner-id="${escapeHTML(ownerId)}">
+  return `<div class="attachment-field" data-attachment-field data-owner-type="${escapeHTML(ownerType)}" data-owner-id="${escapeHTML(ownerId)}" data-attachment-label="${escapeHTML(label)}" ${evidenceOnly ? 'data-evidence-only="true"' : ''}>
     <button type="button" class="attachment-summary" data-attachment-manage>
-      <span class="caption">附件</span>
+      <span class="caption">${escapeHTML(label)}</span>
       <span class="attachment-summary-count">${items.length ? `${items.length} 个` : '添加'} ${icon('chevronRight', 14)}</span>
     </button>
     ${items.length ? `<div class="attachment-strip" data-attachment-strip>
-      ${items.slice(0, STRIP_LIMIT).map((item, index) => `<button type="button" class="attachment-strip-item" data-attachment-preview="${index}" aria-label="预览 ${escapeHTML(item.name)}">${thumbHTML(item)}</button>`).join('')}
+      ${items.slice(0, STRIP_LIMIT).map((item, index) => `<button type="button" class="attachment-strip-item" data-attachment-preview="${index}" aria-label="预览 ${ui.privacy ? `附件 ${index + 1}` : escapeHTML(item.name)}">${thumbHTML(item)}</button>`).join('')}
       ${items.length > STRIP_LIMIT ? `<button type="button" class="attachment-strip-item attachment-strip-more" data-attachment-manage>+${items.length - STRIP_LIMIT}</button>` : ''}
       <button type="button" class="attachment-strip-item attachment-strip-add" data-attachment-add aria-label="添加附件">${icon('plus', 16)}</button>
     </div>` : ''}
-    <input type="file" data-attachment-input hidden multiple accept="image/*,.pdf,.doc,.docx,.txt" />
+    <input type="file" data-attachment-input hidden multiple accept="${evidenceOnly ? 'image/jpeg,image/png,image/webp,application/pdf' : 'image/*,.pdf,.doc,.docx,.txt'}" />
   </div>`;
 }
 
@@ -54,6 +59,8 @@ export function bindAttachmentField(root, { onChange } = {}) {
   if (!field) return;
   const ownerType = field.dataset.ownerType;
   const ownerId = field.dataset.ownerId;
+  const evidenceOnly = field.dataset.evidenceOnly === 'true';
+  const label = field.dataset.attachmentLabel || '附件';
   const input = field.querySelector('[data-attachment-input]');
   let pendingReplaceId = null;
   const ownerChanged = (event) => {
@@ -65,7 +72,7 @@ export function bindAttachmentField(root, { onChange } = {}) {
   const rerender = () => {
     document.removeEventListener('ringgitme:attachment-changed', ownerChanged);
     const fresh = document.createElement('div');
-    fresh.innerHTML = attachmentSummaryHTML(ownerType, ownerId);
+    fresh.innerHTML = attachmentSummaryHTML(ownerType, ownerId, { label, evidenceOnly });
     field.replaceWith(fresh.firstElementChild);
     bindAttachmentField(root, { onChange });
     onChange?.(data.getAttachments(ownerType, ownerId));
@@ -76,13 +83,17 @@ export function bindAttachmentField(root, { onChange } = {}) {
     const files = [...(input.files || [])];
     input.value = '';
     if (!files.length) return;
+    pendingReplaceId = input.dataset.pendingReplaceId || pendingReplaceId;
+    delete input.dataset.pendingReplaceId;
     try {
       const selected = pendingReplaceId ? files.slice(0, 1) : files;
+      if (!pendingReplaceId && evidenceOnly && data.getAttachments(ownerType, ownerId).length + selected.length > MAX_POSTING_EVIDENCE_ATTACHMENTS) throw new Error(`最多只能添加 ${MAX_POSTING_EVIDENCE_ATTACHMENTS} 个付款凭证`);
       for (const file of selected) {
+        (evidenceOnly ? validatePostingEvidenceFile : validateAttachmentFile)(file);
         const meta = await readFile(file);
         if (!meta) continue;
         if (pendingReplaceId) data.replaceAttachment(pendingReplaceId, meta, `att-replace-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-        else data.addAttachment({ ...meta, ownerEntityType: ownerType, ownerEntityId: ownerId, clientEventId: `att-add-${Date.now()}-${Math.random().toString(36).slice(2)}` });
+        else data.addAttachment({ ...meta, source: 'file', category: evidenceOnly ? 'transfer-proof' : 'other', ownerEntityType: ownerType, ownerEntityId: ownerId, clientEventId: `att-add-${Date.now()}-${Math.random().toString(36).slice(2)}` });
       }
     } catch (error) {
       toast(error.message || '无法添加附件');
@@ -94,27 +105,46 @@ export function bindAttachmentField(root, { onChange } = {}) {
 
   field.addEventListener('click', (event) => {
     if (event.target.closest('[data-attachment-add]')) { pendingReplaceId = null; input.click(); return; }
-    if (event.target.closest('[data-attachment-manage]')) { openAttachmentManager({ ownerType, ownerId, requestFile: (replaceId) => { pendingReplaceId = replaceId || null; input.click(); }, onChange: rerender }); return; }
+    if (event.target.closest('[data-attachment-manage]')) {
+      openAttachmentManager({
+        ownerType,
+        ownerId,
+        evidenceOnly,
+        requestFile: (replaceId) => {
+          // The compact field can rerender while its manager remains open.
+          // Resolve the current input so remove-then-readd of the same file
+          // never targets a detached browser input.
+          const liveField = root.querySelector(`[data-attachment-field][data-owner-type="${CSS.escape(ownerType)}"][data-owner-id="${CSS.escape(ownerId)}"]`);
+          const liveInput = liveField?.querySelector('[data-attachment-input]') || input;
+          liveInput.dataset.pendingReplaceId = replaceId || '';
+          liveInput.value = '';
+          liveInput.click();
+        },
+        onChange: rerender,
+      });
+      return;
+    }
     const preview = event.target.closest('[data-attachment-preview]');
     if (preview) openAttachmentGallery(data.getAttachments(ownerType, ownerId), Number(preview.dataset.attachmentPreview));
   });
 }
 
-export function openAttachmentManager({ ownerType, ownerId, requestFile, onChange }) {
+export function openAttachmentManager({ ownerType, ownerId, evidenceOnly = false, requestFile, onChange }) {
   if (activeAttachmentManagerClose && !activeAttachmentManagerClose()) return null;
   const trigger = document.activeElement;
   const layer = document.createElement('div');
   layer.className = 'picker-layer attachment-manager-layer modal-layer';
   const render = () => {
     const items = data.getAttachments(ownerType, ownerId);
+    const attachmentLimit = evidenceOnly ? MAX_POSTING_EVIDENCE_ATTACHMENTS : data.getAttachmentLimit();
     layer.innerHTML = `<button class="picker-scrim" data-manager-close aria-label="完成"></button>
       <section class="picker-sheet glass-sheet" data-modal-surface role="dialog" aria-modal="true" aria-label="附件管理" tabindex="-1">
         <div class="time-picker-grabber"><span></span></div>
-        <header class="time-picker-title">附件 · ${items.length}/${data.getAttachmentLimit()}</header>
+        <header class="time-picker-title">附件 · ${items.length}/${attachmentLimit}</header>
         <div class="attachment-manager-list">
           ${items.map((item, index) => `<div class="attachment-manager-row" data-attachment-id="${item.attachmentId}">
-            <button type="button" class="attachment-manager-thumb" data-manager-preview="${index}" aria-label="预览 ${escapeHTML(item.name)}">${thumbHTML(item)}</button>
-            <div class="row-main"><div class="row-title attachment-name">${escapeHTML(item.name)}</div><div class="caption">${escapeHTML(item.mimeType)} · ${attachmentSizeLabel(item.sizeBytes)}</div></div>
+            <button type="button" class="attachment-manager-thumb" data-manager-preview="${index}" aria-label="预览 ${escapeHTML(attachmentDisplayName(item, index))}">${thumbHTML(item)}</button>
+            <div class="row-main"><div class="row-title attachment-name">${escapeHTML(attachmentDisplayName(item, index))}</div><div class="caption">${ui.privacy ? '附件资料已隐藏' : `${escapeHTML(item.mimeType)} · ${attachmentSizeLabel(item.sizeBytes)}`}</div></div>
             <div class="attachment-manager-actions">
               <button type="button" data-manager-up ${index === 0 ? 'disabled' : ''} aria-label="上移">${icon('chevronLeft', 14)}</button>
               <button type="button" data-manager-down ${index === items.length - 1 ? 'disabled' : ''} aria-label="下移">${icon('chevronRight', 14)}</button>
@@ -124,7 +154,7 @@ export function openAttachmentManager({ ownerType, ownerId, requestFile, onChang
             </div>
           </div>`).join('') || '<div class="caption picker-empty">尚未添加附件</div>'}
         </div>
-        ${items.length < data.getAttachmentLimit() ? '<button class="sheet-secondary" data-manager-add>添加附件</button>' : ''}
+        ${items.length < attachmentLimit ? '<button class="sheet-secondary" data-manager-add>添加附件</button>' : ''}
         <button class="sheet-primary" data-manager-close>完成</button>
       </section>`;
   };
@@ -157,6 +187,7 @@ export function openAttachmentManager({ ownerType, ownerId, requestFile, onChang
     const index = items.findIndex((item) => item.attachmentId === id);
     if (event.target.closest('[data-manager-preview]')) { openAttachmentGallery(items, index); return; }
     if (event.target.closest('[data-manager-remove]')) {
+      if (ownerType === 'transaction' && !window.confirm('从这笔记录移除这个附件？金额与余额不会改变。')) return;
       data.removeAttachment(id);
       document.dispatchEvent(new CustomEvent('ringgitme:attachment-changed', { detail: { ownerType, ownerId } }));
       onChange?.(data.getAttachments(ownerType, ownerId));
@@ -204,11 +235,11 @@ export function openAttachmentGallery(items, startIndex = 0) {
     const canShare = attachmentCanShare(item);
     layer.innerHTML = `<button class="picker-scrim" data-gallery-close aria-label="关闭预览"></button>
       <section class="picker-sheet glass-sheet attachment-gallery" role="dialog" aria-modal="true" aria-label="附件预览">
-        <header class="attachment-gallery-header"><strong>附件 ${index + 1} / ${items.length}</strong><span class="attachment-name" title="${escapeHTML(item.name)}">${escapeHTML(item.name)}</span></header>
+        <header class="attachment-gallery-header"><strong>附件 ${index + 1} / ${items.length}</strong><span class="attachment-name" title="${escapeHTML(attachmentDisplayName(item, index))}">${escapeHTML(attachmentDisplayName(item, index))}</span></header>
         <div class="attachment-gallery-stage">
           ${item.kind === 'photo' && item.localObjectUrl
-            ? `<button type="button" class="attachment-gallery-image" data-gallery-lightbox aria-label="全屏查看 ${escapeHTML(item.name)}"><img src="${escapeHTML(item.localObjectUrl)}" alt="${escapeHTML(item.name)}" /></button>`
-            : `<div class="attachment-gallery-file">${icon('paperclip', 30)}<div class="row-title attachment-name">${escapeHTML(item.name)}</div><div class="caption">${escapeHTML(item.mimeType)} · ${attachmentSizeLabel(item.sizeBytes)}</div></div>`}
+            ? `<button type="button" class="attachment-gallery-image${ui.privacy ? ' is-private' : ''}" data-gallery-lightbox aria-label="全屏查看 ${escapeHTML(attachmentDisplayName(item, index))}"><img src="${escapeHTML(item.localObjectUrl)}" alt="${escapeHTML(attachmentDisplayName(item, index))}" /></button>`
+            : `<div class="attachment-gallery-file">${icon('paperclip', 30)}<div class="row-title attachment-name">${escapeHTML(attachmentDisplayName(item, index))}</div><div class="caption">${ui.privacy ? '附件资料已隐藏' : `${escapeHTML(item.mimeType)} · ${attachmentSizeLabel(item.sizeBytes)}`}</div></div>`}
         </div>
         <div class="attachment-gallery-nav">
           <button type="button" data-gallery-prev ${index === 0 ? 'disabled' : ''} aria-label="上一个">${icon('chevronLeft', 18)}</button>

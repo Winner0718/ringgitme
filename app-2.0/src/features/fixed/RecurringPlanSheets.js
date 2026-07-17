@@ -1,11 +1,12 @@
 import { FIXED_MANAGEMENT_COPY as COPY } from '../../app/copy.js';
-import { escapeHTML, fmtDateMY, fmtRM } from '../../app/format.js';
+import { escapeHTML, fmtDateMY, fmtRM, fmtTimeAMPM } from '../../app/format.js';
 import { data, registerAction, ui, update } from '../../app/state.js';
 import { calculateRecurringRelationshipProjection, normalizeRecurringRelationship } from '../../domain/recurringRelationshipModel.js';
 import { deriveFirstEligibleOccurrence, deriveInstallmentProgress, installmentScheduleByFixedAmount, installmentScheduleByMonths, isRecurringPlanDraftMeaningfullyDirty, normalizeRecurringPlanDraftForComparison } from '../../domain/recurringPlanUsability.js';
 import { addMonths } from '../../domain/scheduleGenerator.js';
 import { deriveRecurringOccurrencePresentation } from '../../domain/recurringOccurrencePresentation.js';
 import { derivePlanVisualPresentation } from '../../domain/planVisualPresentation.js';
+import { maskDuitNowValue, maskPaymentAccount } from '../../domain/recipientPaymentProfiles.js';
 import { openSheet, closeSheet, toast } from '../../components/AppSheet.js';
 import { openDatePickerSheet } from '../../components/DatePickerSheet.js';
 import { icon } from '../../components/Icons.js';
@@ -13,6 +14,8 @@ import { moneyStringToMinor } from '../../components/MoneyCalculatorSheet.js';
 import { openPickerSheet, pickerFieldHTML } from '../../components/PickerSheet.js';
 import { openRecurringRelationshipComposer } from '../../components/RecurringRelationshipComposer.js';
 import { sheetActionDockHTML } from '../../components/SheetActionDock.js';
+import { registerRecurringOccurrenceActionSheets } from './RecurringOccurrenceActionSheets.js';
+import { openRecipientPaymentProfileManager } from './RecipientPaymentProfileSheets.js';
 
 // Removal wording remains centralized. The split key also preserves the
 // original Phase 2C2 source guard that reserves the legacy hard-delete name.
@@ -691,10 +694,12 @@ function occurrenceHistory(plan, source) {
   if (!rows.length) return `<div class="plan-history-empty">暂无账期记录</div>`;
   return rows.map((row) => {
     const presentation = deriveRecurringOccurrencePresentation(row, plan, data.today);
+    const shownMinor = Number.isInteger(row.postedAmountMinor) ? row.postedAmountMinor : row.ownShareMinor;
     const amount = row.amountPending
       ? '<b class="amount-pending">待填写金额</b>'
-      : `<b>${row.amountState === 'estimated' ? '<small>预计</small>' : ''}${fmtRM(row.ownShareMinor / 100, { privacy: ui.privacy })}</b>`;
-    return `<div class="plan-history-row" data-semantic-state="${presentation.semanticState}"><span><strong>${fmtDateMY(row.dueDate)}</strong><small>${row.monthKey}</small></span>${amount}<em class="status-${presentation.semanticState} tone-${presentation.tone}">${escapeHTML(presentation.label)}</em></div>`;
+      : `<b>${row.amountState === 'estimated' ? '<small>预计</small>' : ''}${fmtRM(shownMinor / 100, { privacy: ui.privacy })}</b>`;
+    const attachment = row.attachmentIds?.length ? `<i class="plan-history-attachment" aria-label="${row.attachmentIds.length} 个附件">${icon('paperclip', 13)} ${row.attachmentIds.length}</i>` : '';
+    return `<div class="plan-history-row" data-semantic-state="${presentation.semanticState}"><span><strong>${fmtDateMY(row.dueDate)}</strong><small>${row.monthKey}</small></span>${amount}${attachment}<em class="status-${presentation.semanticState} tone-${presentation.tone}">${escapeHTML(presentation.label)}</em></div>`;
   }).join('');
 }
 
@@ -714,7 +719,7 @@ function planAmountHTML(plan) {
   return `${prefix}${fmtRM((plan.plannedAmountMinor ?? plan.totalAmountMinor) / 100, { privacy: ui.privacy })}`;
 }
 
-export function openPlanDetail(source) {
+export function openPlanDetail(source, occurrenceId = null) {
   const key = canonicalKey(source);
   const canonical = data.getCanonicalRecurringPlan(key);
   const plan = canonical.plan;
@@ -722,7 +727,10 @@ export function openPlanDetail(source) {
   const account = data.getAccount(plan.paymentSourceAccountId);
   const relation = plan.relationship ? data.getRelationshipLedger(plan.relationship.ledgerId) : null;
   const firstOccurrence = deriveFirstEligibleOccurrence(plan);
-  const nextOccurrence = data.getCanonicalRecurringPlanOccurrences(key).find((row) => row.dueDate >= data.today && !['paid','skipped'].includes(row.status));
+  const occurrenceRows = data.getCanonicalRecurringPlanOccurrences(key);
+  const requestedOccurrence = occurrenceId ? occurrenceRows.find((row) => row.id === occurrenceId) : null;
+  const nextOccurrence = requestedOccurrence || occurrenceRows.find((row) => row.dueDate >= data.today && !['paid','skipped'].includes(row.status));
+  const occurrencePosting = requestedOccurrence?.recurringPostingId ? data.getRecurringOccurrencePosting(requestedOccurrence.recurringPostingId) : null;
   const visual = derivePlanVisualPresentation(plan, nextOccurrence || null, {
     context: 'plan-detail',
     referenceDate: data.today,
@@ -731,6 +739,7 @@ export function openPlanDetail(source) {
   });
   const visualAmount = visual.primaryAmountMinor == null ? '待填写' : fmtRM(visual.primaryAmountMinor / 100, { privacy: ui.privacy });
   const visualSecondary = visual.secondaryAmounts.map((item) => `<span><small>${escapeHTML(item.label)}</small><strong>${fmtRM(item.amountMinor / 100, { privacy: ui.privacy })}</strong></span>`).join('');
+  const recipient = data.getRecipientIdentityForPlan(plan);
   const partnerPaidSubscription = plan.planKind === 'subscription' && plan.subscriptionFundingMode === 'other_pays';
   const paymentSourceDetail = partnerPaidSubscription
     ? ['代付方', data.getParticipant(plan.relationship?.payerParticipantId)?.displayName || '对方']
@@ -751,8 +760,9 @@ export function openPlanDetail(source) {
     ${canonical.managementLabel?`<div class="plan-managed-note">${icon('ledger',18)}<span><strong>${canonical.managementLabel}</strong><small>此计划的金额、周期与关系由原账本维护。</small></span></div>`:''}
     <section class="plan-detail-grid">${detailItems.map(([label, value], index) => `<span class="${detailItems.length % 2 && index === detailItems.length - 1 ? 'span-all' : ''}">${escapeHTML(label)}<strong>${escapeHTML(value)}</strong></span>`).join('')}</section>
     ${plan.note?`<p class="plan-detail-note">${escapeHTML(plan.note)}</p>`:''}
+    ${recipient ? `<button type="button" class="sheet-secondary plan-recipient-profile-entry" data-action="fixed-plan-recipient-profile" data-plan-id="${escapeHTML(plan.id)}">${icon('wallet',18)}<span><strong>${escapeHTML(recipient.displayName)}收款资料</strong><small>${data.getRecipientPaymentProfiles({ recipientId: recipient.recipientId }).length ? '管理银行账号与 DuitNow' : '尚未添加收款资料'}</small></span>${icon('chevronRight',15)}</button>` : ''}
     <section class="plan-history"><h3>${COPY.history}</h3>${occurrenceHistory(plan,key)}</section>
-    <div class="plan-detail-actions">${plan.status !== 'stopped' && !plan.archivedAt ? `<button class="sheet-primary" data-action="fixed-plan-edit" data-source="${escapeHTML(key)}">${COPY.editPlan}</button>` : ''}<button class="sheet-secondary ${plan.status === 'stopped' || plan.archivedAt ? 'span-all' : ''}" data-action="fixed-plan-manage" data-source="${escapeHTML(key)}">管理计划</button></div>
+    <div class="plan-detail-actions">${occurrencePosting?.transactionId ? `<button class="sheet-primary" data-action="recurring-posting-view" data-transaction-id="${escapeHTML(occurrencePosting.transactionId)}">查看记录</button>` : ''}${occurrencePosting?.status === 'posted' ? `<button class="sheet-danger" data-action="recurring-posting-reverse-request" data-posting-id="${escapeHTML(occurrencePosting.postingId)}">撤销这次记账</button>` : ''}${!occurrencePosting && nextOccurrence && !['paid','charged','received','repaid','completed','skipped'].includes(nextOccurrence.recordedStatus || nextOccurrence.status) && plan.status === 'active' && !plan.archivedAt ? `<button class="sheet-primary" data-action="fixed-occurrence-action" data-source="${escapeHTML(key)}" data-occurrence-id="${escapeHTML(nextOccurrence.id)}">本期处理</button>` : ''}${plan.status !== 'stopped' && !plan.archivedAt ? `<button class="sheet-secondary" data-action="fixed-plan-edit" data-source="${escapeHTML(key)}">${COPY.editPlan}</button>` : ''}<button class="sheet-secondary ${plan.status === 'stopped' || plan.archivedAt ? 'span-all' : ''}" data-action="fixed-plan-manage" data-source="${escapeHTML(key)}">管理计划</button></div>
   </article>`});
   bindPlanImageFallback(detailSheet);
 }
@@ -761,7 +771,6 @@ function openPlanManage(el) {
   const canonical = data.getCanonicalRecurringPlan(el.dataset.source);
   const plan = canonical.plan;
   const source = el.dataset.source;
-  const eligibility = canonical.owner === 'fixed' ? data.getManagedRecurringPlanRemovalEligibility(source) : { eligible: false, reasonCode: 'source_managed' };
   const lifecycle = plan.archivedAt ? `<button class="sheet-secondary" data-action="fixed-plan-unarchive" data-source="${escapeHTML(source)}">${COPY.unarchive}</button>`
     : plan.status === 'stopped' ? `<button class="sheet-secondary" data-action="fixed-plan-archive" data-source="${escapeHTML(source)}">${COPY.archivePlan}</button>`
       : `${plan.status === 'paused' ? `<button class="sheet-secondary" data-action="fixed-plan-transition" data-target="active" data-source="${escapeHTML(source)}">${COPY.resume}</button>` : `<button class="sheet-secondary" data-action="fixed-plan-transition" data-target="paused" data-source="${escapeHTML(source)}">${COPY.pause}</button>`}<button class="sheet-danger" data-action="fixed-plan-transition" data-target="stopped" data-source="${escapeHTML(source)}">${COPY.stop}</button><button class="sheet-secondary archive-action" data-action="fixed-plan-archive" data-source="${escapeHTML(source)}">${COPY.stopAndArchive}</button>`;
@@ -769,7 +778,7 @@ function openPlanManage(el) {
     title: '管理计划',
     className: 'plan-management-sheet',
     stacked: true,
-    contentHTML: `<div class="plan-management-actions"><p>只调整未来计划状态，不会创建、撤销或修改任何交易。</p>${canonical.managementLabel ? `<div class="plan-managed-note">${icon('ledger',18)}<span><strong>${canonical.managementLabel}</strong><small>归档与删除请回到原账本处理。</small></span></div>` : `${lifecycle}<button class="sheet-danger plan-remove-action${eligibility.eligible ? '' : ' is-blocked'}" data-action="fixed-plan-remove-request" data-source="${escapeHTML(source)}">${REMOVE_PLAN_LABEL}</button>`}<button class="sheet-secondary" data-action="sheet-close">取消</button></div>`,
+    contentHTML: `<div class="plan-management-actions"><p>只调整未来计划状态，不会创建、撤销或修改任何交易。</p>${canonical.managementLabel ? `<div class="plan-managed-note">${icon('ledger',18)}<span><strong>${canonical.managementLabel}</strong><small>归档与删除请回到原账本处理。</small></span></div>` : `<section class="plan-management-group"><h3>计划状态</h3>${lifecycle}</section><section class="plan-management-group is-danger"><h3>危险操作</h3><button class="sheet-danger plan-remove-action" data-action="fixed-plan-delete-request" data-source="${escapeHTML(source)}">删除计划</button><small>计划会移到最近删除，之后仍可恢复。</small></section>`}<button class="sheet-secondary" data-action="sheet-close">取消</button></div>`,
   });
 }
 
@@ -787,6 +796,146 @@ function requestRemoval(el) {
     return openSheet({ title: COPY.deleteBlockedTitle, className: 'plan-confirm-sheet', stacked: true, contentHTML: `<div class="plan-confirm-copy"><p>这项计划已有账期或记录。你可以停止并归档，过去记录会继续保留。</p><button class="sheet-primary" data-action="fixed-plan-archive" data-source="${escapeHTML(source)}">${canonical.plan.status === 'stopped' ? COPY.archivePlan : COPY.stopAndArchive}</button><button class="sheet-secondary" data-action="sheet-close">返回</button></div>` });
   }
   openSheet({ title: REMOVE_PLAN_TITLE, className: 'plan-confirm-sheet', stacked: true, contentHTML: `<div class="plan-confirm-copy"><div class="plan-remove-summary">${planVisual(canonical.plan)}<span><strong>${escapeHTML(canonical.plan.title)}</strong><small>${planAmountHTML(canonical.plan)}</small></span></div><p>这项计划尚未产生正式记录。删除后无法恢复。</p><button class="sheet-danger" data-action="fixed-plan-remove-confirm" data-source="${escapeHTML(source)}" data-command="${commandId('remove')}">${REMOVE_PLAN_LABEL}</button><button class="sheet-secondary" data-action="sheet-close">取消</button></div>` });
+}
+
+function requestSoftDelete(el) {
+  const source = el.dataset.source;
+  const canonical = data.getCanonicalRecurringPlan(source);
+  openSheet({
+    title: '删除这项计划？',
+    className: 'plan-confirm-sheet',
+    stacked: true,
+    contentHTML: `<div class="plan-confirm-copy"><div class="plan-remove-summary">${planVisual(canonical.plan)}<span><strong>${escapeHTML(canonical.plan.title)}</strong><small>${planAmountHTML(canonical.plan)}</small></span></div><p>计划会移到最近删除，之后仍可恢复。已经产生的账期和记录不会被删除。</p><button class="sheet-danger" data-action="fixed-plan-delete-confirm" data-source="${escapeHTML(source)}" data-command="${commandId('soft-delete')}">移到最近删除</button><button class="sheet-secondary" data-action="sheet-close">取消</button></div>`,
+  });
+}
+
+function deletedPlanRow(entry) {
+  const plan = entry.plan;
+  const next = (entry.occurrenceSnapshot || []).find((row) => row.dueDate >= data.today && !['paid', 'skipped'].includes(row.status));
+  return `<article class="recently-deleted-plan-row surface" data-deleted-plan-id="${escapeHTML(plan.id)}">
+    ${planVisual(plan)}
+    <div><strong>${escapeHTML(plan.title)}</strong><small>${escapeHTML(KIND_LABEL[plan.planKind] || '计划')} · 原状态 ${escapeHTML(STATUS_LABEL[entry.tombstone.previousLifecycleStatus] || entry.tombstone.previousLifecycleStatus)}</small><small>删除于 ${fmtDateMY(entry.tombstone.deletedAt.slice(0, 10))}${next ? ` · 原下次账期 ${fmtDateMY(next.dueDate)}` : ''}</small></div>
+    <div class="recently-deleted-actions"><button type="button" class="deleted-plan-view-action" data-action="fixed-plan-deleted-detail" data-plan-id="${escapeHTML(plan.id)}">查看详情</button><button type="button" data-action="fixed-plan-restore-request" data-plan-id="${escapeHTML(plan.id)}">恢复</button><button type="button" class="is-danger" data-action="fixed-plan-permanent-request" data-plan-id="${escapeHTML(plan.id)}">永久删除</button></div>
+  </article>`;
+}
+
+function deletedDetailRow(label, value) {
+  if (value == null || value === '') return '';
+  return `<div class="deleted-plan-detail-row"><span>${escapeHTML(label)}</span><strong>${value}</strong></div>`;
+}
+
+function openDeletedPlanDetail(el) {
+  const planId = el.dataset.planId;
+  const entry = data.getRecentlyDeletedRecurringPlans().find((row) => row.plan.id === planId);
+  if (!entry) return;
+  const plan = entry.plan;
+  const relation = plan.relationship || {};
+  const account = plan.paymentSourceAccountId ? data.getAccount(plan.paymentSourceAccountId) : null;
+  const profile = plan.recipientPaymentProfileId ? data.getRecipientPaymentProfile(plan.recipientPaymentProfileId) : null;
+  const deletedAt = entry.tombstone.deletedAt;
+  const nextAtDelete = (entry.occurrenceSnapshot || []).filter((row) => row.dueDate >= deletedAt.slice(0, 10)).sort((a, b) => a.dueDate.localeCompare(b.dueDate))[0];
+  const retainedCount = (entry.occurrenceSnapshot || []).filter((row) => row.recordedStatus || row.postedTransactionId || ['paid', 'charged', 'received', 'repaid', 'completed', 'skipped'].includes(row.status)).length;
+  const amountMinor = plan.plannedAmountMinor ?? plan.totalAmountMinor ?? plan.estimateAmountMinor;
+  const frequency = plan.schedule?.recurrence === 'yearly'
+    ? `每年 ${plan.schedule.dueMonth || 1} 月 ${plan.schedule.dueDay || 1} 日`
+    : `每月 ${plan.schedule?.dueDay || 1} 日`;
+  const people = [relation.payerParticipantId, relation.collectorParticipantId, relation.counterpartyId, relation.recipientParticipantId, relation.creditorParticipantId]
+    .filter(Boolean).map((id) => data.getParticipant(id)?.displayName || '关系对象').filter((name, index, all) => all.indexOf(name) === index).join('、');
+  const payment = profile ? `<div class="deleted-plan-payment-profile">
+    <span>${escapeHTML(profile.displayName)} · ${escapeHTML(profile.bankDisplayName)}</span>
+    <strong class="num">${escapeHTML(maskPaymentAccount(profile.accountNumber, { hidden: ui.privacy }))}</strong>
+    ${profile.duitNowValue ? `<small>DuitNow ${escapeHTML(maskDuitNowValue(profile.duitNowValue, { hidden: ui.privacy }))}</small>` : ''}
+  </div>` : null;
+  openSheet({
+    id: `fixed-plan-deleted-detail:${plan.id}`,
+    parentId: el.closest('.modal-layer')?.dataset.sheetId || 'fixed-recently-deleted',
+    title: '已删除计划详情', stacked: true,
+    className: 'deleted-plan-detail-sheet', trigger: el,
+    contentHTML: `<div class="deleted-plan-detail">
+      <section class="deleted-plan-detail-hero surface">${planVisual(plan)}<div><small>${escapeHTML(KIND_LABEL[plan.planKind] || '计划')}</small><strong>${escapeHTML(plan.title)}</strong><span>只读快照 · 查看不会恢复计划</span></div></section>
+      <section class="deleted-plan-detail-list surface">
+        ${deletedDetailRow('原状态', escapeHTML(STATUS_LABEL[entry.tombstone.previousLifecycleStatus] || entry.tombstone.previousLifecycleStatus || '—'))}
+        ${deletedDetailRow('删除时间', `${fmtDateMY(deletedAt.slice(0, 10))} ${fmtTimeAMPM(deletedAt.slice(11, 16))}`)}
+        ${deletedDetailRow('原金额', Number.isInteger(amountMinor) ? `${plan.amountMode === 'variable' ? '预计 ' : ''}${fmtRM(amountMinor / 100, { privacy: ui.privacy })}` : '待填写')}
+        ${deletedDetailRow('频率', frequency)}
+        ${deletedDetailRow('付款账户', escapeHTML(account?.name || '只记录'))}
+        ${deletedDetailRow('关系设置', escapeHTML(RELATIONSHIP_LABEL[plan.relationshipMode] || (plan.relationshipMode ? '关系计划' : '没有关系设置')))}
+        ${deletedDetailRow('付款／收款角色', escapeHTML(people || '—'))}
+        ${deletedDetailRow('收款资料', payment)}
+        ${deletedDetailRow('原始本金', Number.isInteger(relation.originalPrincipalMinor) ? fmtRM(relation.originalPrincipalMinor / 100, { privacy: ui.privacy }) : null)}
+        ${deletedDetailRow('删除时剩余本金', Number.isInteger(relation.remainingPrincipalMinor) ? fmtRM(relation.remainingPrincipalMinor / 100, { privacy: ui.privacy }) : null)}
+        ${deletedDetailRow('开始日期', plan.startDate ? fmtDateMY(plan.startDate) : null)}
+        ${deletedDetailRow('结束日期', plan.endDate ? fmtDateMY(plan.endDate) : '没有结束日期')}
+        ${deletedDetailRow('删除时下次账期', nextAtDelete?.dueDate ? fmtDateMY(nextAtDelete.dueDate) : '没有未来账期')}
+        ${deletedDetailRow('备注', escapeHTML(plan.note || '—'))}
+        ${deletedDetailRow('保留的历史账期', `${retainedCount} 个`)}
+      </section>
+      <p class="deleted-plan-detail-preservation">已记录的交易、附件与历史审计会继续保留；查看详情不会恢复计划，也不会重新生成未来账期。</p>
+      <button type="button" class="sheet-primary" data-action="fixed-plan-restore-request" data-plan-id="${escapeHTML(plan.id)}">恢复计划</button>
+      <button type="button" class="sheet-danger" data-action="fixed-plan-permanent-request" data-plan-id="${escapeHTML(plan.id)}">永久删除</button>
+      <button type="button" class="sheet-secondary" data-action="sheet-close">关闭</button>
+    </div>`,
+  });
+}
+
+export function openRecentlyDeletedPlans() {
+  const rows = data.getRecentlyDeletedRecurringPlans();
+  openSheet({
+    id: 'fixed-recently-deleted',
+    title: `最近删除 ${rows.length}`,
+    className: 'recently-deleted-sheet',
+    contentHTML: recentlyDeletedContent(rows),
+  });
+}
+
+function recentlyDeletedContent(rows = data.getRecentlyDeletedRecurringPlans()) {
+  return `<div class="recently-deleted-list">${rows.map(deletedPlanRow).join('') || '<div class="plan-history-empty">最近删除是空的</div>'}</div>${rows.length ? '<button type="button" class="sheet-danger clear-recently-deleted" data-action="fixed-plan-clear-deleted-request">清空最近删除</button>' : ''}<button class="sheet-secondary" data-action="sheet-close">完成</button><p class="recently-deleted-note">计划删除历史与账期历史分开管理。已有记账记录不会被删除。</p>`;
+}
+
+function refreshRecentlyDeletedSheet() {
+  const layer = document.querySelector('[data-sheet-id="fixed-recently-deleted"]');
+  const body = layer?.querySelector('.sheet-body');
+  if (!body) return;
+  const scrollTop = body.scrollTop;
+  const rows = data.getRecentlyDeletedRecurringPlans();
+  body.innerHTML = recentlyDeletedContent(rows);
+  body.scrollTop = scrollTop;
+  layer.querySelector('.sheet-title').textContent = `最近删除 ${rows.length}`;
+}
+
+function requestRestoreDeleted(el) {
+  const planId = el.dataset.planId;
+  const entry = data.getRecentlyDeletedRecurringPlans().find((row) => row.plan.id === planId);
+  if (!entry) return;
+  openSheet({
+    title: '恢复这项计划？',
+    className: 'plan-confirm-sheet',
+    stacked: true,
+    contentHTML: `<div class="plan-confirm-copy"><p>“${escapeHTML(entry.plan.title)}”会恢复为${escapeHTML(STATUS_LABEL[entry.tombstone.previousLifecycleStatus] || '原状态')}，不会重复生成过去账期。</p><button class="sheet-primary" data-action="fixed-plan-restore-confirm" data-plan-id="${escapeHTML(planId)}" data-command="${commandId('restore')}">恢复计划</button><button class="sheet-secondary" data-action="sheet-close">取消</button></div>`,
+  });
+}
+
+function requestPermanentDelete(el) {
+  const planId = el.dataset.planId;
+  const entry = data.getRecentlyDeletedRecurringPlans().find((row) => row.plan.id === planId);
+  if (!entry) return;
+  openSheet({
+    title: '永久删除这项计划？',
+    className: 'plan-confirm-sheet',
+    stacked: true,
+    contentHTML: `<div class="plan-confirm-copy"><p>永久删除后无法恢复。已经产生的记账记录不会被删除。</p><div class="plan-remove-summary">${planVisual(entry.plan)}<span><strong>${escapeHTML(entry.plan.title)}</strong><small>只清除计划定义和未来未处理账期</small></span></div><button class="sheet-danger" data-action="fixed-plan-permanent-confirm" data-plan-id="${escapeHTML(planId)}" data-command="${commandId('permanent-delete')}">永久删除</button><button class="sheet-secondary" data-action="sheet-close">取消</button></div>`,
+  });
+}
+
+function requestClearDeleted() {
+  const count = data.getRecentlyDeletedRecurringPlans().length;
+  if (!count) return;
+  openSheet({
+    title: '清空最近删除？',
+    className: 'plan-confirm-sheet',
+    stacked: true,
+    contentHTML: `<div class="plan-confirm-copy"><p>将永久删除最近删除中的 ${count} 项计划。已经产生的记账记录不会被删除。</p><button class="sheet-danger" data-action="fixed-plan-clear-deleted-confirm" data-command="${commandId('clear-deleted')}">永久删除 ${count} 项</button><button class="sheet-secondary" data-action="sheet-close">取消</button></div>`,
+  });
 }
 
 function transitionPlan(el) {
@@ -864,8 +1013,15 @@ function requestScenario(mode) {
 }
 
 export function registerRecurringPlanManagement() {
+  registerRecurringOccurrenceActionSheets();
   registerAction('fixed-plan-new',()=>openPlanEditor());
-  registerAction('fixed-plan-detail',(el)=>openPlanDetail(el.dataset.source||el.dataset.canonicalSource));
+  registerAction('fixed-plan-detail',(el)=>openPlanDetail(el.dataset.source||el.dataset.canonicalSource, el.dataset.occurrenceId || null));
+  registerAction('fixed-plan-recipient-profile', (el) => {
+    const plan = data.getCanonicalRecurringPlans().find((row) => row.id === el.dataset.planId);
+    const recipient = data.getRecipientIdentityForPlan(plan);
+    if (!recipient) return;
+    openRecipientPaymentProfileManager({ recipientId: recipient.recipientId, displayName: recipient.displayName, parentId: el.closest('.modal-layer')?.dataset.sheetId, trigger: el });
+  });
   registerAction('fixed-plan-registry', () => openPlanRegistry());
   registerAction('fixed-plan-archive-list', () => openPlanRegistry({ archived: true }));
   registerAction('fixed-plan-registry-detail', (el) => { closeSheet(true); setTimeout(() => openPlanDetail(el.dataset.source), 60); });
@@ -916,6 +1072,40 @@ export function registerRecurringPlanManagement() {
   registerAction('fixed-plan-unarchive', (el) => { data.unarchiveManagedRecurringPlan(el.dataset.source, { commandId: commandId('unarchive') }); closeSheet(true); closeSheet(true); update({ fixedMonth: ui.fixedMonth }); toast('已取消归档，计划保持停止'); });
   registerAction('fixed-plan-remove-request', requestRemoval);
   registerAction('fixed-plan-remove-confirm', (el) => { data.removeManagedRecurringPlan(el.dataset.source, { commandId: el.dataset.command }); closeSheet(true); closeSheet(true); closeSheet(true); update({ fixedMonth: ui.fixedMonth }); toast('计划已删除'); });
+  registerAction('fixed-plan-delete-request', requestSoftDelete);
+  registerAction('fixed-plan-delete-confirm', (el) => {
+    data.softDeleteManagedRecurringPlan(el.dataset.source, { commandId: el.dataset.command });
+    closeSheet(true); closeSheet(true); closeSheet(true);
+    update({ fixedMonth: ui.fixedMonth });
+    toast('计划已移到最近删除');
+  });
+  registerAction('fixed-plan-recently-deleted', () => openRecentlyDeletedPlans());
+  registerAction('fixed-plan-deleted-detail', openDeletedPlanDetail);
+  registerAction('fixed-plan-restore-request', requestRestoreDeleted);
+  registerAction('fixed-plan-restore-confirm', (el) => {
+    data.restoreDeletedRecurringPlan(el.dataset.planId, { commandId: el.dataset.command });
+    closeSheet(true);
+    if (document.querySelector('.deleted-plan-detail-sheet')) closeSheet(true);
+    refreshRecentlyDeletedSheet();
+    update({ fixedMonth: ui.fixedMonth });
+    toast('计划已恢复');
+  });
+  registerAction('fixed-plan-permanent-request', requestPermanentDelete);
+  registerAction('fixed-plan-permanent-confirm', (el) => {
+    data.permanentlyDeleteRecurringPlan(el.dataset.planId, { commandId: el.dataset.command });
+    closeSheet(true);
+    if (document.querySelector('.deleted-plan-detail-sheet')) closeSheet(true);
+    refreshRecentlyDeletedSheet();
+    update({ fixedMonth: ui.fixedMonth });
+    toast('计划已永久删除');
+  });
+  registerAction('fixed-plan-clear-deleted-request', requestClearDeleted);
+  registerAction('fixed-plan-clear-deleted-confirm', (el) => {
+    data.clearRecentlyDeletedRecurringPlans({ commandId: el.dataset.command });
+    closeSheet(true); closeSheet(true);
+    update({ fixedMonth: ui.fixedMonth });
+    toast('最近删除已清空');
+  });
   registerAction('fixed-plan-transition',transitionPlan);
   registerAction('fixed-plan-transition-confirm',(el)=>{ const opts={commandId:commandId(el.dataset.target)}; if(el.dataset.target==='paused')data.pauseManagedRecurringPlan(el.dataset.source,opts); else if(el.dataset.target==='active')data.resumeManagedRecurringPlan(el.dataset.source,opts); else data.stopManagedRecurringPlan(el.dataset.source,opts); closeSheet(true);closeSheet(true);closeSheet(true);update({fixedMonth:ui.fixedMonth});toast('计划状态已更新'); });
 }

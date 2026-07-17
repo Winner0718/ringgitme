@@ -46,6 +46,7 @@ export function projectObligationOccurrence(plan, instance, referenceDate) {
   const projectedPlan = projectObligationPlan(plan);
   if (!projectedPlan || instance.planId !== plan.planId) return null;
   const paid = Number(instance.amountPaidMinor || 0) >= Number(instance.amountDueMinor);
+  const recordedStatus = instance.status === 'skipped' ? 'skipped' : paid ? 'paid' : null;
   const periodKey = instance.periodKey;
   const occurrence = {
     id: deterministicOccurrenceId(projectedPlan, periodKey),
@@ -59,9 +60,14 @@ export function projectObligationOccurrence(plan, instance, referenceDate) {
     cashOutflowMinor: 0,
     receivableMinor: 0,
     payableMinor: instance.amountDueMinor,
-    recordedStatus: paid ? 'paid' : null,
-    postedTransactionId: null,
-    relationshipEntryId: null,
+    recordedStatus,
+    postedTransactionId: instance.postedTransactionId || null,
+    relationshipEntryId: instance.relationshipEntryId || null,
+    recurringPostingId: instance.recurringPostingId || null,
+    postedAmountMinor: instance.postedAmountMinor || null,
+    attachmentIds: structuredClone(instance.attachmentIds || []),
+    postingAudit: structuredClone(instance.postingAudit || null),
+    reversalAudit: structuredClone(instance.reversalAudit || null),
     generatedAt: instance.generatedAt,
     planRevision: projectedPlan.revision,
     revision: instance.revision || 1,

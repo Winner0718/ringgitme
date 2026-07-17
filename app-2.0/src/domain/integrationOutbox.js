@@ -30,6 +30,14 @@ export function createIntegrationOutbox(initialEvents = []) {
     },
     getEvents: () => structuredClone(events),
     getByClientEventId: (id) => structuredClone(byClient.get(id) || null),
+    createCheckpoint: () => structuredClone({ events, sequence }),
+    restoreCheckpoint(checkpoint) {
+      if (!checkpoint?.events) throw new Error('整合事件快照无效');
+      events = structuredClone(checkpoint.events);
+      sequence = Number(checkpoint.sequence || events.length);
+      byClient.clear();
+      events.forEach((event) => byClient.set(event.clientEventId, event));
+    },
     reset() { events = structuredClone(seed); sequence = events.length; byClient.clear(); events.forEach((event) => byClient.set(event.clientEventId, event)); },
   };
 }

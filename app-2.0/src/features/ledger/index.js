@@ -14,6 +14,8 @@ import { participantAvatarHTML } from '../../domain/avatarResolver.js';
 import { openCapacityAlert } from '../../components/CapacityAlertSheet.js';
 import { isAccountCapacityError } from '../../domain/accountCapacity.js';
 import { openPlanEditor } from '../fixed/RecurringPlanSheets.js';
+import { openRecipientPaymentProfileManager } from '../fixed/RecipientPaymentProfileSheets.js';
+import { paymentMethodDestination, RECIPIENT_PAYMENT_METHOD_TYPES } from '../../domain/recipientPaymentProfiles.js';
 
 const ME = 'participant-me';
 const minorRM = (value) => fmtRM(Number(value || 0) / 100, { privacy: ui.privacy });
@@ -61,6 +63,7 @@ function overviewHTML() {
       <button class="seg-item${ui.ledgerSegment === 'personal' ? ' active' : ''}" data-action="ledger-segment" data-seg="personal" role="radio" aria-checked="${ui.ledgerSegment === 'personal'}">个人</button>
       <button class="seg-item${ui.ledgerSegment === 'group' ? ' active' : ''}" data-action="ledger-segment" data-seg="group" role="radio" aria-checked="${ui.ledgerSegment === 'group'}">群组</button>
     </div>
+    <button type="button" class="surface ledger-payment-directory-entry" data-action="ledger-payment-directory">${icon('wallet', 20)}<span><strong>收款资料</strong><small>管理家人、朋友、房东等收款方式</small></span>${icon('chevronRight', 16)}</button>
     <section class="section surface"><ul>${rows.map((ledger) => {
       const person = ledger.derivedType === 'personal' ? counterparty(ledger) : null;
       return `<li class="row ledger-row" data-action="open-ledger" data-ledger="${ledger.ledgerId}" role="button" tabindex="0">
@@ -70,6 +73,29 @@ function overviewHTML() {
       </li>`;
     }).join('') || '<li class="row row-static caption">暂无关系账。</li>'}</ul></section>
     <button class="sheet-secondary ledger-add-person" data-action="ledger-new-ledger">新增账本</button>`;
+}
+
+function recipientPaymentSummary(recipientId) {
+  const methods = data.getRecipientPaymentProfiles({ recipientId });
+  const method = methods.find((row) => row.isDefaultForParticipant) || methods[0] || null;
+  if (!method) return { label: '尚未添加', count: 0 };
+  const channel = method.paymentMethodType === RECIPIENT_PAYMENT_METHOD_TYPES.DUITNOW ? 'DuitNow' : method.bankDisplayName || '银行账号';
+  return { label: `${channel} · ${paymentMethodDestination(method, { hidden: true })}`, count: methods.length };
+}
+
+function openPaymentDirectory(trigger = document.activeElement) {
+  const recipients = data.getRecipientDirectory();
+  openSheet({
+    id: 'ledger-payment-directory',
+    title: '收款资料',
+    className: 'ledger-payment-directory-sheet',
+    trigger,
+    contentHTML: `<div class="ledger-payment-directory-list">${recipients.map((recipient) => {
+      const summary = recipientPaymentSummary(recipient.recipientId);
+      const plans = recipient.sourcePlanIds?.length ? `${recipient.sourcePlanIds.length} 项计划使用` : recipient.kind === 'relationship_person' ? '关系对象' : '外部收款对象';
+      return `<button type="button" class="surface ledger-payment-directory-row" data-action="ledger-payment-directory-recipient" data-recipient-id="${escapeHTML(recipient.recipientId)}"><span class="avatar">${escapeHTML(recipient.displayName.slice(0,1))}</span><span><strong>${escapeHTML(recipient.displayName)}</strong><small>${escapeHTML(summary.label)}</small><em>${summary.count ? `共 ${summary.count} 个收款方式 · ` : ''}${escapeHTML(plans)}</em></span>${icon('chevronRight',16)}</button>`;
+    }).join('') || '<div class="recipient-payment-empty surface"><strong>尚无收款对象</strong></div>'}</div><button type="button" class="sheet-secondary" data-action="sheet-close">完成</button>`,
+  });
 }
 
 // ---- Group participants ------------------------------------
@@ -97,8 +123,10 @@ function participantDetailSheet(participantId) {
   const summary = personal ? data.getRelationshipSummary(personal.ledgerId) : null;
   const net = summary?.netMinor || 0;
   const netCopy = !personal ? '尚未建立个人账本' : net > 0 ? `对方欠你 ${minorRM(net)}` : net < 0 ? `你欠对方 ${minorRM(-net)}` : '已结清';
-  openSheet({ title: participant.displayName, className: 'participant-detail-sheet', contentHTML: `<div class="participant-detail-hero">${participantAvatarHTML(participant, 'participant-strip-avatar')}<strong>${escapeHTML(participant.displayName)}${participantId === ME ? '（我）' : ''}</strong><span class="caption">${participantStatus(participant)}</span></div>
+  const sheetId = `ledger-participant-detail:${participantId}`;
+  openSheet({ id: sheetId, title: participant.displayName, className: 'participant-detail-sheet', contentHTML: `<div class="participant-detail-hero">${participantAvatarHTML(participant, 'participant-strip-avatar')}<strong>${escapeHTML(participant.displayName)}${participantId === ME ? '（我）' : ''}</strong><span class="caption">${participantStatus(participant)}</span></div>
     ${participantId !== ME ? `<div class="sheet-group participant-connection"><div class="detail-row"><span>个人关系账</span><strong>${personal ? '已连接' : '未建立'}</strong></div><div class="detail-row"><span>净额</span><strong class="num ${net > 0 ? 'amt-pos' : net < 0 ? 'amt-neg' : ''}">${netCopy}</strong></div></div>
+      <button class="sheet-secondary participant-payment-profile-entry" data-action="ledger-recipient-payment-profiles" data-participant="${escapeHTML(participantId)}">${icon('wallet', 18)}<span><strong>收款资料</strong><small>${data.getRecipientPaymentProfiles({ ownerParticipantId: participantId }).length ? '管理银行账号与 DuitNow' : '尚未添加收款资料'}</small></span>${icon('chevronRight', 15)}</button>
       ${personal ? `<button class="sheet-primary" data-action="ledger-open-personal" data-ledger="${escapeHTML(personal.ledgerId)}">前往${escapeHTML(participant.displayName)}账本 〉</button>` : `<button class="sheet-primary" data-action="ledger-create-personal" data-participant="${escapeHTML(participantId)}">建立与${escapeHTML(participant.displayName)}的个人账本 〉</button>`}` : ''}
     <button class="sheet-secondary" data-action="ledger-return">完成</button>` });
 }
@@ -769,6 +797,22 @@ export function registerLedgerFeature() {
   registerAction('ledger-load-more', () => update({ ledgerHistoryLimit: ui.ledgerHistoryLimit + 30 }));
   registerAction('ledger-participants', participantSheet);
   registerAction('ledger-participant-detail', (el) => participantDetailSheet(el.dataset.participant));
+  registerAction('ledger-payment-directory', (el) => openPaymentDirectory(el));
+  registerAction('ledger-payment-directory-recipient', (el) => {
+    const recipient = data.getRecipientDirectory().find((row) => row.recipientId === el.dataset.recipientId);
+    if (!recipient) return;
+    openRecipientPaymentProfileManager({ recipientId: recipient.recipientId, displayName: recipient.displayName, parentId: el.closest('.modal-layer')?.dataset.sheetId, trigger: el });
+  });
+  registerAction('ledger-recipient-payment-profiles', (el) => {
+    const participant = data.getParticipant(el.dataset.participant);
+    if (!participant) return;
+    openRecipientPaymentProfileManager({
+      recipientId: participant.participantId,
+      displayName: participant.displayName,
+      parentId: el.closest('.modal-layer')?.dataset.sheetId,
+      trigger: el,
+    });
+  });
   registerAction('ledger-open-personal', (el) => { closeSheet(); pushRoute({ tab: 'ledger', ledgerId: el.dataset.ledger, ledgerSegment: 'personal', ledgerHistoryLimit: 30 }, { direction: 'forward' }); });
   registerAction('ledger-create-personal', (el) => {
     const participant = data.getParticipant(el.dataset.participant);

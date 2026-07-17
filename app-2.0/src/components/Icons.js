@@ -27,6 +27,7 @@ export const icons = {
   calendar: P('<rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4M16 3v4M4 11h16"/>'),
   clock: P('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
   note: P('<path d="M5 4h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z"/><path d="M8 9h8M8 13h6"/>'),
+  copy: P('<rect x="8" y="8" width="11" height="11" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>'),
   camera: P('<path d="M5 8h2l1.5-2.5h7L17 8h2a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2z"/><circle cx="12" cy="13" r="3.2"/>'),
   moon: P('<path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11z"/>'),
   dots: P('<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>'),
@@ -37,6 +38,7 @@ export const icons = {
   pin: P('<path d="M9 4h6l-1 7 3 2v2H7v-2l3-2-1-7z"/><path d="M12 15v6"/>'),
   radar: P('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><path d="M12 12l6-6"/>'),
   wallet: P('<path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7z"/><path d="M16 12h4v4h-4a2 2 0 0 1 0-4z"/>'),
+  phone: P('<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M10 5h4M11 18.5h2"/>'),
   // category icons
   food: P('<path d="M5 3v9M8 3v9M6.5 12v9M5 3c0 3 3 3 3 0"/><path d="M17 3c-2 0-3 2.5-3 5 0 2 1 3 2 3v10M17 3c2 0 2 3 2 5"/>'),
   cart: P('<circle cx="9" cy="19" r="1.6"/><circle cx="17" cy="19" r="1.6"/><path d="M3 4h2l2.2 11h10.6L20 8H6"/>'),

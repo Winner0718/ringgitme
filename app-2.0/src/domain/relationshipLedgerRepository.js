@@ -40,6 +40,14 @@ export function createRelationshipLedgerRepository({ ledgers = [], entries = [],
     getSettlement: (id) => structuredClone(state.settlements.find((item) => item.settlementId === id) || null),
     updateSettlement(id, changes) { const index = state.settlements.findIndex((item) => item.settlementId === id); state.settlements[index] = { ...state.settlements[index], ...structuredClone(changes) }; return structuredClone(state.settlements[index]); },
     getSnapshot: () => structuredClone(state),
+    createCheckpoint: () => structuredClone({ state, entrySequence, settlementSequence, ledgerSequence }),
+    restoreCheckpoint(checkpoint) {
+      if (!checkpoint?.state) throw new Error('无效的关系账检查点');
+      state = structuredClone(checkpoint.state);
+      entrySequence = Number(checkpoint.entrySequence || state.entries.length);
+      settlementSequence = Number(checkpoint.settlementSequence || state.settlements.length);
+      ledgerSequence = Number(checkpoint.ledgerSequence || state.ledgers.length);
+    },
     reset() { state = structuredClone(seed); entrySequence = state.entries.length; settlementSequence = state.settlements.length; ledgerSequence = state.ledgers.length; },
   };
 }

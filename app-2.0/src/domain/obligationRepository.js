@@ -63,6 +63,14 @@ export function createObligationRepository({ plans = [], instances = [], payment
       state.payments[index] = { ...state.payments[index], ...structuredClone(changes) };
       return structuredClone(state.payments[index]);
     },
+    createCheckpoint: () => structuredClone({ state, planSequence, instanceSequence, paymentSequence }),
+    restoreCheckpoint(checkpoint) {
+      if (!checkpoint?.state) throw new Error('义务账快照无效');
+      state = structuredClone(checkpoint.state);
+      planSequence = Number(checkpoint.planSequence);
+      instanceSequence = Number(checkpoint.instanceSequence);
+      paymentSequence = Number(checkpoint.paymentSequence);
+    },
     getSnapshot: () => structuredClone(state),
     reset() {
       state = structuredClone(seed);

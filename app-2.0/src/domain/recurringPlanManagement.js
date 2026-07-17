@@ -204,6 +204,44 @@ export function createRecurringPlanManagementGateway({
     return run(commandId, () => ({ status: 'removed', owner: 'fixed', source: canonical.source, ...recurringRepository.removeUnusedPlan(canonical.plan.id) }));
   }
 
+  function softDelete(sourceValue, { commandId, actorId = 'participant-me' } = {}) {
+    const canonical = getCanonicalPlan(sourceValue);
+    if (canonical.owner !== 'fixed') recurringError('source_managed_delete', '这项计划由账本管理');
+    return run(commandId, () => ({
+      status: 'recently_deleted',
+      owner: 'fixed',
+      source: canonical.source,
+      ...recurringRepository.softDeletePlan(canonical.plan.id, {
+        deletedAt: `${today()}T09:00:00+08:00`,
+        deletedByActorId: actorId,
+      }),
+    }));
+  }
+
+  function restoreDeleted(planId, { commandId } = {}) {
+    return run(commandId, () => {
+      const plan = recurringRepository.restoreDeletedPlan(planId, { restoredAt: `${today()}T09:00:00+08:00` });
+      const occurrence = fixedOccurrence(recurringRepository, plan, today().slice(0, 7), today());
+      return { status: 'restored', owner: 'fixed', source: clone(plan.canonicalSource), plan, occurrence };
+    });
+  }
+
+  function permanentlyDelete(planId, { commandId } = {}) {
+    return run(commandId, () => ({
+      status: 'permanently_deleted',
+      owner: 'fixed',
+      ...recurringRepository.permanentlyDeletePlan(planId),
+    }));
+  }
+
+  function clearDeleted({ commandId } = {}) {
+    return run(commandId, () => ({
+      status: 'recently_deleted_cleared',
+      owner: 'fixed',
+      ...recurringRepository.clearRecentlyDeleted(),
+    }));
+  }
+
   return Object.freeze({
     getCanonicalPlan,
     listCanonicalPlans: () => clone(allPlans()),
@@ -216,6 +254,12 @@ export function createRecurringPlanManagementGateway({
     archivePlan: archive,
     unarchivePlan: unarchive,
     removePlan: remove,
+    softDeletePlan: softDelete,
+    listRecentlyDeletedPlans: () => recurringRepository.listRecentlyDeleted(),
+    restoreDeletedPlan: restoreDeleted,
+    permanentlyDeletePlan: permanentlyDelete,
+    clearRecentlyDeleted: clearDeleted,
+    getPreservedDeletedHistory: () => recurringRepository.getPreservedDeletedHistory(),
     getRemovalEligibility: removalEligibility,
     occurrencesFor,
     resetCommands: () => commands.clear(),

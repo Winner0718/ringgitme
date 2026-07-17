@@ -15,8 +15,14 @@ import { icon } from '../../components/Icons.js';
 import { registerFixedCenterFeature, renderFixedCenter } from '../fixed/index.js';
 import { deriveMonthlyWorkspace } from '../../domain/fixedCenterWorkspace.js';
 
+function standaloneCommitments() {
+  // Canonical recurring plans are rendered and actioned by Fixed Center. Keeping
+  // their legacy radar rows visible would create a second, disconnected paid state.
+  return data.getCommitments().filter((commitment) => !commitment.recurringPlanId);
+}
+
 function radarSorted() {
-  return [...data.getCommitments()].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+  return [...standaloneCommitments()].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 }
 
 function pinnedCommitment() {
@@ -99,7 +105,7 @@ function renderToday(container) {
   const pulse = data.getPulse();
   // The pinned item is not repeated as the first radar row
   const pinned = pinnedCommitment();
-  const radar = radarSorted().filter((c) => c !== pinned).slice(0, 3);
+  const radar = radarSorted().filter((c) => c !== pinned && !c.paid).slice(0, 3);
   container.innerHTML = `
     ${renderMoneyPulse(pulse)}
     ${renderMetricStrip(pulse)}
@@ -108,7 +114,7 @@ function renderToday(container) {
     <section class="section">
       <div class="row-between sec-head">
         <h2 class="sec-title">${icon('radar', 16)} 本月必还</h2>
-        <span class="caption">共 ${data.getCommitments().filter((c) => !c.paid).length} 项待付</span>
+        <span class="caption">共 ${standaloneCommitments().filter((c) => !c.paid).length} 项待付</span>
       </div>
       <div class="surface"><ul>${radar.map(renderCommitmentRow).join('')}</ul></div>
     </section>
@@ -132,7 +138,7 @@ export function registerTodayFeature() {
   // Marking paid is a short confirmation, never an instant mutation
   registerAction('toggle-commit-paid', (el, e) => {
     e.stopPropagation();
-    const c = data.getCommitments().find((x) => x.id === el.dataset.commit);
+    const c = standaloneCommitments().find((x) => x.id === el.dataset.commit);
     if (!c) return;
     openSheet({
       title: c.paid ? '恢复为待付' : '标记已付',
@@ -149,7 +155,7 @@ export function registerTodayFeature() {
   });
 
   registerAction('confirm-commit-paid', (el) => {
-    const c = data.getCommitments().find((x) => x.id === el.dataset.commit);
+    const c = standaloneCommitments().find((x) => x.id === el.dataset.commit);
     if (!c) return;
     data.setCommitmentPaid(c.id, !c.paid);
     closeSheet();

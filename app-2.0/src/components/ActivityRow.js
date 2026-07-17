@@ -16,14 +16,16 @@ export function renderActivityRow(t) {
   const category = data.getCategory(t.catId);
   const catIcon = KIND_ICON[t.kind] || category?.icon || catIconName(t.catId);
   const attachmentCount = t.attachmentCount ?? (t.attachment || t.receipt || t.photo ? 1 : 0);
+  const reversed = t.status === 'reversed' || Boolean(t.reversalAudit);
   const marks = [
+    reversed ? '<span class="row-mark reversal-row-badge">已撤销</span>' : '',
     t.shared ? `<span class="row-mark" title="共享">AA</span>` : '',
     t.accountEffect === 'record_only' ? '<span class="row-mark record-only-badge">只记录</span>' : '',
     t.accountEffect === 'relationship_only' ? '<span class="row-mark relationship-only-badge">关系账</span>' : '',
     attachmentCount ? `<span class="row-clip">${icon('paperclip', 13)}${attachmentCount > 1 ? `<span class="row-clip-count">${attachmentCount}</span>` : ''}</span>` : '',
   ].join('');
   return `
-    <li class="act-row row${t.justSaved ? ' just-saved' : ''}" data-action="open-record-detail" data-txn="${t.id}" id="act-${t.id}" role="button" tabindex="0" aria-label="查看 ${escapeHTML(t.desc)} 记录详情">
+    <li class="act-row row${t.justSaved ? ' just-saved' : ''}${reversed ? ' is-reversed' : ''}" data-action="open-record-detail" data-txn="${t.id}" id="act-${t.id}" role="button" tabindex="0" aria-label="查看 ${escapeHTML(t.desc)}${reversed ? ' 已撤销' : ''}记录详情">
       <span class="row-icon theme-${t.categoryThemeToken || category?.themeToken || 'slate'}">${icon(catIcon, 17)}</span>
       <div class="row-main">
         <div class="row-title">${escapeHTML(t.desc)}${marks}</div>

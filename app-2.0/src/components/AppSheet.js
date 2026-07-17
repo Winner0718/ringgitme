@@ -60,6 +60,9 @@ export function openSheet({ title, contentHTML, className = '', onClose, onOpen,
   syncCaptureOpen();
 
   requestAnimationFrame(() => {
+    const body = sheet.querySelector('.sheet-body');
+    sheet.scrollTop = 0;
+    if (body) body.scrollTop = 0;
     scrim.classList.add('open');
     sheet.classList.add('open');
     sheet.focus({ preventScroll: true });
@@ -207,14 +210,25 @@ function attachDragToClose(sheet, entry) {
 
 let toastTimer = null;
 export function toast(message) {
-  let el = document.querySelector('.toast');
+  let root = document.getElementById('ringgitme-toast-root');
+  if (!root) {
+    root = document.createElement('div');
+    root.id = 'ringgitme-toast-root';
+    root.className = 'toast-portal-root';
+    root.setAttribute('aria-live', 'polite');
+    root.setAttribute('aria-atomic', 'true');
+    document.body.appendChild(root);
+  }
+  let el = root.querySelector('.toast');
   if (!el) {
     el = document.createElement('div');
     el.className = 'toast glass-sheet';
-    document.getElementById('app').appendChild(el);
+    el.setAttribute('role', 'status');
+    root.appendChild(el);
   }
-  el.textContent = message;
+  el.textContent = String(message || '');
   el.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+  return el;
 }

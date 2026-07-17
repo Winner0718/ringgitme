@@ -4,9 +4,53 @@
 // attachments by id; the store is the single authority for order and metadata.
 
 export const DEFAULT_MAX_ATTACHMENTS = 6;
+export const MAX_POSTING_EVIDENCE_ATTACHMENTS = 5;
+export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+const POSTING_EVIDENCE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'application/pdf']);
+const ALLOWED_ATTACHMENT_TYPES = new Set([
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'text/plain',
+]);
+
+export function validateAttachmentFile({ mimeType, type, sizeBytes, size } = {}) {
+  const normalizedType = String(mimeType || type || 'application/octet-stream').toLowerCase();
+  const normalizedSize = Number(sizeBytes ?? size ?? 0);
+  if (!normalizedType.startsWith('image/') && !ALLOWED_ATTACHMENT_TYPES.has(normalizedType)) throw new Error('不支持这种附件格式');
+  if (!Number.isFinite(normalizedSize) || normalizedSize < 0 || normalizedSize > MAX_ATTACHMENT_BYTES) throw new Error('附件不能超过 10 MB');
+  return true;
+}
+
+export function validatePostingEvidenceFile(file = {}) {
+  const normalizedType = String(file.mimeType || file.type || '').toLowerCase();
+  if (!POSTING_EVIDENCE_TYPES.has(normalizedType)) throw new Error('付款凭证只支持 JPG、PNG、WebP 或 PDF');
+  return validateAttachmentFile(file);
+}
+
+export function createPostingEvidenceDraftStore(options = {}) {
+  const store = createAttachmentStore({ ...options, maxPerOwner: MAX_POSTING_EVIDENCE_ATTACHMENTS });
+  return Object.freeze({
+    ...store,
+    add(input) {
+      validatePostingEvidenceFile(input);
+      return store.add({ ...input, category: input.category || 'transfer-proof' });
+    },
+  });
+}
 
 function defaultRevoke(url) {
   if (url && url.startsWith('blob:') && typeof URL !== 'undefined' && URL.revokeObjectURL) URL.revokeObjectURL(url);
+}
+
+function inferredMimeType(name) {
+  const value = String(name || '').toLowerCase();
+  if (/\.(jpe?g|png|gif|webp|heic)$/.test(value)) return `image/${value.endsWith('.jpg') || value.endsWith('.jpeg') ? 'jpeg' : value.slice(value.lastIndexOf('.') + 1)}`;
+  if (value.endsWith('.pdf')) return 'application/pdf';
+  if (value.endsWith('.docx')) return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  if (value.endsWith('.doc')) return 'application/msword';
+  if (value.endsWith('.txt')) return 'text/plain';
+  return 'application/octet-stream';
 }
 
 export function attachmentKind(mimeType) {
@@ -42,7 +86,8 @@ export function createAttachmentStore({ maxPerOwner = DEFAULT_MAX_ATTACHMENTS, r
 
   function normalize(input) {
     const name = String(input.name || '附件').trim() || '附件';
-    const mimeType = String(input.mimeType || input.type || 'application/octet-stream');
+    const mimeType = String(input.mimeType || input.type || inferredMimeType(name));
+    validateAttachmentFile({ mimeType, sizeBytes: input.sizeBytes ?? input.size });
     return {
       name,
       mimeType,
@@ -51,6 +96,11 @@ export function createAttachmentStore({ maxPerOwner = DEFAULT_MAX_ATTACHMENTS, r
       localObjectUrl: String(input.localObjectUrl || input.dataUrl || ''),
       thumbnail: attachmentKind(mimeType) === 'photo' ? { kind: 'image', url: String(input.localObjectUrl || input.dataUrl || '') } : { kind: 'tile', label: name.includes('.') ? name.slice(name.lastIndexOf('.') + 1).toUpperCase().slice(0, 4) : 'FILE' },
       source: input.source || 'app',
+      category: input.category || 'other',
+      note: input.note || null,
+      planId: input.planId || null,
+      occurrenceId: input.occurrenceId || null,
+      transactionId: input.transactionId || null,
     };
   }
 
@@ -113,7 +163,13 @@ export function createAttachmentStore({ maxPerOwner = DEFAULT_MAX_ATTACHMENTS, r
     assignOwner(fromType, fromId, toType, toId) {
       const moved = listRaw(fromType, fromId);
       const offset = listRaw(toType, toId).length;
-      moved.forEach((item, index) => Object.assign(item, { ownerEntityType: toType, ownerEntityId: toId, sortOrder: offset + index, updatedAt: now() }));
+      moved.forEach((item, index) => Object.assign(item, {
+        ownerEntityType: toType,
+        ownerEntityId: toId,
+        transactionId: toType === 'transaction' ? toId : item.transactionId,
+        sortOrder: offset + index,
+        updatedAt: now(),
+      }));
       return moved.map((item) => item.attachmentId);
     },
     removeFor(ownerEntityType, ownerEntityId) {
@@ -124,6 +180,14 @@ export function createAttachmentStore({ maxPerOwner = DEFAULT_MAX_ATTACHMENTS, r
     listFor: (ownerEntityType, ownerEntityId) => structuredClone(listRaw(ownerEntityType, ownerEntityId)),
     countFor: (ownerEntityType, ownerEntityId) => listRaw(ownerEntityType, ownerEntityId).length,
     getSnapshot: () => structuredClone(items),
+    createCheckpoint: () => structuredClone({ items, sequence }),
+    restoreCheckpoint(checkpoint) {
+      if (!checkpoint?.items) throw new Error('无效的附件检查点');
+      items = structuredClone(checkpoint.items);
+      sequence = Number(checkpoint.sequence || items.length);
+      byClientEvent.clear();
+      items.forEach((item) => { if (item.clientEventId) byClientEvent.set(item.clientEventId, item); });
+    },
     reset() {
       items.filter((item) => !seed.some((seeded) => seeded.attachmentId === item.attachmentId)).forEach((item) => revokeUrl(item.localObjectUrl));
       items = structuredClone(seed);

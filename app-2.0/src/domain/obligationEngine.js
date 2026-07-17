@@ -172,7 +172,7 @@ export function createObligationEngine({ repository, getLedger, outbox, financia
       const payable = plan.direction === 'payable';
       const draft = {
         kind: payable ? 'expense' : 'income',
-        amount: fromMinor(amountMinor),
+        amountMinor,
         desc: command.description || `${plan.title} · ${targets[0].periodKey}`,
         catId: command.catId || (payable ? 'expense-fallback' : 'income-fallback'),
         catLabel: command.catLabel || (payable ? '未分类支出' : '未分类收入'),
@@ -184,6 +184,11 @@ export function createObligationEngine({ repository, getLedger, outbox, financia
         attachmentIds: command.attachmentIds || [],
         lockedReason: PAYMENT_LOCK,
         submissionKey: `obligation:${command.clientEventId}`,
+        recurringPlanId: command.recurringPlanId || null,
+        recurringOccurrenceId: command.recurringOccurrenceId || null,
+        recurringPostingId: command.recurringPostingId || null,
+        recipientPaymentSnapshot: command.recipientPaymentSnapshot || null,
+        payerAccountSnapshot: command.payerAccountSnapshot || null,
       };
       const transaction = financial.addTransaction(draft);
       let remaining = amountMinor;
@@ -193,11 +198,25 @@ export function createObligationEngine({ repository, getLedger, outbox, financia
         const appliedMinor = Math.min(remaining, remainingOf(instance));
         remaining -= appliedMinor;
         const nextPaid = instance.amountPaidMinor + appliedMinor;
-        repository.updateInstance(instance.instanceId, { amountPaidMinor: nextPaid, status: nextPaid === instance.amountDueMinor ? 'paid' : 'partial', settlementIds: [...instance.settlementIds, command.clientEventId] });
+        repository.updateInstance(instance.instanceId, {
+          amountPaidMinor: nextPaid,
+          status: nextPaid === instance.amountDueMinor ? 'paid' : 'partial',
+          settlementIds: [...instance.settlementIds, command.clientEventId],
+          recurringPostingId: command.recurringPostingId || null,
+          postedTransactionId: transaction.id,
+          postedAmountMinor: appliedMinor,
+          attachmentIds: command.attachmentIds || [],
+          postingAudit: command.recurringPostingId ? {
+            postingId: command.recurringPostingId,
+            confirmedAt: command.occurredAt || `${command.date}T${command.time}:00+08:00`,
+            amountMinor: appliedMinor,
+            attachmentCount: (command.attachmentIds || []).length,
+          } : null,
+        });
         allocations.push({ instanceId: instance.instanceId, periodKey: instance.periodKey, appliedMinor });
       });
       const occurredAt = command.occurredAt || `${command.date}T${command.time}:00+08:00`;
-      const payment = repository.addPayment({ planId: plan.planId, amountMinor, allocations, transactionId: transaction.id, recordOnly: Boolean(command.recordOnly), sourceChannel: command.sourceChannel || 'app', clientEventId: command.clientEventId, occurredAt, attachmentIds: command.attachmentIds || [] });
+      const payment = repository.addPayment({ planId: plan.planId, amountMinor, allocations, transactionId: transaction.id, recordOnly: Boolean(command.recordOnly), sourceChannel: command.sourceChannel || 'app', clientEventId: command.clientEventId, occurredAt, attachmentIds: command.attachmentIds || [], recurringPlanId: command.recurringPlanId || null, recurringOccurrenceId: command.recurringOccurrenceId || null, recurringPostingId: command.recurringPostingId || null });
       financial.linkTransaction?.(transaction.id, payment.paymentId);
       const updatedPlan = syncPlanAfterPayment(repository.getPlan(plan.planId), { ...command, occurredAt });
       if (transaction.confirmation) transaction.confirmation = immutableConfirmationSnapshot({ ...transaction.confirmation, plan: {
@@ -235,7 +254,19 @@ export function createObligationEngine({ repository, getLedger, outbox, financia
       payment.allocations.forEach((allocation) => {
         const instance = repository.getInstance(allocation.instanceId);
         const nextPaid = instance.amountPaidMinor - allocation.appliedMinor;
-        repository.updateInstance(instance.instanceId, { amountPaidMinor: nextPaid, status: nextPaid === 0 ? 'scheduled' : nextPaid === instance.amountDueMinor ? 'paid' : 'partial' });
+        repository.updateInstance(instance.instanceId, {
+          amountPaidMinor: nextPaid,
+          status: nextPaid === 0 ? 'scheduled' : nextPaid === instance.amountDueMinor ? 'paid' : 'partial',
+          recurringPostingId: nextPaid === 0 ? null : instance.recurringPostingId || null,
+          postedTransactionId: nextPaid === 0 ? null : instance.postedTransactionId || null,
+          postedAmountMinor: nextPaid === 0 ? null : nextPaid,
+          attachmentIds: nextPaid === 0 ? [] : instance.attachmentIds || [],
+          reversalAudit: payment.recurringPostingId ? {
+            postingId: payment.recurringPostingId,
+            reversedAt: command.occurredAt || new Date().toISOString(),
+            reason: command.reason || '用户撤销',
+          } : null,
+        });
       });
       if (payment.transactionId) financial.reverseTransaction(payment.transactionId);
       const reversed = repository.updatePayment(paymentId, { status: 'reversed', reversedAt: command.occurredAt || new Date().toISOString(), reversalOf: paymentId });
@@ -309,6 +340,15 @@ export function createObligationEngine({ repository, getLedger, outbox, financia
     getPlan: (id) => repository.getPlan(id),
     getInstances: (planId) => repository.getInstances(planId),
     getPayments: (planId) => repository.getPayments(planId),
+    getPayment: (paymentId) => repository.getPayment(paymentId),
+    getInstance: (instanceId) => repository.getInstance(instanceId),
+    createCheckpoint: () => ({ repository: repository.createCheckpoint(), commands: structuredClone(commands) }),
+    restoreCheckpoint(checkpoint) {
+      if (!checkpoint?.repository) throw new Error('义务执行快照无效');
+      repository.restoreCheckpoint(checkpoint.repository);
+      commands.clear();
+      for (const [key, value] of checkpoint.commands || []) commands.set(key, structuredClone(value));
+    },
     reset() { repository.reset(); commands.clear(); },
   };
 }

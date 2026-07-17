@@ -175,6 +175,12 @@ function validateAndNormalize(draft, accounts) {
     transferFeeMinor: rawFeeMinor,
     relationshipMode: draft.relationshipMode || draft.entryType || null,
     submissionKey: draft.submissionKey || draft.clientEventId || null,
+    recurringPlanId: draft.recurringPlanId || null,
+    recurringOccurrenceId: draft.recurringOccurrenceId || null,
+    recurringPostingId: draft.recurringPostingId || null,
+    recipientPaymentSnapshot: structuredClone(draft.recipientPaymentSnapshot || null),
+    payerAccountSnapshot: structuredClone(draft.payerAccountSnapshot || null),
+    reversalOfTransactionId: draft.reversalOfTransactionId || null,
   };
 }
 
@@ -311,6 +317,20 @@ export function createMoneyEngine({ accounts, transactions, today }) {
       return () => listeners.delete(listener);
     },
     getSnapshot,
+    createCheckpoint() {
+      return structuredClone({ state, sequence, confirmationSequence });
+    },
+    restoreCheckpoint(checkpoint) {
+      if (!checkpoint?.state) throw new Error('无效的账户检查点');
+      state = structuredClone(checkpoint.state);
+      sequence = Number(checkpoint.sequence || 0);
+      confirmationSequence = Number(checkpoint.confirmationSequence || 0);
+      submissionKeys.clear();
+      state.transactions.forEach((transaction) => {
+        if (transaction.submissionKey) submissionKeys.set(transaction.submissionKey, transaction);
+      });
+      notify();
+    },
     getAccounts: () => state.accounts,
     getAccount: (id) => accountById(state.accounts, id),
     getTransactions({ includeReversed = false } = {}) {
@@ -441,15 +461,36 @@ export function createMoneyEngine({ accounts, transactions, today }) {
       notify();
       return state.transactions[index];
     },
+    markTransactionReversalAudit(id, reversal) {
+      const transaction = state.transactions.find((item) => item.id === id);
+      if (!transaction) throw new Error('找不到原始记录');
+      transaction.reversal = { ...(transaction.reversal || {}), ...structuredClone(reversal || {}) };
+      transaction.reversalAudit = structuredClone(transaction.reversal);
+      transaction.updatedAt = nowISO();
+      notify();
+      return transaction;
+    },
     deleteTransaction(id) {
       return this.reverseTransaction(id);
     },
-    // Attachment membership only — no financial meaning, no edit history.
+    // Attachment membership only — no financial meaning. Keep a lightweight
+    // evidence audit without fabricating a financial edit revision.
     setTransactionAttachments(id, attachmentIds) {
       const transaction = state.transactions.find((item) => item.id === id);
       if (!transaction) throw new Error('找不到这笔记录');
+      const previousIds = structuredClone(transaction.attachmentIds || []);
       transaction.attachmentIds = structuredClone(attachmentIds || []);
       transaction.updatedAt = nowISO();
+      if (JSON.stringify(previousIds) !== JSON.stringify(transaction.attachmentIds)) {
+        transaction.attachmentAudit = [
+          ...(transaction.attachmentAudit || []),
+          {
+            occurredAt: transaction.updatedAt,
+            previousCount: previousIds.length,
+            nextCount: transaction.attachmentIds.length,
+          },
+        ];
+      }
       notify();
       return transaction;
     },

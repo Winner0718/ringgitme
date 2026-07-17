@@ -16,6 +16,10 @@ import { buildOccurrenceSnapshot, dueSoonReminderIntents } from '../domain/recur
 import { dedupeCanonicalPlans, projectFixedRelationshipsForLedger, projectObligationOccurrence, projectObligationPlan, selectRecurringMonth } from '../domain/recurringPlanSelectors.js';
 import { RECURRING_PLAN_FIXTURES, RECURRING_OCCURRENCE_FIXTURES } from './recurringPlanFixtures.js';
 import { buildLedgerRecurringProjection, selectRecurringPlansForLedger } from '../domain/ledgerRecurringProjection.js';
+import { createRecipientPaymentProfileRepository } from '../domain/recipientPaymentProfiles.js';
+import { buildRecipientDirectory, recipientIdentityForPlan } from '../domain/recipientDirectory.js';
+import { RECIPIENT_PAYMENT_PROFILE_FIXTURES } from './recipientPaymentProfileFixtures.js';
+import { createRecurringPostingExecutor } from '../domain/recurringPostingExecutor.js';
 
 // ============================================================
 // RinggitMe 2.0 — demo fixtures (Phase 1 shell only)
@@ -117,8 +121,8 @@ const savingsFlow = { inflow: 4150.0, outflow: 2318.4 };
 // ---- Commitments (radar) -----------------------------------
 const commitments = [
   { id: 'cm-loan', name: '车贷 Proton X50', amount: 751.2, myShare: 751.2, dueDate: '2026-07-10', sourceId: 'sv-mbb', paid: false, kind: 'loan' },
-  { id: 'cm-rent', name: '房租（两人平分）', amount: 1312, myShare: 656, dueDate: '2026-07-15', sourceId: 'sv-mbb', paid: false, kind: 'rent' },
-  { id: 'cm-netflix', name: 'Netflix', amount: 54.9, myShare: 54.9, dueDate: '2026-07-20', sourceId: 'cc-mbb-visa', paid: false, kind: 'sub' },
+  { id: 'cm-rent', name: '房租（两人平分）', amount: 1312, myShare: 656, dueDate: '2026-07-15', sourceId: 'sv-mbb', paid: false, kind: 'rent', recurringPlanId: 'fixed-rent-shared' },
+  { id: 'cm-netflix', name: 'Netflix', amount: 54.9, myShare: 54.9, dueDate: '2026-07-20', sourceId: 'cc-mbb-visa', paid: false, kind: 'sub', recurringPlanId: 'subscription-netflix' },
   { id: 'cm-spotify', name: 'Spotify', amount: 23.9, myShare: 23.9, dueDate: '2026-07-28', sourceId: 'ew-tng', paid: false, kind: 'sub' },
 ];
 
@@ -266,7 +270,7 @@ function buildActivities() {
 }
 
 // ---- Data source interface (the adapter boundary) ----------
-export function createDemoDataSource() {
+export function createDemoDataSource({ recurringPostingFaultInjector = null } = {}) {
   const engine = createMoneyEngine({ accounts, transactions: buildActivities(), today: FIXTURE_TODAY });
   const categoryRepo = createCategoryRepository();
   const participantRepo = createParticipantRepository(RELATIONSHIP_PARTICIPANTS);
@@ -302,6 +306,73 @@ export function createDemoDataSource() {
     recurringRepository: recurringPlans,
     obligationEngine: obligations,
     today: () => FIXTURE_TODAY,
+  });
+  const recipientPaymentProfiles = createRecipientPaymentProfileRepository({
+    profiles: RECIPIENT_PAYMENT_PROFILE_FIXTURES,
+    clock: () => `${FIXTURE_TODAY}T09:00:00+08:00`,
+  });
+  const resolveObligationPostingContext = (planId, occurrenceId) => {
+    const sourcePlan = obligationRepo.getPlans()
+      .find((candidate) => projectObligationPlan(candidate)?.id === planId);
+    if (!sourcePlan) return { plan: null, occurrence: null, sourceType: null };
+    const plan = projectObligationPlan(sourcePlan);
+    const sourceInstance = obligationRepo.getInstances(sourcePlan.planId)
+      .find((candidate) => projectObligationOccurrence(sourcePlan, candidate, FIXTURE_TODAY)?.id === occurrenceId);
+    if (!sourceInstance) return { plan: null, occurrence: null, sourceType: null };
+    return {
+      plan,
+      occurrence: projectObligationOccurrence(sourcePlan, sourceInstance, FIXTURE_TODAY),
+      sourceType: 'obligation_plan',
+      sourcePlan,
+      sourceInstance,
+    };
+  };
+  const recurringTransactionLinks = new Map();
+  const recurringPosting = createRecurringPostingExecutor({
+    adapter: {
+      money: engine,
+      recurring: recurringPlans,
+      relationship: ledgerRepo,
+      attachments: attachmentStore,
+      outbox,
+      obligation: {
+        resolveContext: resolveObligationPostingContext,
+        recordPayment: (command) => obligations.recordPayment(command),
+        reversePayment: (paymentId, command) => obligations.reversePayment(paymentId, command),
+        createCheckpoint: () => obligations.createCheckpoint(),
+        restoreCheckpoint: (checkpoint) => obligations.restoreCheckpoint(checkpoint),
+        skipOccurrence(instanceId, postingAudit) {
+          return obligationRepo.updateInstance(instanceId, {
+            status: 'skipped',
+            recurringPostingId: postingAudit.postingId,
+            postingAudit: structuredClone(postingAudit),
+          });
+        },
+        restoreOccurrence(instanceId, before, reversalAudit) {
+          return obligationRepo.updateInstance(instanceId, {
+            amountPaidMinor: before.amountPaidMinor,
+            status: before.status,
+            settlementIds: structuredClone(before.settlementIds || []),
+            recurringPostingId: before.recurringPostingId || null,
+            postedTransactionId: before.postedTransactionId || null,
+            postedAmountMinor: before.postedAmountMinor || null,
+            attachmentIds: structuredClone(before.attachmentIds || []),
+            postingAudit: structuredClone(before.postingAudit || null),
+            reversalAudit: structuredClone(reversalAudit),
+          });
+        },
+      },
+      participants: () => participantRepo.getAll(),
+      participantName: (id) => participantRepo.get(id)?.displayName || (id === 'participant-me' ? '我' : '关系对象'),
+      linkTransaction(transactionId, relationshipEntityId, postingId) {
+        if (transactionId) {
+          recurringTransactionLinks.set(transactionId, postingId);
+          if (relationshipEntityId) relationshipLinks.set(transactionId, relationshipEntityId);
+        }
+      },
+    },
+    clock: () => `${FIXTURE_TODAY}T09:00:00+08:00`,
+    faultInjector: recurringPostingFaultInjector,
   });
   const emitAttachmentEvent = (eventType, attachment, clientEventId, payload = {}) => outbox.emit({
     clientEventId, eventType, sourceChannel: 'app', actorUserId: 'user-winner', participantId: null,
@@ -412,6 +483,43 @@ export function createDemoDataSource() {
     unarchiveManagedRecurringPlan: (source, options) => recurringManagement.unarchivePlan(source, options),
     removeManagedRecurringPlan: (source, options) => recurringManagement.removePlan(source, options),
     getManagedRecurringPlanRemovalEligibility: (source) => recurringManagement.getRemovalEligibility(source),
+    softDeleteManagedRecurringPlan: (source, options) => recurringManagement.softDeletePlan(source, options),
+    getRecentlyDeletedRecurringPlans: () => recurringManagement.listRecentlyDeletedPlans(),
+    restoreDeletedRecurringPlan: (planId, options) => recurringManagement.restoreDeletedPlan(planId, options),
+    permanentlyDeleteRecurringPlan: (planId, options) => recurringManagement.permanentlyDeletePlan(planId, options),
+    clearRecentlyDeletedRecurringPlans: (options) => recurringManagement.clearRecentlyDeleted(options),
+    getPreservedDeletedRecurringHistory: () => recurringManagement.getPreservedDeletedHistory(),
+    getRecipientPaymentProfile: (profileId) => recipientPaymentProfiles.get(profileId),
+    getRecipientPaymentProfiles: (options) => recipientPaymentProfiles.list(options),
+    getDefaultRecipientPaymentProfile: (recipientId) => recipientPaymentProfiles.findDefault(recipientId),
+    getRecipientIdentityForPlan(planOrId) {
+      const plan = typeof planOrId === 'string'
+        ? recurringManagement.listCanonicalPlans().find((row) => row.id === planOrId)
+        : planOrId;
+      return recipientIdentityForPlan(plan, {
+        getProfile: (id) => recipientPaymentProfiles.get(id),
+        getParticipant: (id) => participantRepo.get(id),
+      });
+    },
+    getRecipientDirectory() {
+      return buildRecipientDirectory({
+        participants: participantRepo.getAll(),
+        plans: recurringManagement.listCanonicalPlans(),
+        profiles: recipientPaymentProfiles.list(),
+      });
+    },
+    createRecipientPaymentProfile: (input) => recipientPaymentProfiles.create(input),
+    updateRecipientPaymentProfile: (profileId, changes) => recipientPaymentProfiles.update(profileId, changes),
+    deleteRecipientPaymentProfile: (profileId) => recipientPaymentProfiles.remove(profileId),
+    setDefaultRecipientPaymentProfile: (profileId) => recipientPaymentProfiles.setDefault(profileId),
+    executeRecurringOccurrencePosting: (command) => recurringPosting.executeRecurringOccurrencePosting(command),
+    reverseRecurringOccurrencePosting: (postingId, options) => recurringPosting.reverseRecurringOccurrencePosting(postingId, options),
+    getRecurringOccurrencePosting: (postingId) => recurringPosting.getPosting(postingId),
+    getRecurringOccurrencePostings: () => recurringPosting.listPostings(),
+    getRecurringPostingForTransaction(transactionId) {
+      const postingId = recurringTransactionLinks.get(transactionId);
+      return postingId ? recurringPosting.getPosting(postingId) : null;
+    },
 
     subscribe: (listener) => engine.subscribe(listener),
     getAccounts: () => engine.getAccounts(),
@@ -462,7 +570,9 @@ export function createDemoDataSource() {
     resetCategoryType: (type) => categoryRepo.resetType(type),
     getRecentCategories: () => categoryRepo.getQuickCategories('expense'),
 
-    getActivities: () => engine.getTransactions().map(decorateTransaction),
+    getActivities: () => engine.getTransactions({ includeReversed: true })
+      .filter((transaction) => transaction.status === 'active' || transaction.recurringPostingId)
+      .map(decorateTransaction),
     getTransactions: (options) => engine.getTransactions(options).map(decorateTransaction),
     getActivity: (id) => decorateTransaction(engine.getTransaction(id)),
     getTransaction: (id) => decorateTransaction(engine.getTransaction(id)),
@@ -533,6 +643,9 @@ export function createDemoDataSource() {
       obligationLinks.clear();
       recurringPlans.reset();
       recurringManagement.resetCommands();
+      recipientPaymentProfiles.reset();
+      recurringPosting.reset();
+      recurringTransactionLinks.clear();
       attachmentStore.reset();
     },
     projectAAReceivable: (...args) => engine.projectAAReceivable(...args),

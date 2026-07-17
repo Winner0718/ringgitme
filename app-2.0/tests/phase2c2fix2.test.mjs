@@ -240,7 +240,7 @@ add('visual reads do not create activities', () => assert.deepEqual(demo.getActi
 add('visual reads do not mutate relationship balances', () => assert.deepEqual(demo.getRelationshipSummary('ledger-sis'), before.relationship));
 add('one canonical plan source', () => { const keys = demo.getCanonicalRecurringPlans().map((plan) => canonicalSourceKey(plan.canonicalSource)); assert.equal(new Set(keys).size, keys.length); });
 add('one occurrence per period', () => { const rows = demo.getFixedCenterMonth('2026-07', referenceDate).rows; assert.equal(new Set(rows.map((row) => `${canonicalSourceKey(row.canonicalSource)}:${row.periodKey}`)).size, rows.length); });
-add('Fixed and Ledger couple plan ID equal', () => assert.equal(demo.getFixedCenterMonth('2026-07', referenceDate).rows.find((row) => row.plan.id === couple.id).canonicalPlanId, demo.getLedgerRecurringProjection('ledger-sis', referenceDate).cards.find((card) => card.planId === couple.id).canonicalPlanId));
+add('Fixed and Ledger couple plan ID equal', () => assert.equal(demo.getFixedCenterMonth('2026-07', referenceDate).rows.find((row) => row.plan.id === couple.id).canonicalPlanId, demo.getLedgerRecurringProjection(couple.relationship.ledgerId, referenceDate).cards.find((card) => card.planId === couple.id).canonicalPlanId));
 add('variable display does not mark paid', () => assert.notEqual(variableOccurrence.status, 'paid'));
 add('installment display does not reduce principal', () => { const beforeRemaining = installment.relationship.remainingPrincipalMinor; derivePlanVisualPresentation(installment, occurrence(installment), context()); assert.equal(installment.relationship.remainingPrincipalMinor, beforeRemaining); });
 for (const [name, pattern] of [

@@ -8,11 +8,13 @@ export const RECURRING_PLAN_FIXTURES = [
     id: 'fixed-rent-shared', planKind: 'fixed_expense', title: '房租', categoryId: 'home', currency: 'MYR',
     totalAmountMinor: 131200, schedule: { recurrence: 'monthly', dueDay: 7, timezone: 'Asia/Kuala_Lumpur' },
     startDate: '2024-08-31', moveInDate: '2024-08-31', status: 'active', paymentSourceAccountId: 'sv-mbb',
+    recipientId: 'recipient-external-landlord', recipientDisplayName: '房东',
+    recipientPaymentProfileId: 'recipient-profile-rent-landlord',
     relationship: {
-      ledgerId: 'ledger-sis', participantIds: ['participant-me', 'participant-sis'], authenticatedParticipantId: 'participant-me',
+      ledgerId: 'ledger-abi', participantIds: ['participant-me', 'participant-abi'], authenticatedParticipantId: 'participant-me',
       payerParticipantId: 'participant-me', splitMode: 'custom',
-      shares: [{ participantId: 'participant-me', amountMinor: 65600 }, { participantId: 'participant-sis', amountMinor: 65600 }],
-      relationshipLabel: '与姐姐分摊',
+      shares: [{ participantId: 'participant-me', amountMinor: 65600 }, { participantId: 'participant-abi', amountMinor: 65600 }],
+      relationshipLabel: '与 Abi 分摊',
     },
     recordOnlyDefault: false, note: '两人平分，我先支付完整账单', createdAt, updatedAt: createdAt,
   },
@@ -43,7 +45,8 @@ export const RECURRING_PLAN_FIXTURES = [
   {
     id: 'fixed-month-end-utilities', planKind: 'fixed_expense', title: '月末水电预算', categoryId: 'bill', currency: 'MYR',
     amountMode: 'variable', estimateAmountMinor: 24000, totalAmountMinor: 24000, schedule: { recurrence: 'monthly', dueDay: 31, timezone: 'Asia/Kuala_Lumpur' },
-    startDate: '2026-01-31', status: 'active', paymentSourceAccountId: 'sv-cimb', recordOnlyDefault: false,
+    startDate: '2026-01-31', status: 'active', paymentSourceAccountId: 'sv-cimb',
+    recipientPaymentProfileId: 'recipient-profile-rent-landlord', recordOnlyDefault: false,
     note: '每月最后一天到期', createdAt, updatedAt: createdAt,
   },
   {
@@ -66,7 +69,7 @@ export const LEDGER_RECURRING_SCENARIO_FIXTURES = [
     relationship: {
       relationshipMode: 'central_collection', ledgerId: 'ledger-family', participantIds: ['participant-me', 'participant-sis', 'participant-peng'], authenticatedParticipantId: 'participant-me',
       collectorParticipantId: 'participant-sis', externalPayerParticipantId: 'participant-sis', splitMode: 'equal', shares: [], relationshipLabel: '家人',
-    }, recordOnlyDefault: false, note: '姐姐统一收款后支付房东', logoRef: 'home', createdAt, updatedAt: createdAt,
+    }, recipientId: 'participant-sis', recipientDisplayName: '姐姐', recipientPaymentProfileId: 'recipient-profile-sister-default', recordOnlyDefault: false, note: '姐姐统一收款后支付房东', logoRef: 'home', createdAt, updatedAt: createdAt,
   },
   {
     id: 'fixed-sister-bed-installment', planKind: 'recurring_relationship', title: '床架分期', categoryId: 'home', currency: 'MYR',
@@ -77,7 +80,7 @@ export const LEDGER_RECURRING_SCENARIO_FIXTURES = [
       creditorParticipantId: 'participant-sis', debtorParticipantId: 'participant-me', originalPrincipalMinor: 100000, remainingPrincipalMinor: 50000,
       installmentAmountMinor: 8333, completedInstallments: 6, plannedInstallmentCount: 12, repaymentMethod: 'fixed_monthly', repaymentMonths: 12, finalInstallmentMinor: 8335,
       relationshipLabel: '姐姐',
-    }, recordOnlyDefault: false, note: '已还一半，剩余六期', logoRef: 'receipt', createdAt, updatedAt: createdAt,
+    }, recipientId: 'participant-sis', recipientDisplayName: '姐姐', recipientPaymentProfileId: 'recipient-profile-sister-default', recordOnlyDefault: false, note: '已还一半，剩余六期', logoRef: 'receipt', createdAt, updatedAt: createdAt,
   },
 ];
 

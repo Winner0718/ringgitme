@@ -1,0 +1,236 @@
+/* Phase 2C3A occurrence action and read-only posting preview. */
+.occurrence-action-sheet,
+.posting-preview-sheet { max-width: 520px; }
+
+.occurrence-action-sheet .sheet-body,
+.posting-preview-sheet .sheet-body { padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+
+.occurrence-action-sheet-content,
+.posting-preview-content { display: grid; gap: 12px; }
+
+.occurrence-action-identity {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 22px;
+}
+
+.occurrence-action-mark {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 15px;
+  color: var(--green);
+  background: var(--green-soft);
+}
+
+.occurrence-action-identity div,
+.occurrence-action-field div { min-width: 0; }
+
+.occurrence-action-identity strong,
+.occurrence-action-identity small { display: block; }
+
+.occurrence-action-identity small {
+  margin-top: 3px;
+  color: var(--text-secondary);
+}
+
+.occurrence-action-identity > b { white-space: nowrap; }
+
+.occurrence-variable-amount,
+.occurrence-action-field,
+.occurrence-action-summary {
+  padding: 14px;
+  border-radius: 20px;
+}
+
+.occurrence-variable-amount {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.occurrence-variable-amount div span,
+.occurrence-variable-amount div strong { display: block; }
+
+.occurrence-variable-amount div strong { margin-top: 3px; font-size: 1.2rem; }
+
+.occurrence-variable-amount button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--green);
+  font-weight: 750;
+}
+
+.occurrence-variable-amount small {
+  grid-column: 1 / -1;
+  color: var(--text-secondary);
+}
+
+.occurrence-action-choices { display: grid; gap: 8px; }
+
+.occurrence-action-choice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 18px;
+  text-align: left;
+  background: var(--surface-strong);
+}
+
+.occurrence-action-choice.active {
+  border-color: var(--green);
+  color: var(--green);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--green) 30%, transparent);
+}
+
+.occurrence-action-choice > span:first-child {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  background: var(--green-soft);
+}
+
+.occurrence-action-choice strong,
+.occurrence-action-choice small { display: block; }
+
+.occurrence-action-choice small { margin-top: 2px; color: var(--text-secondary); }
+
+.occurrence-action-choice em { color: var(--text-secondary); font-style: normal; }
+
+.occurrence-action-field {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+.occurrence-action-field > span { color: var(--text-secondary); }
+
+.occurrence-action-field > button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px 8px;
+  text-align: left;
+}
+
+.occurrence-action-field > button small { color: var(--text-secondary); }
+.occurrence-action-field > button svg { grid-column: 2; grid-row: 1 / 3; }
+.occurrence-action-field div strong,
+.occurrence-action-field div small { display: block; }
+.occurrence-action-field div small { color: var(--text-secondary); }
+
+.occurrence-action-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.occurrence-action-summary span { min-width: 0; }
+.occurrence-action-summary small,
+.occurrence-action-summary strong { display: block; }
+.occurrence-action-summary small { color: var(--text-secondary); }
+.occurrence-action-summary strong { margin-top: 4px; }
+.occurrence-action-error { margin: 0; color: var(--danger); font-weight: 700; }
+
+.posting-preview-section {
+  padding: 14px;
+  border-radius: 20px;
+}
+
+.posting-preview-section h3 {
+  margin: 0 0 10px;
+  font-size: .86rem;
+  color: var(--text-secondary);
+}
+
+.posting-preview-section p { margin: 0; }
+
+.posting-preview-row,
+.posting-preview-effect {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.posting-preview-row > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.posting-preview-effect + .posting-preview-effect { margin-top: 10px; }
+.posting-preview-effect strong { min-width: 0; }
+.posting-preview-effect span { text-align: right; }
+.posting-preview-effect small { color: var(--text-secondary); }
+
+.posting-preview-account-effect > div {
+  display: grid;
+  gap: 3px;
+  justify-items: end;
+  min-width: 0;
+}
+
+.posting-preview-account-effect > div span,
+.posting-preview-account-effect > div small {
+  line-height: 1.25;
+}
+
+.posting-preview-idempotency {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--green);
+}
+
+.posting-preview-idempotency strong,
+.posting-preview-idempotency small { display: block; }
+.posting-preview-idempotency small { margin-top: 2px; color: var(--text-secondary); }
+
+.posting-preview-readonly {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  text-align: center;
+  color: var(--text-secondary);
+  background: var(--surface-soft);
+}
+
+.posting-preview-invalid {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 16px;
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.occurrence-discard-copy { display: grid; gap: 12px; }
+.occurrence-discard-copy p { margin: 0; color: var(--text-secondary); }
+
+@media (max-width: 430px) {
+  .occurrence-action-sheet,
+  .posting-preview-sheet { width: calc(100% - 12px); }
+  .occurrence-action-identity { grid-template-columns: auto minmax(0, 1fr); }
+  .occurrence-action-identity > b { grid-column: 2; }
+  .occurrence-action-summary { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .occurrence-action-sheet *,
+  .posting-preview-sheet * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
