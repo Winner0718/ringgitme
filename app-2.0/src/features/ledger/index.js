@@ -13,6 +13,7 @@ import { openMoneyFlowConfirmation } from '../../components/MoneyFlowConfirmatio
 import { participantAvatarHTML } from '../../domain/avatarResolver.js';
 import { openCapacityAlert } from '../../components/CapacityAlertSheet.js';
 import { isAccountCapacityError } from '../../domain/accountCapacity.js';
+import { openPlanEditor } from '../fixed/RecurringPlanSheets.js';
 
 const ME = 'participant-me';
 const minorRM = (value) => fmtRM(Number(value || 0) / 100, { privacy: ui.privacy });
@@ -68,7 +69,7 @@ function overviewHTML() {
         <span class="num row-amt ${ledger.netMinor >= 0 ? 'amt-pos' : 'amt-neg'}">${minorRM(Math.abs(ledger.netMinor))}</span>${icon('chevronRight', 15)}
       </li>`;
     }).join('') || '<li class="row row-static caption">暂无关系账。</li>'}</ul></section>
-    <button class="sheet-secondary ledger-add-person" data-action="ledger-add-person">添加对象</button>`;
+    <button class="sheet-secondary ledger-add-person" data-action="ledger-new-ledger">新增账本</button>`;
 }
 
 // ---- Group participants ------------------------------------
@@ -170,12 +171,16 @@ function installmentSectionHTML(ledger) {
   return `<section class="section obligation-section"><div class="row-between sec-head"><h2 class="sec-title">分期</h2><button class="obligation-new" data-action="obligation-new-installment">新建分期</button></div>
     ${plans.length ? plans.map((plan) => {
       const overview = installmentPlanOverview(plan, data.getObligationInstances(plan.planId), data.today);
+      const paidProgress = plan.totalRepayableMinor > 0
+        ? Math.min(100, Math.round((overview.paidMinor / plan.totalRepayableMinor) * 100))
+        : 0;
       const clips = plan.attachmentIds?.length || 0;
       return `<div class="surface obligation-card" data-plan="${plan.planId}">
         <div class="row-between"><div class="row-title">${escapeHTML(plan.title)}</div><span class="channel-badge${plan.status === 'completed' ? ' badge-pos' : ''}">${plan.status === 'completed' ? '已结清' : `第 ${overview.currentTerm}/${overview.termCount} 期`}</span></div>
         <div class="caption obligation-line">${escapeHTML(plan.merchant || '')}${plan.merchant ? ' · ' : ''}${plan.direction === 'payable' ? `还给 ${escapeHTML(name(plan.creditorParticipantId))}` : `${escapeHTML(name(plan.debtorParticipantId))} 还我`}</div>
+        ${plan.status !== 'completed' ? `<div class="caption obligation-line num">本期应还 ${minorRM(overview.dueThisMonthMinor)}${overview.nextDueDate ? ` · 下期 ${fmtDateMY(overview.nextDueDate)} ${minorRM(overview.nextDueAmountMinor)}` : ''}</div>` : ''}
         <div class="caption obligation-line num">总额 ${minorRM(plan.totalRepayableMinor)} · 已还 ${minorRM(overview.paidMinor)} · 剩余 ${minorRM(overview.remainingMinor)}</div>
-        ${plan.status !== 'completed' ? `<div class="caption obligation-line num">本月应还 ${minorRM(overview.dueThisMonthMinor)}${overview.nextDueDate ? ` · 下期 ${fmtDateMY(overview.nextDueDate)} ${minorRM(overview.nextDueAmountMinor)}` : ''}</div>` : ''}
+        <div class="plan-progress" role="progressbar" aria-label="还款进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${paidProgress}"><i style="width:${paidProgress}%"></i></div>
         ${clips ? `<button class="attachment-open" data-action="obligation-attachments" data-attachment-ids="${escapeHTML(plan.attachmentIds.join(','))}">${icon('paperclip', 13)} ${clips} 个附件</button>` : ''}
         <div class="obligation-actions">
           ${plan.status !== 'completed' && plan.status !== 'stopped' ? `<button class="primary" data-action="obligation-pay" data-plan="${plan.planId}">记录还款</button><button data-action="installment-early" data-plan="${plan.planId}">提前结清</button>` : ''}
@@ -188,30 +193,26 @@ function installmentSectionHTML(ledger) {
 }
 
 function plansPaymentsSectionHTML(ledger) {
-  const plans = data.getObligationPlans({ ledgerId: ledger.ledgerId });
-  const monthlyCount = plans.filter((plan) => plan.planType === 'recurring_monthly').length;
-  const installmentCount = plans.length - monthlyCount;
-  return `<section class="section plans-payments-section"><div class="row-between sec-head"><div><h2 class="sec-title">计划与还款</h2>${plans.length ? `<div class="caption">每月账 ${monthlyCount} · 分期 ${installmentCount}</div>` : ''}</div><button class="obligation-new" data-action="obligation-new-actions">新建</button></div>
-    ${plans.length ? `<div class="plans-compact-list">${plans.map((plan) => {
-      if (plan.planType === 'recurring_monthly') {
-        const overview = monthlyPlanOverview(plan, data.getObligationInstances(plan.planId), data.today);
-        const current = overview.current;
-        const dueMinor = current ? instanceRemaining(current) : 0;
-        const state = plan.status === 'active' ? (current ? PLAN_STATE_LABEL[overview.currentState] : '本月未生成') : PLAN_STATUS_LABEL[plan.status];
-        return `<article class="surface plan-compact-card" data-action="obligation-plan-detail" data-plan="${plan.planId}" role="button" tabindex="0">
-          <div class="row-between"><div><strong>${escapeHTML(plan.title)}</strong><small>${plan.direction === 'payable' ? `给 ${escapeHTML(name(plan.creditorParticipantId))}` : `向 ${escapeHTML(name(plan.debtorParticipantId))} 收取`} · 每月 ${plan.dueDay} 号</small></div><span class="channel-badge${overview.currentState === 'overdue' ? ' badge-warn' : ''}">${state}</span></div>
-          <div class="plan-due"><span class="caption">本月待${plan.direction === 'payable' ? '付' : '收'}</span><strong class="num">${minorRM(dueMinor)}</strong></div>
-          <div class="row-between caption"><span>${current ? `本期到期 ${fmtDateMY(current.dueDate)}` : overview.nextPreview ? `下次 ${fmtDateMY(overview.nextPreview.dueDate)}` : '等待生成账期'}</span>${dueMinor > 0 ? `<button class="plan-inline-primary" data-action="obligation-pay" data-plan="${plan.planId}">${plan.direction === 'payable' ? '立即付款' : '记录收款'}</button>` : ''}<button class="plan-more" data-action="obligation-plan-menu" data-plan="${plan.planId}" aria-label="更多计划操作">•••</button></div>
-        </article>`;
-      }
-      const overview = installmentPlanOverview(plan, data.getObligationInstances(plan.planId), data.today);
-      const progress = plan.totalRepayableMinor ? Math.min(100, Math.round((overview.paidMinor / plan.totalRepayableMinor) * 100)) : 0;
-      return `<article class="surface plan-compact-card" data-action="obligation-plan-detail" data-plan="${plan.planId}" role="button" tabindex="0">
-        <div class="row-between"><div><strong>${escapeHTML(plan.title)}</strong><small>还给 ${escapeHTML(name(plan.creditorParticipantId))}${plan.merchant ? ` · ${escapeHTML(plan.merchant)}` : ''}</small></div><span class="channel-badge">${plan.status === 'completed' ? '已结清' : `第 ${overview.currentTerm}/${overview.termCount} 期`}</span></div>
-        <div class="plan-installment-summary"><span>本期应还 <b class="num">${minorRM(overview.dueThisMonthMinor)}</b></span><span>剩余 <b class="num">${minorRM(overview.remainingMinor)}</b></span></div>
-        <div class="plan-progress"><i style="width:${progress}%"></i></div><div class="row-between caption"><span>已完成 ${progress}%${overview.nextDueDate ? ` · 下期 ${fmtDateMY(overview.nextDueDate)}` : ''}</span>${overview.remainingMinor > 0 ? `<button class="plan-inline-primary" data-action="obligation-pay" data-plan="${plan.planId}">记录还款</button>` : ''}<button class="plan-more" data-action="obligation-plan-menu" data-plan="${plan.planId}" aria-label="更多计划操作">•••</button></div>
-      </article>`;
-    }).join('')}</div>` : `<button class="surface plans-empty-row" data-action="obligation-new-actions"><span>${icon('calendar', 19)}<span><strong>计划</strong><small>建立每月账或分期</small></span></span>${icon('chevronRight', 15)}</button>`}
+  const projection = data.getLedgerRecurringProjection(ledger.ledgerId, data.today);
+  const hasPlans = projection.cards.length > 0;
+  const group = ledger.derivedType === 'group';
+  const statusClass = (card) => ['overdue', 'urgent'].includes(card.semanticState) ? ' badge-warn' : ['completed', 'paid'].includes(card.lifecycle) ? ' badge-pos' : '';
+  const flowLine = (card) => `${escapeHTML(card.moneyFlow.primary)} <b class="num">${minorRM(card.moneyFlow.amountMinor)}</b>${escapeHTML(card.moneyFlow.cadence)}`;
+  const installmentMeta = (card) => card.relationshipMode === 'installment_repayment'
+    ? `<small>剩余 ${minorRM(card.moneyFlow.remainingPrincipalMinor)} · ${card.moneyFlow.remainingPeriods}期${card.moneyFlow.finalInstallmentMinor ? ` · 末期 ${minorRM(card.moneyFlow.finalInstallmentMinor)}` : ''}</small>` : '';
+  const nextScheduleMeta = (card) => card.scheduledAmountMinor !== card.occurrenceAmountMinor
+    ? `<small>下期 ${minorRM(card.scheduledAmountMinor)}${escapeHTML(card.moneyFlow.cadence)}</small>` : '';
+  const plannedSummary = hasPlans ? `<section class="ledger-planned-summary" aria-label="本月计划，不计入实际余额"><div><span>${projection.summary.label}</span><small>尚未记账，不计入上方实际净额</small></div><div><span>预计待收 <b class="num amt-pos">${minorRM(projection.summary.plannedReceivableMinor)}</b></span><span>预计需付 <b class="num amt-neg">${minorRM(projection.summary.plannedPayableMinor)}</b></span></div></section>` : '';
+  const actionSection = projection.currentActions.length ? `<section class="section ledger-current-actions"><div class="sec-head"><h2 class="sec-title">本期要处理</h2><div class="caption">只显示计划提醒，不会自动付款或记账</div></div><div class="ledger-current-action-list">${projection.currentActions.map((card) => {
+    const due = card.amountPending ? '等待填写本期金额' : card.occurrenceStatus === 'overdue' ? `已逾期 ${Math.abs(card.daysUntilDue)} 天` : card.occurrenceStatus === 'due_today' ? '今天到期' : `${card.daysUntilDue} 天后`;
+    return `<article class="surface ledger-current-action-card tone-${escapeHTML(card.tone)}" data-plan-id="${escapeHTML(card.planId)}" data-occurrence-id="${escapeHTML(card.occurrenceId)}"><div><span class="channel-badge${statusClass(card)}">${escapeHTML(card.statusLabel)}</span><strong>${escapeHTML(card.title)}</strong><small>${flowLine(card)}</small><small>${escapeHTML(due)}</small></div><button type="button" data-action="fixed-plan-detail" data-source="${escapeHTML(card.canonicalSourceKey)}">${escapeHTML(card.actionLabel)}</button></article>`;
+  }).join('')}</div></section>` : '';
+  const cards = projection.cards.map((card) => `<button type="button" class="surface ledger-recurring-card lifecycle-${escapeHTML(card.lifecycle)}" data-action="fixed-plan-detail" data-source="${escapeHTML(card.canonicalSourceKey)}" data-plan-id="${escapeHTML(card.planId)}" data-ledger-id="${escapeHTML(card.ledgerId)}">
+    <span class="ledger-recurring-icon">${icon(card.planKind === 'subscription' ? 'receipt' : card.relationshipMode === 'installment_repayment' ? 'repayment' : 'calendar', 19)}</span><span class="ledger-recurring-main"><span><strong>${escapeHTML(card.title)}</strong><em class="channel-badge${statusClass(card)}">${escapeHTML(card.lifecycle === 'active' ? card.visual.statusLabel : card.visual.planStateLabel)}</em></span><small>${escapeHTML(card.visual.typeLabel)} · ${flowLine(card)}</small>${nextScheduleMeta(card)}${card.moneyFlow.secondary ? `<small>${escapeHTML(card.moneyFlow.secondary)}</small>` : ''}${installmentMeta(card)}</span>${icon('chevronRight', 15)}
+  </button>`).join('');
+  const emptyCopy = group ? '可建立共同费用、统一收款或分期归还' : '可建立共同费用、定期往来、订阅代付或分期还款';
+  return `${plannedSummary}${actionSection}<section class="section plans-payments-section"><div class="row-between sec-head"><div><h2 class="sec-title">计划与还款</h2>${hasPlans ? `<div class="caption">${projection.cards.length} 项 canonical 计划</div>` : ''}</div><button class="obligation-new" data-action="ledger-recurring-new">新建</button></div>
+    ${hasPlans ? `<div class="ledger-recurring-list">${cards}</div>` : `<button class="surface plans-empty-row" data-action="ledger-recurring-new"><span>${icon('calendar', 19)}<span><strong>${group ? '还没有群组计划' : '还没有定期计划'}</strong><small>${emptyCopy}</small></span></span>${icon('chevronRight', 15)}</button>`}
   </section>`;
 }
 
@@ -255,7 +256,7 @@ function detailHTML(ledger) {
       ${summary.receivableMinor ? '<button data-action="ledger-open-settle" data-direction="received">收到款</button>' : ''}${summary.payableMinor ? '<button data-action="ledger-open-settle" data-direction="paid">我还款</button>' : ''}
     </div>
     ${plansPaymentsSectionHTML(ledger)}
-    <section class="section"><div class="row-between sec-head"><h2 class="sec-title">${ui.ledgerView === 'current' ? '当前未结' : '结算历史'}</h2><div class="segmented ledger-view-switch"><button class="seg-item${ui.ledgerView === 'current' ? ' active' : ''}" data-action="ledger-view" data-view="current">未结</button><button class="seg-item${ui.ledgerView === 'history' ? ' active' : ''}" data-action="ledger-view" data-view="history">历史</button></div></div>
+    <section class="section ledger-actual-history"><div class="row-between sec-head"><div><h2 class="sec-title">往来记录</h2><div class="caption">实际已记录的欠款、收款与还款</div></div><div class="segmented ledger-view-switch"><button class="seg-item${ui.ledgerView === 'current' ? ' active' : ''}" data-action="ledger-view" data-view="current">未结</button><button class="seg-item${ui.ledgerView === 'history' ? ' active' : ''}" data-action="ledger-view" data-view="history">历史</button></div></div>
       <div class="surface"><ul>${shown.map((item) => entryRow(item, labels)).join('') || '<li class="row row-static caption">没有记录。</li>'}</ul></div>
       <div class="caption load-note">已显示 ${shown.length} / ${relevantRows.length} 条</div>${relevantRows.length > shown.length ? '<button class="load-more surface" data-action="ledger-load-more">加载更多</button>' : ''}
     </section>`;
@@ -438,8 +439,90 @@ function settlementDetail(id) {
   openSheet({ title: '结算详情', contentHTML: `<div class="detail-hero"><div class="num detail-amt">${minorRM(settlement.amountMinor)}</div><div class="caption">${settlement.direction === 'received' ? '收到款' : '我还款'} · ${fmtDateMY(settlement.occurredAt.slice(0, 10))}</div>${clips ? `<button class="attachment-open" data-action="ledger-item-attachments" data-attachment-ids="${escapeHTML(settlement.attachmentIds.join(','))}">${icon('paperclip', 12)} ${clips} 个附件</button>` : ''}</div>${settlement.status === 'active' ? `<button class="sheet-danger" data-action="ledger-settlement-reverse" data-settlement="${id}">撤销这次结算</button>` : '<div class="mutation-lock-note caption">这次结算已经撤销。</div>'}<button class="sheet-secondary" data-action="ledger-return">完成</button>` });
 }
 
-function addPersonSheet() {
-  openSheet({ title: '添加对象', contentHTML: `<label class="cap-field"><span class="caption">名称</span><input data-new-participant maxlength="30" placeholder="例如 Alex" /></label><button class="sheet-primary" data-action="ledger-add-person-confirm">添加</button><button class="sheet-secondary" data-action="sheet-close">取消</button>` });
+let personDraft = null;
+let groupDraft = null;
+let groupSheet = null;
+
+function newLedgerSheet() {
+  openSheet({ title: '新增账本', className: 'compact-action-sheet', contentHTML: `<div class="compact-action-list">
+    <button data-action="ledger-add-person">${icon('users', 20)}<span><strong>添加个人</strong><small>建立一个本地个人关系账本</small></span>${icon('chevronRight', 14)}</button>
+    <button data-action="ledger-create-group">${icon('ledger', 20)}<span><strong>建立群组</strong><small>选择至少两位成员</small></span>${icon('chevronRight', 14)}</button>
+  </div><button class="sheet-secondary" data-action="sheet-close">取消</button>` });
+}
+
+function personFormHTML() {
+  const duplicate = data.getParticipants().some((participant) => participant.displayName.trim().toLocaleLowerCase() === String(personDraft?.name || '').trim().toLocaleLowerCase());
+  return `<div class="ledger-create-form">
+    <label class="cap-field"><span class="caption">名称</span><input data-new-participant maxlength="30" value="${escapeHTML(personDraft?.name || '')}" placeholder="例如 Alex" /></label>
+    <label class="cap-field"><span class="caption">关系称呼（可选）</span><input data-new-participant-label maxlength="24" value="${escapeHTML(personDraft?.relationshipLabel || '')}" placeholder="例如 姐姐、同事" /></label>
+    <label class="cap-field"><span class="caption">备注（可选）</span><textarea data-new-participant-note maxlength="80" placeholder="只保留在当前示例会话">${escapeHTML(personDraft?.note || '')}</textarea></label>
+    ${duplicate ? '<div class="ledger-duplicate-note">已有同名对象；仍可作为另一位独立对象建立。</div>' : ''}
+    <button class="sheet-primary" data-action="ledger-add-person-confirm">添加个人</button><button class="sheet-secondary" data-action="sheet-close">取消</button>
+  </div>`;
+}
+
+function collectPersonDraft() {
+  personDraft = {
+    ...(personDraft || {}),
+    name: document.querySelector('[data-new-participant]')?.value || personDraft?.name || '',
+    relationshipLabel: document.querySelector('[data-new-participant-label]')?.value || personDraft?.relationshipLabel || '',
+    note: document.querySelector('[data-new-participant-note]')?.value || personDraft?.note || '',
+  };
+}
+
+function addPersonSheet({ returnToGroup = false } = {}) {
+  personDraft = { name: '', relationshipLabel: '', note: '', returnToGroup };
+  openSheet({ title: '添加个人', stacked: returnToGroup, className: 'ledger-create-sheet', contentHTML: personFormHTML() });
+}
+
+function groupFormHTML() {
+  const participants = data.getParticipants();
+  return `<div class="ledger-create-form" data-group-create-form>
+    <label class="cap-field"><span class="caption">群组名称</span><input data-group-name maxlength="36" value="${escapeHTML(groupDraft.name)}" placeholder="例如 父母老家" /></label>
+    <div class="caption">添加成员</div><div class="ledger-member-picker">${participants.map((participant) => {
+      const selected = groupDraft.participantIds.includes(participant.participantId);
+      const me = participant.participantId === ME;
+      return `<button type="button" class="${selected ? 'active' : ''}" data-action="ledger-group-member" data-participant="${escapeHTML(participant.participantId)}" aria-pressed="${selected}" ${me ? 'disabled' : ''}><span class="avatar">${escapeHTML(participant.avatar?.initials || participant.displayName.slice(0,1))}</span><span>${escapeHTML(me ? '我' : participant.displayName)}</span>${selected ? icon('check',15) : ''}</button>`;
+    }).join('')}</div>
+    <button type="button" class="sheet-secondary ledger-nested-person" data-action="ledger-group-add-person">${icon('plus',16)} 添加个人</button>
+    <label class="cap-field"><span class="caption">备注（可选）</span><textarea data-group-note maxlength="100" placeholder="只保留在当前示例会话">${escapeHTML(groupDraft.note)}</textarea></label>
+    <div class="ledger-group-count">已选择 ${groupDraft.participantIds.length} 位成员</div>
+    <button class="sheet-primary" data-action="ledger-create-group-confirm">建立群组</button><button class="sheet-secondary" data-action="sheet-close">取消</button>
+  </div>`;
+}
+
+function collectGroupDraft() {
+  if (!groupDraft) return;
+  groupDraft.name = groupSheet?.querySelector('[data-group-name]')?.value ?? groupDraft.name;
+  groupDraft.note = groupSheet?.querySelector('[data-group-note]')?.value ?? groupDraft.note;
+}
+
+function rerenderGroupSheet() {
+  const body = groupSheet?.querySelector('.sheet-body');
+  if (body) body.innerHTML = groupFormHTML();
+}
+
+function createGroupSheet() {
+  groupDraft = { name: '', note: '', participantIds: [ME] };
+  groupSheet = openSheet({ title: '建立群组', className: 'ledger-create-sheet ledger-group-create-sheet', contentHTML: groupFormHTML(), onClose: () => { groupSheet = null; } });
+}
+
+function createPersonFromDraft() {
+  collectPersonDraft();
+  const sameName = data.getParticipants().some((participant) => participant.displayName.trim().toLocaleLowerCase() === String(personDraft.name || '').trim().toLocaleLowerCase());
+  if (sameName && !personDraft.duplicateConfirmed) {
+    return openSheet({ title: '建立同名对象？', stacked: true, className: 'plan-confirm-sheet', contentHTML: `<div class="plan-confirm-copy"><p>已有同名对象。继续后会建立新的独立对象，不会自动合并。</p><button class="sheet-primary" data-action="ledger-add-person-duplicate-confirm">继续建立</button><button class="sheet-secondary" data-action="sheet-close">返回</button></div>` });
+  }
+  const person = data.createManualParticipant({ displayName: personDraft.name, relationshipLabel: personDraft.relationshipLabel, note: personDraft.note });
+  if (personDraft.returnToGroup && groupDraft) {
+    if (!groupDraft.participantIds.includes(person.participantId)) groupDraft.participantIds.push(person.participantId);
+    closeSheet();
+    rerenderGroupSheet();
+    toast('个人已添加到群组草稿');
+    return;
+  }
+  data.createRelationshipLedger({ title: person.displayName, participantIds: [ME, person.participantId], ownerUserId: 'user-winner', note: person.note });
+  closeSheet(); update({ ledgerSegment: 'personal' }); toast('个人账本已建立');
 }
 
 // ---- Obligation sheets -------------------------------------
@@ -588,6 +671,23 @@ function newPlanActionsSheet() {
   </div><button class="sheet-secondary" data-action="ledger-return">取消</button>` });
 }
 
+function ledgerRecurringNewSheet() {
+  const ledger = data.getRelationshipLedger(ui.ledgerId);
+  if (!ledger) return toast('账本不存在');
+  const group = ledger.derivedType === 'group';
+  const options = group ? [
+    ['recurring_relationship', 'shared_bill', '', '共同费用', '一人先付，其他成员按份额归还', 'users'],
+    ['recurring_relationship', 'central_collection', '', '统一收款', '成员先交给一人，再由他统一付款', 'wallet'],
+    ['recurring_relationship', 'installment_repayment', '', '分期归还', '群组成员按期归还某位成员的代付款', 'repayment'],
+  ] : [
+    ['recurring_relationship', 'shared_bill', '', '共同费用', '一人先付，另一人按份额归还', 'users'],
+    ['recurring_relationship', 'direct_recurring_payment', '', '定期往来', '每月固定付给对方，或由对方付给我', 'calendar'],
+    ['recurring_relationship', 'installment_repayment', '', '分期还款', '按月归还一笔欠款或代付款', 'repayment'],
+    ['subscription', 'shared_bill', 'other_pays', '订阅代付', '一方扣款，另一方按期归还', 'receipt'],
+  ];
+  openSheet({ title: `新建 · ${ledger.title}`, className: 'compact-action-sheet ledger-recurring-choice-sheet', contentHTML: `<div class="ledger-origin-chip">${icon(group ? 'users' : 'ledger', 18)}<span><strong>${escapeHTML(ledger.title)}</strong><small>${group ? `${ledger.participantIds.length} 位成员已预填` : '关系对象已预填'}</small></span></div><div class="compact-action-list">${options.map(([kind, scenario, funding, label, note, glyph]) => `<button data-action="ledger-recurring-create" data-kind="${kind}" data-scenario="${scenario}" data-funding="${funding}">${icon(glyph, 20)}<span><strong>${label}</strong><small>${note}</small></span>${icon('chevronRight', 14)}</button>`).join('')}</div><button class="sheet-secondary" data-action="ledger-return">取消</button>` });
+}
+
 function planDetailSheet(planId) {
   const plan = data.getObligationPlan(planId);
   if (!plan) return toast('计划不存在');
@@ -607,7 +707,7 @@ function planDetailSheet(planId) {
   data.recordPlanDetailOpened?.(planId);
   openSheet({ title: plan.title, className: 'plan-detail-sheet', contentHTML: `<div class="plan-detail-hero" data-plan-detail-id="${escapeHTML(planId)}">
       <div class="row-between"><span class="channel-badge">计划 ${planStatus}</span><span class="channel-badge${currentState === 'overdue' ? ' badge-warn' : ''}">本期 ${periodStatus}</span></div>
-      <small>本期应${plan.direction === 'payable' ? '付' : '收'}</small><strong class="num">${minorRM(dueMinor)}</strong>
+      <small>${monthly ? `本月待${plan.direction === 'payable' ? '付' : '收'}` : `本期应${plan.direction === 'payable' ? '付' : '收'}`}</small><strong class="num">${minorRM(dueMinor)}</strong>
       ${current ? `<div><span>本期到期 ${fmtDateMY(current.dueDate)}</span>${overdueDays ? `<strong class="amt-neg">已逾期 ${overdueDays} 天</strong>` : ''}</div>` : ''}
       ${overview.nextPreview ? `<div class="plan-next-period"><span>下一期</span><span>${fmtDateMY(overview.nextPreview.dueDate)}</span></div>` : ''}
     </div>
@@ -762,11 +862,53 @@ export function registerLedgerFeature() {
     else toast('附件不可用');
   });
   registerAction('ledger-settlement-reverse', (el) => { try { data.reverseRelationshipSettlement(el.dataset.settlement, { ledgerId: ui.ledgerId, clientEventId: `settlement-reverse-${el.dataset.settlement}`, sourceChannel: 'app' }); closeSheet(); update({}); toast('结算已撤销'); } catch (error) { toast(error.message); } });
-  registerAction('ledger-add-person', addPersonSheet);
-  registerAction('ledger-add-person-confirm', () => { try { const person = data.createManualParticipant({ displayName: document.querySelector('[data-new-participant]').value }); data.createRelationshipLedger({ title: person.displayName, participantIds: [ME, person.participantId], ownerUserId: 'user-winner' }); closeSheet(); update({ ledgerSegment: 'personal' }); toast('对象已添加'); } catch (error) { toast(error.message); } });
+  registerAction('ledger-new-ledger', newLedgerSheet);
+  registerAction('ledger-add-person', () => addPersonSheet());
+  registerAction('ledger-add-person-confirm', () => { try { createPersonFromDraft(); } catch (error) { toast(error.message); } });
+  registerAction('ledger-add-person-duplicate-confirm', () => { closeSheet(); personDraft.duplicateConfirmed = true; try { createPersonFromDraft(); } catch (error) { toast(error.message); } });
+  registerAction('ledger-create-group', createGroupSheet);
+  registerAction('ledger-group-add-person', () => { collectGroupDraft(); addPersonSheet({ returnToGroup: true }); });
+  registerAction('ledger-group-member', (el) => {
+    collectGroupDraft();
+    const id = el.dataset.participant;
+    if (id === ME) return;
+    const selected = new Set(groupDraft.participantIds);
+    if (selected.has(id)) selected.delete(id); else selected.add(id);
+    const order = data.getParticipants().map((participant) => participant.participantId);
+    groupDraft.participantIds = [ME, ...order.filter((participantId) => participantId !== ME && selected.has(participantId))];
+    rerenderGroupSheet();
+  });
+  registerAction('ledger-create-group-confirm', () => {
+    try {
+      collectGroupDraft();
+      if (!groupDraft.name.trim()) throw new Error('请输入群组名称');
+      if (groupDraft.participantIds.length < 2) throw new Error('群组至少需要两位成员');
+      const ledger = data.createRelationshipLedger({ title: groupDraft.name, participantIds: groupDraft.participantIds, ownerUserId: 'user-winner', note: groupDraft.note, icon: 'users' });
+      closeSheet(); update({ ledgerSegment: 'group', ledgerId: null }); toast(`${ledger.title} 已建立`);
+    } catch (error) { toast(error.message); }
+  });
 
   // ---- Obligation actions ----------------------------------
   registerAction('obligation-new-actions', newPlanActionsSheet);
+  registerAction('ledger-recurring-new', ledgerRecurringNewSheet);
+  registerAction('ledger-recurring-create', (el) => {
+    const ledger = data.getRelationshipLedger(ui.ledgerId);
+    if (!ledger) return toast('账本不存在');
+    const origin = {
+      origin: 'ledger',
+      originLedgerId: ledger.ledgerId,
+      originLedgerType: ledger.derivedType,
+      originMemberIds: [...ledger.participantIds],
+      originDisplayName: ledger.title,
+    };
+    closeSheet(true);
+    setTimeout(() => openPlanEditor({
+      kind: el.dataset.kind,
+      scenario: el.dataset.scenario || null,
+      subscriptionFundingMode: el.dataset.funding || null,
+      origin,
+    }), 70);
+  });
   registerAction('obligation-new-monthly', () => newPlanSheet('recurring_monthly'));
   registerAction('obligation-new-installment', () => newPlanSheet('installment'));
   registerAction('obligation-plan-detail', (el) => pushRoute({ tab: 'ledger', planDetailId: el.dataset.plan }, { direction: 'forward' }));

@@ -29,13 +29,22 @@ watchSystemTheme();
 
 const tab = params.get('tab');
 if (['today', 'assets', 'activity', 'ledger'].includes(tab)) ui.tab = tab;
+if (params.get('fixedCenter') === '1') {
+  ui.tab = 'today';
+  ui.todayView = 'fixed';
+  if (/^\d{4}-(0[1-9]|1[0-2])$/.test(params.get('month') || '')) ui.fixedMonth = params.get('month');
+  if (['month', 'plans', 'history'].includes(params.get('view'))) ui.fixedWorkspace = params.get('view');
+  if (['active', 'paused', 'stopped', 'archived'].includes(params.get('status'))) ui.fixedPlanStatus = params.get('status');
+  if (['all', 'fixed', 'subscription', 'relationship', 'installment'].includes(params.get('type'))) ui.fixedPlanType = params.get('type');
+  if (['all', 'completed', 'overdue', 'skipped'].includes(params.get('history'))) ui.fixedHistoryFilter = params.get('history');
+}
 
 // Assets sub-views: ?view=saving|cc|ew (category) or ?view=detail&acc=<id>
 const view = params.get('view');
-if (['saving', 'cc', 'ew'].includes(view)) {
+if (params.get('fixedCenter') !== '1' && ['saving', 'cc', 'ew'].includes(view)) {
   ui.tab = 'assets';
   ui.assetsView = { name: 'category', type: view };
-} else if (view === 'detail' && params.get('acc')) {
+} else if (params.get('fixedCenter') !== '1' && view === 'detail' && params.get('acc')) {
   ui.tab = 'assets';
   ui.assetsView = { name: 'detail', accountId: params.get('acc'), from: 'category' };
 }

@@ -47,7 +47,7 @@ function focusTop(entry, preferred = null) {
 
 function triggerIdentity(trigger) {
   if (!trigger?.getAttribute) return null;
-  for (const attribute of ['data-picker-field', 'data-money-field', 'data-action', 'data-attachment-manage']) {
+  for (const attribute of ['data-picker-field', 'data-recurring-picker', 'data-date-key', 'data-money-field', 'data-action', 'data-attachment-manage']) {
     if (trigger.hasAttribute(attribute)) return { attribute, value: trigger.getAttribute(attribute) || '' };
   }
   return null;
@@ -114,6 +114,10 @@ function sync() {
     else child.setAttribute('inert', '');
     layer.setAttribute('aria-hidden', String(!top));
     layer.classList.toggle('modal-suspended', !top);
+    layer.classList.toggle('modal-root-layer', index === 0);
+    layer.classList.toggle('modal-child-layer', index > 0);
+    backdrop?.classList.toggle('modal-effective-scrim', index === 0);
+    backdrop?.classList.toggle('modal-context-backdrop', index > 0);
     surface?.setAttribute('data-modal-surface', '');
     backdrop?.setAttribute('data-modal-backdrop', '');
     if (surface) surface.style.zIndex = '1';
@@ -129,6 +133,33 @@ function sync() {
   }
 }
 
+function freezeParent(entry) {
+  if (!entry || entry.frozenState) return;
+  const body = entry.surface?.querySelector?.('.sheet-body');
+  const rect = entry.surface?.getBoundingClientRect?.();
+  entry.frozenState = {
+    surfaceScrollTop: entry.surface?.scrollTop || 0,
+    bodyScrollTop: body?.scrollTop || 0,
+    inlineHeight: entry.surface?.style.height || '',
+    height: rect?.height || 0,
+  };
+  if (entry.surface && rect?.height) entry.surface.style.height = `${rect.height}px`;
+  entry.layer.classList.add('modal-parent-frozen');
+}
+
+function restoreParent(entry) {
+  if (!entry?.frozenState) return;
+  const body = entry.surface?.querySelector?.('.sheet-body');
+  const frozen = entry.frozenState;
+  if (entry.surface) {
+    entry.surface.style.height = frozen.inlineHeight;
+    entry.surface.scrollTop = frozen.surfaceScrollTop;
+  }
+  if (body) body.scrollTop = frozen.bodyScrollTop;
+  entry.layer.classList.remove('modal-parent-frozen');
+  entry.frozenState = null;
+}
+
 export function pushModalLayer(layer, { id, parentId, kind = 'sheet', trigger = document.activeElement, surface = layer.querySelector?.('[role="dialog"]'), backdrop = layer.firstElementChild } = {}) {
   // Compatibility boundary: older picker/date/attachment callers may append
   // to #app first. Registration always moves the layer into the authoritative
@@ -137,6 +168,7 @@ export function pushModalLayer(layer, { id, parentId, kind = 'sheet', trigger = 
   const existing = stack.findIndex((entry) => entry.layer === layer);
   if (existing >= 0) stack.splice(existing, 1);
   const parent = stack.at(-1);
+  freezeParent(parent);
   // stack.at(-1) regains focus through focusTop when the trigger disappeared.
   const entry = {
     layer,
@@ -152,8 +184,13 @@ export function pushModalLayer(layer, { id, parentId, kind = 'sheet', trigger = 
   installFocusTrap();
   sync();
   let released = false;
-  const release = () => {
+  const release = (expectedLayerId = entry.id) => {
     if (released) return false;
+    const top = stack.at(-1);
+    if (!top || top.id !== expectedLayerId || top.layer !== layer) {
+      const actual = top?.id || 'none';
+      throw new Error(`modal_layer_mismatch: expected ${expectedLayerId}, actual ${actual}`);
+    }
     released = true;
     return popModalLayer(layer);
   };
@@ -169,7 +206,9 @@ export function popModalLayer(layer) {
   sync();
   removeFocusTrap();
   const parent = stack.at(-1);
+  restoreParent(parent);
   requestAnimationFrame(() => {
+    restoreParent(parent);
     if (!parent) entry.trigger?.focus?.({ preventScroll: true });
     else {
       const trigger = restoredTrigger(entry, parent);
@@ -182,6 +221,19 @@ export function popModalLayer(layer) {
 
 export function isTopModal(layer) {
   return stack.at(-1)?.layer === layer;
+}
+
+export function topModalLayerId() {
+  return stack.at(-1)?.id || null;
+}
+
+export function closeTopModalLayer(expectedLayerId) {
+  const top = stack.at(-1);
+  if (!top || top.id !== expectedLayerId) {
+    const actual = top?.id || 'none';
+    throw new Error(`modal_layer_mismatch: expected ${expectedLayerId}, actual ${actual}`);
+  }
+  return popModalLayer(top.layer);
 }
 
 export function modalDepth() {

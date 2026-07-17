@@ -16,6 +16,13 @@ export const ui = {
   privacy: false,
   theme: 'auto', // auto | light | dark
   heroIndex: 0, // Money Pulse hero state
+  todayView: 'overview', // overview | fixed (still the Today tab)
+  fixedMonth: '2026-07',
+  fixedWorkspace: 'month', // month | plans | history
+  fixedPlanStatus: 'active', // active | paused | stopped | archived
+  fixedPlanType: 'all', // all | fixed | subscription | relationship | installment
+  fixedHistoryFilter: 'all', // all | completed | overdue | skipped
+  fixedCompletedExpanded: false,
   // Assets zone: overview → category (储蓄卡/信用卡/eWallet) → 账户详情
   assetsView: { name: 'overview' }, // | {name:'category', type} | {name:'detail', accountId, from}
   assetsSegment: 'all', // all | assets | liab

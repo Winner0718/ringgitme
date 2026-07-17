@@ -27,11 +27,11 @@ export function createParticipantRepository(initialParticipants = []) {
   return {
     getAll: () => structuredClone(participants),
     get: (id) => structuredClone(find(id) || null),
-    createManual({ displayName, manualContactRef = null }) {
+    createManual({ displayName, manualContactRef = null, relationshipLabel = null, note = null, avatar = null }) {
       const name = String(displayName || '').trim();
       if (!name) throw new Error('请输入参与者名称');
       const now = new Date().toISOString();
-      const participant = sync({ participantId: `participant-local-${++sequence}`, displayName: name, avatar: { initials: name.slice(0, 1) }, manualContactRef, channelBindings: [], claimState: 'unclaimed', notificationPreferences: {}, createdAt: now, updatedAt: now });
+      const participant = sync({ participantId: `participant-local-${++sequence}`, displayName: name, relationshipLabel: String(relationshipLabel || '').trim() || null, note: String(note || '').trim() || null, avatar: avatar || { initials: name.slice(0, 1) }, manualContactRef, channelBindings: [], claimState: 'unclaimed', notificationPreferences: {}, createdAt: now, updatedAt: now });
       participants.push(participant); return structuredClone(participant);
     },
     prepareClaim(participantId, appUserId, clientEventId) {

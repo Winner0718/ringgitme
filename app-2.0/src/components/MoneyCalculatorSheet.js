@@ -1,10 +1,12 @@
 import { escapeHTML } from '../app/format.js';
+import { registerOwnedModalHistory } from '../app/modalHistory.js';
 import { icon } from './Icons.js';
 import { isTopModal, mountModalLayer, pushModalLayer } from '../app/modalStack.js';
 
 const MAX_DEFAULT_MINOR = 99_999_999_99;
 const PRECEDENCE = { '+': 1, '−': 1, '×': 2, '÷': 2 };
 let activeCalculatorCancel = null;
+let calculatorSequence = 0;
 
 function gcd(a, b) {
   let x = a < 0n ? -a : a;
@@ -132,8 +134,9 @@ export function moneyCalculatorHTML(value, options = {}) {
   return `<div class="calculator-layer" role="presentation">${calculatorHTML(String(value || ''), options)}</div>`;
 }
 
-export function openMoneyCalculatorSheet({ value = '', allowZero = false, maxMinor = MAX_DEFAULT_MINOR, onComplete, trigger = document.activeElement }) {
+export function openMoneyCalculatorSheet({ value = '', allowZero = false, maxMinor = MAX_DEFAULT_MINOR, onComplete, trigger = document.activeElement, id = null, parentId = undefined }) {
   if (activeCalculatorCancel && !activeCalculatorCancel()) return null;
+  if (activeCalculatorCancel) return null;
   const layer = document.createElement('div');
   layer.className = 'calculator-layer modal-layer';
   let expression = String(value || '');
@@ -149,14 +152,20 @@ export function openMoneyCalculatorSheet({ value = '', allowZero = false, maxMin
     display?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
   };
   let releaseModal = () => {};
-  const close = () => {
+  const calculatorId = id || `money-calculator:${++calculatorSequence}`;
+  let closed = false;
+  let ownedHistory = null;
+  const finishClose = () => {
+    if (closed) return false;
     if (!isTopModal(layer)) return false;
-    releaseModal();
+    closed = true;
+    releaseModal(calculatorId);
     activeCalculatorCancel = null;
     layer.classList.remove('open');
     setTimeout(() => layer.remove(), 220);
     return true;
   };
+  const close = () => ownedHistory?.requestClose() || false;
   activeCalculatorCancel = close;
   const append = (key) => {
     if (key === 'C') { expression = ''; fresh = false; return render(); }
@@ -185,7 +194,8 @@ export function openMoneyCalculatorSheet({ value = '', allowZero = false, maxMin
   surface?.setAttribute('data-modal-surface', '');
   backdrop?.setAttribute('data-modal-backdrop', '');
   mountModalLayer(layer);
-  releaseModal = pushModalLayer(layer, { kind: 'calculator', trigger, surface, backdrop });
+  releaseModal = pushModalLayer(layer, { id: calculatorId, parentId, kind: 'calculator', trigger, surface, backdrop });
+  ownedHistory = registerOwnedModalHistory({ layerId: calculatorId, isTop: () => isTopModal(layer), onPop: finishClose });
   requestAnimationFrame(() => layer.classList.add('open'));
   layer.addEventListener('click', (event) => {
     if (!isTopModal(layer)) return;

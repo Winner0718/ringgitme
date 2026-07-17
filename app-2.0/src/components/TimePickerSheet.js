@@ -1,5 +1,8 @@
 import { fmtTimeAMPM, parseTimeAMPM } from '../app/format.js';
-import { pushModalLayer } from '../app/modalStack.js';
+import { registerOwnedModalHistory } from '../app/modalHistory.js';
+import { isTopModal, mountModalLayer, pushModalLayer } from '../app/modalStack.js';
+
+let activeTimePickerCancel = null;
 
 // One custom 12-hour picker shared by Capture, Edit, relationship entries,
 // obligations and settlements. Internal storage stays HH:mm. No native
@@ -31,7 +34,7 @@ function wheelOptions(count, start, selected) {
 
 export function timePickerHTML(value) {
   const parts = timePartsFrom24(value);
-  return `<div class="time-picker-layer" role="presentation">
+  return `<div class="time-picker-layer modal-layer" role="presentation">
     <button class="time-picker-scrim" data-time-cancel aria-label="取消选择时间"></button>
     <section class="time-picker-sheet glass-sheet" role="dialog" aria-modal="true" aria-label="选择时间">
       <div class="time-picker-grabber"><span></span></div>
@@ -85,16 +88,23 @@ function bindWheel(wheel, onChange) {
   };
 }
 
-export function openTimePickerSheet({ value, onComplete, now = () => new Date() }) {
-  document.querySelector('.time-picker-layer')?.remove();
+let timePickerSequence = 0;
+
+export function openTimePickerSheet({ value, onComplete, now = () => new Date(), trigger = document.activeElement, id = null, parentId = undefined }) {
+  if (activeTimePickerCancel) {
+    activeTimePickerCancel();
+    return null;
+  }
   const wrapper = document.createElement('div');
   wrapper.innerHTML = timePickerHTML(value);
   const layer = wrapper.firstElementChild;
-  document.getElementById('app').appendChild(layer);
-  const releaseModal = pushModalLayer(layer);
+  mountModalLayer(layer);
+  const timePickerId = id || `time-picker:${++timePickerSequence}`;
+  const releaseModal = pushModalLayer(layer, { id: timePickerId, parentId, kind: 'time-picker', trigger, surface: layer.querySelector('.time-picker-sheet'), backdrop: layer.querySelector('.time-picker-scrim') });
   requestAnimationFrame(() => layer.classList.add('open'));
   let period = timePartsFrom24(value).period;
   let completed = false;
+  let closed = false;
 
   const refresh = () => {
     layer.querySelector('[data-time-preview]').textContent = fmtTimeAMPM(selectedValue());
@@ -108,11 +118,18 @@ export function openTimePickerSheet({ value, onComplete, now = () => new Date() 
   const minute = bindWheel(layer.querySelector('[data-time-minute]'), () => refresh());
   const selectedValue = () => time24FromParts({ hour: hour.value(), minute: minute.value(), period });
 
-  const close = () => {
-    releaseModal();
+  const finishClose = () => {
+    if (closed || !isTopModal(layer)) return false;
+    closed = true;
+    releaseModal(timePickerId);
+    activeTimePickerCancel = null;
     layer.classList.remove('open');
     setTimeout(() => layer.remove(), 220);
+    return true;
   };
+  const ownedHistory = registerOwnedModalHistory({ layerId: timePickerId, isTop: () => isTopModal(layer), onPop: finishClose });
+  const close = () => ownedHistory.requestClose();
+  activeTimePickerCancel = close;
   const cancelButtons = layer.querySelectorAll('[data-time-cancel]');
   cancelButtons.forEach((button) => button.addEventListener('click', close));
   layer.querySelectorAll('[data-time-period]').forEach((button) => button.addEventListener('click', () => { period = button.dataset.timePeriod; refresh(); }));

@@ -1,4 +1,5 @@
 import { escapeHTML } from '../app/format.js';
+import { registerOwnedModalHistory } from '../app/modalHistory.js';
 import { icon } from './Icons.js';
 import { isTopModal, mountModalLayer, pushModalLayer } from '../app/modalStack.js';
 
@@ -10,6 +11,7 @@ import { isTopModal, mountModalLayer, pushModalLayer } from '../app/modalStack.j
 
 const SEARCH_THRESHOLD = 8;
 let activePickerCancel = null;
+let pickerSequence = 0;
 
 function optionRow(option, selectedValue) {
   const active = option.value === selectedValue;
@@ -20,8 +22,9 @@ function optionRow(option, selectedValue) {
   </button>`;
 }
 
-export function openPickerSheet({ title, options, selectedValue = null, onSelect, searchable = options.length > SEARCH_THRESHOLD, trigger = document.activeElement }) {
+export function openPickerSheet({ title, options, selectedValue = null, onSelect, searchable = options.length > SEARCH_THRESHOLD, trigger = document.activeElement, id = null, parentId = undefined }) {
   if (activePickerCancel && !activePickerCancel()) return null;
+  if (activePickerCancel) return null;
   const wrapper = document.createElement('div');
   wrapper.innerHTML = `<div class="picker-layer modal-layer" role="presentation">
     <button class="picker-scrim" data-modal-backdrop data-picker-cancel aria-label="取消选择"></button>
@@ -35,26 +38,44 @@ export function openPickerSheet({ title, options, selectedValue = null, onSelect
   </div>`;
   const layer = wrapper.firstElementChild;
   mountModalLayer(layer);
-  const releaseModal = pushModalLayer(layer, { kind: 'picker', trigger, surface: layer.querySelector('.picker-sheet'), backdrop: layer.querySelector('.picker-scrim') });
+  const pickerId = id || `picker:${++pickerSequence}`;
+  const releaseModal = pushModalLayer(layer, { id: pickerId, parentId, kind: 'picker', trigger, surface: layer.querySelector('.picker-sheet'), backdrop: layer.querySelector('.picker-scrim') });
+  let closed = false;
+  let committing = false;
   requestAnimationFrame(() => layer.classList.add('open'));
 
-  const close = () => {
+  const finishClose = () => {
+    if (closed) return false;
     if (!isTopModal(layer)) return false;
-    releaseModal();
+    releaseModal(pickerId);
+    closed = true;
     activePickerCancel = null;
     layer.classList.remove('open');
     setTimeout(() => layer.remove(), 200);
     return true;
   };
+  const ownedHistory = registerOwnedModalHistory({ layerId: pickerId, stateKey: 'ringgitmePicker', isTop: () => isTopModal(layer), onPop: finishClose });
+  const close = () => ownedHistory.requestClose();
   activePickerCancel = close;
   layer.querySelectorAll('[data-picker-cancel]').forEach((button) => button.addEventListener('click', (event) => { event.preventDefault(); event.stopPropagation(); close(); }));
   layer.querySelector('[data-picker-options]').addEventListener('click', (event) => {
     if (!isTopModal(layer)) return;
     const button = event.target.closest('[data-picker-value]');
-    if (!button) return;
+    if (!button || committing || closed) return;
     event.stopPropagation();
-    close();
-    onSelect?.(button.dataset.pickerValue);
+    committing = true;
+    layer.style.pointerEvents = 'none';
+    try {
+      // Commit into the still-mounted parent draft before closing exactly the
+      // child layer. This keeps rerendered fields, scroll and focus restorable.
+      onSelect?.(button.dataset.pickerValue);
+      close();
+    } catch (error) {
+      committing = false;
+      layer.style.pointerEvents = '';
+      console.error('picker_commit_failed', error);
+      throw error;
+    }
   });
   const search = layer.querySelector('[data-picker-search]');
   if (search) {
@@ -69,7 +90,7 @@ export function openPickerSheet({ title, options, selectedValue = null, onSelect
     if (event.key === 'Escape' && isTopModal(layer)) { event.preventDefault(); event.stopPropagation(); close(); }
   });
   requestAnimationFrame(() => (search || layer.querySelector('.picker-sheet'))?.focus?.({ preventScroll: true }));
-  return { cancel: close };
+  return { cancel: close, layerId: pickerId, parentLayerId: releaseModal.parentSheetId };
 }
 
 // Compact display field that opens the picker — shared markup for forms.

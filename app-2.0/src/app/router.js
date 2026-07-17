@@ -4,7 +4,7 @@
 // ============================================================
 
 import { ui, update } from './state.js';
-import { closeSheet } from '../components/AppSheet.js';
+import { closeSheet, isSheetOpen } from '../components/AppSheet.js';
 
 const pages = new Map();
 const TAB_ORDER = ['today', 'assets', 'activity', 'ledger'];
@@ -21,13 +21,15 @@ export function navigate(tab) {
       replaceRoute({ assetsView: { name: 'overview' } }, { direction: 'back' });
     } else if (tab === 'ledger' && ui.ledgerId) {
       replaceRoute({ ledgerId: null, planDetailId: null, ledgerHistoryLimit: 30 }, { direction: 'back' });
+    } else if (tab === 'today' && ui.todayView === 'fixed') {
+      replaceRoute({ todayView: 'overview' }, { direction: 'back' });
     } else {
       renderCurrentPage();
     }
     return;
   }
   const dir = TAB_ORDER.indexOf(tab) >= TAB_ORDER.indexOf(ui.tab) ? 'forward' : 'back';
-  replaceRoute({ tab, activityDetailId: null, planDetailId: null }, { direction: dir });
+  replaceRoute({ tab, ...(tab === 'today' ? { todayView: 'overview' } : {}), activityDetailId: null, planDetailId: null }, { direction: dir });
 }
 
 let historyDepth = 0;
@@ -36,6 +38,13 @@ let historyReady = false;
 function routeSnapshot(source = ui) {
   return {
     tab: source.tab,
+    todayView: source.todayView || 'overview',
+    fixedMonth: source.fixedMonth || null,
+    fixedWorkspace: source.fixedWorkspace || 'month',
+    fixedPlanStatus: source.fixedPlanStatus || 'active',
+    fixedPlanType: source.fixedPlanType || 'all',
+    fixedHistoryFilter: source.fixedHistoryFilter || 'all',
+    fixedCompletedExpanded: Boolean(source.fixedCompletedExpanded),
     assetsView: structuredClone(source.assetsView),
     ledgerId: source.ledgerId || null,
     ledgerSegment: source.ledgerSegment,
@@ -88,6 +97,16 @@ function routeURL(route) {
   url.search = '';
   presentationQuery.forEach((value, key) => url.searchParams.set(key, value));
   if (route.tab !== 'today') url.searchParams.set('tab', route.tab);
+  if (route.tab === 'today' && route.todayView === 'fixed') {
+    url.searchParams.set('fixedCenter', '1');
+    if (route.fixedMonth) url.searchParams.set('month', route.fixedMonth);
+    url.searchParams.set('view', route.fixedWorkspace || 'month');
+    if (route.fixedWorkspace === 'plans') {
+      url.searchParams.set('status', route.fixedPlanStatus || 'active');
+      url.searchParams.set('type', route.fixedPlanType || 'all');
+    }
+    if (route.fixedWorkspace === 'history' && route.fixedHistoryFilter !== 'all') url.searchParams.set('history', route.fixedHistoryFilter);
+  }
   if (route.tab === 'assets' && route.assetsView?.name === 'category') url.searchParams.set('view', route.assetsView.type);
   if (route.tab === 'assets' && route.assetsView?.name === 'detail') {
     url.searchParams.set('view', 'detail');
@@ -123,6 +142,10 @@ export function initializeNavigationHistory() {
   history.replaceState({ ringgitme: true, depth: historyDepth, route: routeSnapshot() }, '', routeURL(routeSnapshot()));
   window.addEventListener('popstate', (event) => {
     if (!event.state?.ringgitme) return;
+    // Modal history is owned by AppSheet/child-modal handlers. This router
+    // listener is installed before those handlers, so it must not consume the
+    // same popstate first and tear down a dirty editor before its guard runs.
+    if (isSheetOpen()) return;
     const nextDepth = Number(event.state.depth || 0);
     const direction = nextDepth < historyDepth ? 'back' : 'forward';
     const targetOverlay = event.state.overlay || null;

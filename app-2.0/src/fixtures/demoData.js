@@ -10,6 +10,12 @@ import { createObligationRepository } from '../domain/obligationRepository.js';
 import { createObligationEngine } from '../domain/obligationEngine.js';
 import { RELATIONSHIP_PARTICIPANTS, RELATIONSHIP_LEDGERS, RELATIONSHIP_ENTRIES } from './relationshipFixtures.js';
 import { OBLIGATION_PLANS, OBLIGATION_INSTANCES, OBLIGATION_PAYMENTS } from './obligationFixtures.js';
+import { createRecurringPlanRepository } from '../domain/recurringPlanRepository.js';
+import { createRecurringPlanManagementGateway } from '../domain/recurringPlanManagement.js';
+import { buildOccurrenceSnapshot, dueSoonReminderIntents } from '../domain/recurringSchedule.js';
+import { dedupeCanonicalPlans, projectFixedRelationshipsForLedger, projectObligationOccurrence, projectObligationPlan, selectRecurringMonth } from '../domain/recurringPlanSelectors.js';
+import { RECURRING_PLAN_FIXTURES, RECURRING_OCCURRENCE_FIXTURES } from './recurringPlanFixtures.js';
+import { buildLedgerRecurringProjection, selectRecurringPlansForLedger } from '../domain/ledgerRecurringProjection.js';
 
 // ============================================================
 // RinggitMe 2.0 — demo fixtures (Phase 1 shell only)
@@ -284,6 +290,19 @@ export function createDemoDataSource() {
     defaultAccountId: () => engine.getAccounts().find((account) => account.type !== 'cc')?.id,
     linkTransaction: (transactionId, paymentId) => { if (transactionId) obligationLinks.set(transactionId, paymentId); },
   } });
+  const recurringPlans = createRecurringPlanRepository({
+    plans: RECURRING_PLAN_FIXTURES,
+    occurrences: RECURRING_OCCURRENCE_FIXTURES,
+    accountExists: (id) => Boolean(engine.getAccount(id)),
+    participantExists: (id) => Boolean(participantRepo.get(id)),
+    ledgerExists: (id) => Boolean(ledgerRepo.getLedger(id)),
+    clock: () => `${FIXTURE_TODAY}T09:00:00+08:00`,
+  });
+  const recurringManagement = createRecurringPlanManagementGateway({
+    recurringRepository: recurringPlans,
+    obligationEngine: obligations,
+    today: () => FIXTURE_TODAY,
+  });
   const emitAttachmentEvent = (eventType, attachment, clientEventId, payload = {}) => outbox.emit({
     clientEventId, eventType, sourceChannel: 'app', actorUserId: 'user-winner', participantId: null,
     ledgerId: null, entityId: attachment?.attachmentId || payload.entityId || null, revision: 1,
@@ -307,6 +326,29 @@ export function createDemoDataSource() {
     const attachmentCount = attachments.length || (transaction.attachment || transaction.receipt || transaction.photo ? 1 : 0);
     return { ...transaction, catLabel: label, category: label, categoryArchived: Boolean(category?.isArchived && !category?.isSystemFallback), categoryIcon: category?.icon || null, categoryThemeToken: category?.themeToken || 'slate', attachments, attachmentCount };
   };
+  const fixedCenterProjection = (monthKey = FIXTURE_TODAY.slice(0, 7), referenceDate = FIXTURE_TODAY) => {
+    const fixedPlans = recurringPlans.listPlans();
+    const fixedOccurrences = [];
+    fixedPlans.filter((plan) => !plan.archivedAt).forEach((plan) => {
+      const generated = recurringPlans.generateOccurrence(plan.id, monthKey, { referenceDate, generatedAt: `${referenceDate}T09:00:00+08:00`, preserveLocked: true });
+      if (generated.occurrence) fixedOccurrences.push(generated.occurrence);
+    });
+    const obligationPlans = obligationRepo.getPlans().map((plan) => projectObligationPlan(plan)).filter(Boolean);
+    const obligationOccurrences = obligationPlans.flatMap((projectedPlan) => {
+      const sourcePlan = obligationRepo.getPlan(projectedPlan.canonicalSource.sourceId);
+      const authoritative = obligationRepo.getInstances(sourcePlan.planId).find((instance) => instance.dueDate.startsWith(monthKey));
+      if (authoritative) return [projectObligationOccurrence(sourcePlan, authoritative, referenceDate)];
+      if (projectedPlan.status !== 'active') return [];
+      const projected = buildOccurrenceSnapshot(projectedPlan, monthKey, { referenceDate, generatedAt: `${referenceDate}T09:00:00+08:00` });
+      return projected ? [projected] : [];
+    });
+    return selectRecurringMonth({
+      plans: dedupeCanonicalPlans([...fixedPlans, ...obligationPlans]),
+      occurrences: [...fixedOccurrences, ...obligationOccurrences],
+      monthKey,
+      referenceDate,
+    });
+  };
 
   return {
     today: FIXTURE_TODAY,
@@ -317,15 +359,59 @@ export function createDemoDataSource() {
     // getPendingCardDue / getAfterCardPaymentCash / getAAReceivables /
     // getFullPayoffPosition) behind this same shape.
     getPulse() {
+      const fixed = fixedCenterProjection(FIXTURE_TODAY.slice(0, 7), FIXTURE_TODAY);
       return engine.getDerivedMetrics({
         investmentTotal: investments.total,
         fixedDepositTotal: fixedDeposits.total,
         instalmentRemaining: instalmentRemaining(),
         monthCardDue: cardDueThisMonth(),
         aaReceivable: aaReceivable(),
-        myFixed: Math.round(commitmentState.reduce((sum, commitment) => sum + commitment.myShare, 0) * 100) / 100,
+        myFixed: fixed.summary.myFixedMinor / 100,
       });
     },
+
+    // Canonical read-only fixed/subscription projections. These commands may
+    // generate deterministic in-memory occurrences but never post money.
+    getRecurringPlans: () => recurringPlans.listPlans(),
+    getRecurringPlan: (id) => recurringPlans.getPlan(id),
+    getFixedCenterMonth: (monthKey, referenceDate = FIXTURE_TODAY) => fixedCenterProjection(monthKey, referenceDate),
+    getRecurringOccurrencesForMonth: (monthKey, referenceDate = FIXTURE_TODAY) => fixedCenterProjection(monthKey, referenceDate).rows,
+    getRecurringOccurrencesForPlan: (planId, referenceDate = FIXTURE_TODAY) => recurringPlans.listOccurrencesForPlan(planId, referenceDate),
+    createRecurringPlan: (input) => recurringPlans.createPlan(input),
+    updateRecurringPlan: (id, changes, options) => recurringPlans.updatePlan(id, changes, options),
+    pauseRecurringPlan: (id, options) => recurringPlans.pausePlan(id, options),
+    resumeRecurringPlan: (id, options) => recurringPlans.resumePlan(id, options),
+    stopRecurringPlan: (id, options) => recurringPlans.stopPlan(id, options),
+    generateRecurringOccurrence: (id, monthKey, options) => recurringPlans.generateOccurrence(id, monthKey, options),
+    getFixedRelationshipPlanProjections: (ledgerId) => projectFixedRelationshipsForLedger(recurringPlans.listPlans(), ledgerId),
+    getRecurringReminderIntents(monthKey, referenceDate = FIXTURE_TODAY) {
+      return dueSoonReminderIntents(fixedCenterProjection(monthKey, referenceDate).rows, referenceDate);
+    },
+    getCanonicalRecurringPlan: (source) => recurringManagement.getCanonicalPlan(source),
+    getCanonicalRecurringPlanOccurrences: (source, referenceDate = FIXTURE_TODAY) => recurringManagement.occurrencesFor(source, referenceDate),
+    getCanonicalRecurringPlans: () => recurringManagement.listCanonicalPlans(),
+    getLedgerRecurringProjection(ledgerId, referenceDate = FIXTURE_TODAY) {
+      const plans = recurringManagement.listCanonicalPlans();
+      const ledgerPlans = selectRecurringPlansForLedger(plans, ledgerId, { includeArchived: true });
+      const occurrences = ledgerPlans.flatMap((plan) => recurringManagement.occurrencesFor(plan.canonicalSource, referenceDate));
+      return buildLedgerRecurringProjection({
+        plans,
+        occurrences,
+        ledgerId,
+        participants: participantRepo.getAll(),
+        referenceDate,
+      });
+    },
+    findRecurringPlanDuplicates: (candidate, options) => recurringManagement.semanticDuplicates(candidate, options),
+    createManagedRecurringPlan: (input, options) => recurringManagement.createPlan(input, options),
+    updateManagedRecurringPlan: (source, changes, options) => recurringManagement.updatePlan(source, changes, options),
+    pauseManagedRecurringPlan: (source, options) => recurringManagement.pausePlan(source, options),
+    resumeManagedRecurringPlan: (source, options) => recurringManagement.resumePlan(source, options),
+    stopManagedRecurringPlan: (source, options) => recurringManagement.stopPlan(source, options),
+    archiveManagedRecurringPlan: (source, options) => recurringManagement.archivePlan(source, options),
+    unarchiveManagedRecurringPlan: (source, options) => recurringManagement.unarchivePlan(source, options),
+    removeManagedRecurringPlan: (source, options) => recurringManagement.removePlan(source, options),
+    getManagedRecurringPlanRemovalEligibility: (source) => recurringManagement.getRemovalEligibility(source),
 
     subscribe: (listener) => engine.subscribe(listener),
     getAccounts: () => engine.getAccounts(),
@@ -445,6 +531,8 @@ export function createDemoDataSource() {
       relationshipLinks.clear();
       obligations.reset();
       obligationLinks.clear();
+      recurringPlans.reset();
+      recurringManagement.resetCommands();
       attachmentStore.reset();
     },
     projectAAReceivable: (...args) => engine.projectAAReceivable(...args),

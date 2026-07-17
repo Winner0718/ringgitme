@@ -4,7 +4,7 @@
 // → three radar rows. Budget + group summary below the fold.
 // ============================================================
 
-import { registerPage, navigate } from '../../app/router.js';
+import { registerPage, navigate, pushRoute } from '../../app/router.js';
 import { data, ui, update, registerAction } from '../../app/state.js';
 import { fmtRM, daysBetween } from '../../app/format.js';
 import { renderMoneyPulse, activateMoneyPulse, cycleHero } from '../../components/MoneyPulse.js';
@@ -12,6 +12,8 @@ import { renderMetricStrip } from '../../components/MetricStrip.js';
 import { renderCommitmentRow, commitmentStatus } from '../../components/CommitmentRow.js';
 import { openSheet, closeSheet, toast } from '../../components/AppSheet.js';
 import { icon } from '../../components/Icons.js';
+import { registerFixedCenterFeature, renderFixedCenter } from '../fixed/index.js';
+import { deriveMonthlyWorkspace } from '../../domain/fixedCenterWorkspace.js';
 
 function radarSorted() {
   return [...data.getCommitments()].sort((a, b) => a.dueDate.localeCompare(b.dueDate));
@@ -81,7 +83,19 @@ function groupSummaryHTML() {
   `;
 }
 
+function fixedCenterEntryHTML() {
+  const month = deriveMonthlyWorkspace(data.getFixedCenterMonth(data.today.slice(0, 7), data.today));
+  return `<section class="section fixed-center-entry-wrap"><button class="fixed-center-entry surface" data-action="fixed-center-open">
+    <span>${icon('calendar', 18)}<span><strong>固定与订阅</strong><small>本月负担 ${fmtRM(month.overview.burdenMinor / 100, { privacy: ui.privacy })}</small></span></span>
+    <span><small>${month.overview.attentionCount ? `待处理 ${month.overview.attentionCount}` : `已完成 ${month.overview.completedCount}/${month.overview.totalCount}`}</small>${icon('chevronRight', 16)}</span>
+  </button></section>`;
+}
+
 function renderToday(container) {
+  if (ui.todayView === 'fixed') {
+    renderFixedCenter(container);
+    return;
+  }
   const pulse = data.getPulse();
   // The pinned item is not repeated as the first radar row
   const pinned = pinnedCommitment();
@@ -89,6 +103,7 @@ function renderToday(container) {
   container.innerHTML = `
     ${renderMoneyPulse(pulse)}
     ${renderMetricStrip(pulse)}
+    ${fixedCenterEntryHTML()}
     ${pinnedItem()}
     <section class="section">
       <div class="row-between sec-head">
@@ -105,11 +120,13 @@ function renderToday(container) {
 
 export function registerTodayFeature() {
   registerPage('today', renderToday);
+  registerFixedCenterFeature();
   registerAction('pulse-cycle', (el) => cycleHero(el.closest('.pulse')));
   registerAction('pin-tap', () => navigate('activity'));
   registerAction('metric-tap', (el) => {
     const m = el.dataset.metric;
-    if (m === 'aaReceivable' || m === 'afterReceive') navigate('ledger');
+    if (m === 'myFixed') pushRoute({ todayView: 'fixed', fixedWorkspace: 'month', fixedMonth: data.today.slice(0, 7) }, { direction: 'forward' });
+    else if (m === 'aaReceivable' || m === 'afterReceive') navigate('ledger');
     else navigate('assets');
   });
   // Marking paid is a short confirmation, never an instant mutation

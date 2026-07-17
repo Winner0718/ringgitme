@@ -1,9 +1,11 @@
 import { fmtDateMY } from '../app/format.js';
+import { registerOwnedModalHistory } from '../app/modalHistory.js';
 import { prefersReducedMotion } from '../app/motion.js';
-import { pushModalLayer } from '../app/modalStack.js';
+import { isTopModal, mountModalLayer, pushModalLayer } from '../app/modalStack.js';
 
 const MIN_YEAR = 1900;
 const MAX_YEAR = 2100;
+let activeDatePickerCancel = null;
 
 export function isISODate(value) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''));
@@ -102,8 +104,13 @@ export function datePickerHTML(value, { today = localISO(), chooser = false } = 
   return `<div class="date-picker-layer" role="presentation">${calendarHTML({ selected, today, viewYear: year, viewMonth: month, chooser })}</div>`;
 }
 
-export function openDatePickerSheet({ value, onComplete, today = () => localISO() }) {
-  document.querySelector('.date-picker-layer')?.remove();
+let datePickerSequence = 0;
+
+export function openDatePickerSheet({ value, onComplete, today = () => localISO(), trigger = document.activeElement, id = null, parentId = undefined }) {
+  if (activeDatePickerCancel) {
+    activeDatePickerCancel();
+    return null;
+  }
   const todayValue = today();
   let selected = isISODate(value) ? value : todayValue;
   let { year: viewYear, month: viewMonth } = dateParts(selected);
@@ -112,8 +119,10 @@ export function openDatePickerSheet({ value, onComplete, today = () => localISO(
   let pointer = null;
   let transitionTimer = null;
   const layer = document.createElement('div');
-  layer.className = 'date-picker-layer';
+  layer.className = 'date-picker-layer modal-layer';
   let releaseModal = () => {};
+  let ownedHistory = null;
+  let closed = false;
 
   const render = () => {
     layer.innerHTML = calendarHTML({ selected, today: todayValue, viewYear, viewMonth, chooser });
@@ -142,12 +151,17 @@ export function openDatePickerSheet({ value, onComplete, today = () => localISO(
     layer.querySelector('.date-picker-month-title')?.classList.add(delta > 0 ? 'to-next' : 'to-prev');
     transitionTimer = setTimeout(commit, 230);
   };
-  const close = () => {
+  const finishClose = () => {
+    if (closed || !isTopModal(layer)) return false;
+    closed = true;
     clearTimeout(transitionTimer);
-    releaseModal();
+    releaseModal(datePickerId);
+    activeDatePickerCancel = null;
     layer.classList.remove('open');
     setTimeout(() => layer.remove(), 220);
+    return true;
   };
+  const close = () => ownedHistory?.requestClose() || false;
   const choose = (iso) => {
     if (!isISODate(iso)) return;
     selected = iso;
@@ -157,8 +171,11 @@ export function openDatePickerSheet({ value, onComplete, today = () => localISO(
   };
 
   render();
-  document.getElementById('app').appendChild(layer);
-  releaseModal = pushModalLayer(layer);
+  mountModalLayer(layer);
+  const datePickerId = id || `date-picker:${++datePickerSequence}`;
+  releaseModal = pushModalLayer(layer, { id: datePickerId, parentId, kind: 'date-picker', trigger, surface: layer.querySelector('.date-picker-sheet'), backdrop: layer.querySelector('.date-picker-scrim') });
+  ownedHistory = registerOwnedModalHistory({ layerId: datePickerId, isTop: () => isTopModal(layer), onPop: finishClose });
+  activeDatePickerCancel = close;
   requestAnimationFrame(() => layer.classList.add('open'));
   layer.addEventListener('click', (event) => {
     if (event.target.closest('[data-date-cancel]')) return close();

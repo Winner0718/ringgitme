@@ -15,11 +15,14 @@ const CATEGORY_TITLES = { saving: '储蓄卡', cc: '信用卡', ew: 'eWallet' };
 
 // Topbar spec per current view: title, back affordance, eye, menu
 function topbarSpec() {
+  if (ui.tab === 'today' && ui.todayView === 'fixed') {
+    return { title: '固定与订阅', back: true, backAction: 'fixed-center-back', eye: true, menu: false };
+  }
   if (ui.tab === 'assets' && ui.assetsView.name === 'category') {
-    return { title: CATEGORY_TITLES[ui.assetsView.type], back: true, eye: true, menu: true };
+    return { title: CATEGORY_TITLES[ui.assetsView.type], back: true, backAction: 'assets-back', eye: true, menu: true };
   }
   if (ui.tab === 'assets' && ui.assetsView.name === 'detail') {
-    return { title: '账户详情', back: true, eye: true, menu: true };
+    return { title: '账户详情', back: true, backAction: 'assets-back', eye: true, menu: true };
   }
   return { title: TITLES[ui.tab] || 'RinggitMe', back: false, eye: ui.tab === 'today' || ui.tab === 'assets', menu: false };
 }
@@ -76,7 +79,7 @@ function renderTopbar() {
   const spec = topbarSpec();
   topbarEl.innerHTML = `
     <div class="topbar-lead">
-      ${spec.back ? `<button class="topbar-btn" data-action="assets-back" aria-label="返回">${icon('chevronLeft', 22)}</button>` : ''}
+      ${spec.back ? `<button class="topbar-btn" data-action="${spec.backAction}" aria-label="返回">${icon('chevronLeft', 22)}</button>` : ''}
       <h1 class="topbar-title">${spec.title}</h1>
     </div>
     <div class="topbar-actions">
@@ -146,6 +149,13 @@ function registerShellActions() {
     closeSheet();
     update({
       tab: 'today',
+      todayView: 'overview',
+      fixedMonth: data.today.slice(0, 7),
+      fixedWorkspace: 'month',
+      fixedPlanStatus: 'active',
+      fixedPlanType: 'all',
+      fixedHistoryFilter: 'all',
+      fixedCompletedExpanded: false,
       navDirection: 'back',
       assetsView: { name: 'overview' },
       categoryIndex: { saving: 0, cc: 0, ew: 0 },

@@ -7,6 +7,17 @@ import { dispatchAction } from '../app/state.js';
 
 let host = null;
 const sheets = [];
+let sheetHistorySequence = 0;
+
+function sheetPopstateHandler(event) {
+  if (!sheets.length) return;
+  const top = sheets.at(-1);
+  if (!top || !isTopModal(top.layer)) return;
+  event.stopImmediatePropagation();
+  // Browser Back follows the same dirty-state contract as Escape/backdrop.
+  // A parent editor may open its own discard confirmation and remain mounted.
+  closeSheet(false, { fromHistory: true });
+}
 
 export function mountSheetHost(parent) {
   // `parent` is retained for API compatibility. Every sheet now belongs to
@@ -16,10 +27,11 @@ export function mountSheetHost(parent) {
   return host;
 }
 
-export function openSheet({ title, contentHTML, className = '', onClose, onOpen, stacked = false, id, parentId, trigger = document.activeElement }) {
+export function openSheet({ title, contentHTML, className = '', onClose, onOpen, onRequestClose, stacked = false, id, parentId, trigger = document.activeElement }) {
   // Every layer is ultimately mounted beneath document.body by modalStack.
   // Compatibility contract: pushModalLayer(layer) is enriched with metadata below.
-  if (!stacked) while (sheets.length) closeSheet(true);
+  const replacing = !stacked && sheets.length > 0;
+  if (!stacked) while (sheets.length) closeSheet(true, { fromHistory: true });
   const layer = document.createElement('div');
   layer.className = `sheet-layer modal-layer${stacked ? ' sheet-layer-stacked' : ''}`;
   const scrim = document.createElement('div');
@@ -41,7 +53,9 @@ export function openSheet({ title, contentHTML, className = '', onClose, onOpen,
   attachActionDelegation(layer);
   mountModalLayer(layer);
   const releaseModal = pushModalLayer(layer, { id, parentId, kind: className.includes('capture-relationship-sheet') ? 'relationship' : className.includes('capture-sheet') ? 'capture' : 'sheet', trigger, surface: sheet, backdrop: scrim });
-  const entry = { layer, scrim, sheet, onClose, releaseModal };
+  const historyToken = `sheet-${++sheetHistorySequence}`;
+  history[replacing ? 'replaceState' : 'pushState']({ ...(history.state || {}), ringgitmeSheet: historyToken }, '', location.href);
+  const entry = { layer, scrim, sheet, onClose, onRequestClose, releaseModal, historyToken };
   sheets.push(entry);
   syncCaptureOpen();
 
@@ -57,7 +71,10 @@ export function openSheet({ title, contentHTML, className = '', onClose, onOpen,
     if (sheets.at(-1) === entry && isTopModal(layer)) closeSheet();
   });
   attachDragToClose(sheet, entry);
-  if (sheets.length === 1) document.addEventListener('keydown', escHandler);
+  if (sheets.length === 1) {
+    document.addEventListener('keydown', escHandler);
+    window.addEventListener('popstate', sheetPopstateHandler, true);
+  }
   onOpen?.(sheet);
   return sheet;
 }
@@ -76,24 +93,49 @@ function syncCaptureOpen() {
   document.getElementById('app')?.classList.toggle('capture-open', sheets.some(({ sheet }) => sheet.classList.contains('capture-sheet')));
 }
 
-export function closeSheet(instant = false) {
+export function closeSheet(instant = false, { fromHistory = false } = {}) {
   const entry = sheets.at(-1);
   if (!entry) return;
   if (!instant && !isTopModal(entry.layer)) return false;
+  return closeTopSheet(entry.layer.dataset.sheetId, instant, { fromHistory, soft: true });
+}
+
+export function closeTopSheet(expectedLayerId, instant = false, { fromHistory = false, soft = false } = {}) {
+  const entry = sheets.at(-1);
+  if (!entry || entry.layer.dataset.sheetId !== expectedLayerId || !isTopModal(entry.layer)) {
+    if (soft) return false;
+    const actual = entry?.layer.dataset.sheetId || 'none';
+    throw new Error(`sheet_layer_mismatch: expected ${expectedLayerId}, actual ${actual}`);
+  }
+  if (!instant && entry.onRequestClose?.() === false) return false;
   sheets.pop();
-  const { layer, scrim, sheet, onClose, releaseModal } = entry;
+  const { layer, scrim, sheet, onClose, releaseModal, historyToken } = entry;
   releaseModal();
   onClose?.();
   syncCaptureOpen();
-  if (!sheets.length) document.removeEventListener('keydown', escHandler);
+  if (!sheets.length) {
+    document.removeEventListener('keydown', escHandler);
+    window.removeEventListener('popstate', sheetPopstateHandler, true);
+  }
+  if (!fromHistory && historyToken) {
+    // UI/Escape dismissal must not navigate the application underneath the
+    // modal stack. Browser Back still consumes the pushed entries through the
+    // popstate handler, while direct dismissal rewrites only the current token.
+    const remainingToken = sheets.at(-1)?.historyToken;
+    const nextState = { ...(history.state || {}) };
+    if (remainingToken) nextState.ringgitmeSheet = remainingToken;
+    else delete nextState.ringgitmeSheet;
+    history.replaceState(nextState, '', location.href);
+  }
   if (instant) {
     layer.remove();
-    return;
+    return true;
   }
   layer.style.pointerEvents = 'none';
   scrim.classList.remove('open');
   sheet.classList.remove('open');
   setTimeout(() => layer.remove(), 300);
+  return true;
 }
 
 export function closeAllSheets({ instant = true } = {}) {
