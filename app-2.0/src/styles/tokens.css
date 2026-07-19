@@ -1,140 +1,257 @@
 /* ============================================================
-   RinggitMe 2.0 — Design Tokens (blueprint §15.1)
-   Single source of truth. No unregistered hex values elsewhere.
+   RINGGITME LIQUID CHROME iOS — canonical token source.
+   Compatibility names such as jade/accent intentionally resolve to the
+   neutral interaction palette. Green is reserved for financial semantics.
    ============================================================ */
 
 :root {
-  /* ---- Ringgit Jade palette ---- */
-  --jade-600: #0a8a54;
-  --jade-400: #34d27f;
-  --emerald-800: #065f3f;
-  --gold-500: #b8860b;
+  color-scheme: light;
 
-  /* Neutral mist scale */
-  --mist-50: #f5f5f7;
-  --mist-100: #ebebef;
-  --mist-200: #dcdce2;
-  --mist-300: #c3c3cc;
-  --mist-400: #9a9aa5;
-  --mist-500: #71717d;
-  --mist-600: #52525c;
-  --mist-700: #3a3a42;
-  --mist-800: #232329;
-  --mist-900: #131316;
+  /* Neutral interaction primitives. Legacy jade names are neutral aliases. */
+  --graphite-950: #0b0d10;
+  --graphite-900: #111419;
+  --graphite-800: #1c2026;
+  --graphite-700: #303640;
+  --silver-600: #69717c;
+  --silver-500: #7d858f;
+  --silver-400: #a3aab3;
+  --silver-300: #c0c6cd;
+  --silver-200: #d8dde3;
+  --silver-100: #e9edf1;
+  --pearl-50: #fafbfc;
+  --jade-700: var(--graphite-950);
+  --jade-600: var(--graphite-900);
+  --jade-500: var(--graphite-800);
+  --jade-400: var(--graphite-700);
+  --emerald-800: var(--graphite-950);
+  --gold-500: #9b712a;
+  --mist-50: #f7f8fa;
+  --mist-100: #eef1f4;
+  --mist-200: #dde2e7;
+  --mist-300: #c7cdd4;
+  --mist-400: #9aa2ac;
+  --mist-500: #707984;
+  --mist-600: #535b65;
+  --mist-700: #393f47;
+  --mist-800: #24282e;
+  --mist-900: #14171b;
 
-  /* Semantic (MY convention: expense red / income green) */
-  --sem-red: #dc2626;
-  --sem-green: #0a8a54;
-  --sem-orange: #c2620a;
-  --sem-blue: #0a6ea8;
+  /* Financial and status semantics: these are the only normal green roles. */
+  --sem-red: #c93642;
+  --sem-green: #16865d;
+  --sem-orange: #a9651d;
+  --sem-blue: #2b6f9c;
 
-  /* ---- Typography (SF Pro system stack, tabular numerals) ---- */
-  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
-    "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-  --type-page-title: 700 28px/1.2 var(--font-ui);
+  /* Canonical light roles. */
+  --rm-color-canvas: #f1f4f7;
+  --rm-color-canvas-elevated: #f7f9fb;
+  --rm-color-surface-solid: #fafbfc;
+  --rm-color-surface-tonal: #f0f3f6;
+  --rm-color-surface-control: #e7ebef;
+  --rm-color-surface-frosted: rgba(247, 249, 252, .68);
+  --rm-color-surface-frosted-strong: rgba(250, 251, 253, .9);
+  --rm-color-border: rgba(38, 45, 55, .11);
+  --rm-color-border-strong: rgba(30, 36, 45, .2);
+  --rm-color-edge-highlight: rgba(255, 255, 255, .92);
+  --rm-color-edge-lowlight: rgba(70, 79, 91, .22);
+  --rm-color-text-primary: #0d1014;
+  --rm-color-text-secondary: #69717c;
+  --rm-color-text-tertiary: #858d97;
+  --rm-color-text-disabled: #a9b0b8;
+  --rm-color-interactive: var(--graphite-900);
+  --rm-color-interactive-pressed: var(--graphite-950);
+  --rm-color-interactive-subtle: rgba(22, 26, 32, .075);
+  --rm-color-interactive-focus: rgba(38, 45, 55, .22);
+  --rm-color-jade-primary: var(--rm-color-interactive);
+  --rm-color-jade-pressed: var(--rm-color-interactive-pressed);
+  --rm-color-jade-subtle: var(--rm-color-interactive-subtle);
+  --rm-color-jade-focus: var(--rm-color-interactive-focus);
+  --rm-color-success: var(--sem-green);
+  --rm-color-danger: var(--sem-red);
+  --rm-color-warning: var(--sem-orange);
+  --rm-color-information: var(--sem-blue);
+  --rm-color-divider: rgba(37, 44, 54, .085);
+  --rm-color-scrim: rgba(19, 23, 29, .34);
+
+  /* Compatibility boundary used by accepted feature CSS. */
+  --accent: var(--rm-color-interactive);
+  --accent-soft: var(--rm-color-interactive-subtle);
+  --green: var(--rm-color-interactive);
+  --green-soft: var(--rm-color-interactive-subtle);
+  --s0: var(--rm-color-canvas);
+  --s1: var(--rm-color-surface-solid);
+  --s2: var(--rm-color-surface-tonal);
+  --text-1: var(--rm-color-text-primary);
+  --text-2: var(--rm-color-text-secondary);
+  --text-3: var(--rm-color-text-tertiary);
+  --line: var(--rm-color-border);
+  --line-strong: var(--rm-color-border-strong);
+  --scrim: var(--rm-color-scrim);
+
+  /* Native system typography. */
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+    "PingFang SC", "Helvetica Neue", "Segoe UI", "Noto Sans CJK SC", sans-serif;
+  --type-page-title: 700 28px/1.18 var(--font-ui);
   --type-section: 650 18px/1.3 var(--font-ui);
-  --type-body: 450 15px/1.4 var(--font-ui);
-  --type-caption: 500 12.5px/1.35 var(--font-ui);
-  --type-amount-hero: 700 40px/1.1 var(--font-ui);
-  --type-amount-row: 600 15px/1.3 var(--font-ui);
-  --type-amount-sub: 600 13px/1.3 var(--font-ui);
+  --type-card-title: 620 16px/1.34 var(--font-ui);
+  --type-body: 440 15px/1.46 var(--font-ui);
+  --type-secondary: 470 13.5px/1.42 var(--font-ui);
+  --type-label: 600 12.5px/1.35 var(--font-ui);
+  --type-caption: 500 12px/1.38 var(--font-ui);
+  --type-amount-hero: 720 40px/1.08 var(--font-ui);
+  --type-amount-row: 640 15px/1.3 var(--font-ui);
+  --type-amount-sub: 610 13px/1.3 var(--font-ui);
+  --type-button: 650 15px/1.2 var(--font-ui);
+  --type-tab: 580 11px/1.15 var(--font-ui);
 
-  /* ---- Spacing / density ---- */
-  --space-page-x: 16px;
-  --space-section: 20px;
-  --space-2: 2px;
-  --space-4: 4px;
-  --space-6: 6px;
-  --space-8: 8px;
-  --space-10: 10px;
-  --space-12: 12px;
-  --space-16: 16px;
-  --space-20: 20px;
-  --space-24: 24px;
-  --row-h: 48px;
-  --row-h-dense: 40px;
-  --control-h: 44px;
-  --control-h-compact: 32px;
-  --card-pad: 14px;
+  /* Spacing. */
+  --rm-space-1: 4px; --rm-space-2: 8px; --rm-space-3: 12px;
+  --rm-space-4: 16px; --rm-space-5: 20px; --rm-space-6: 24px; --rm-space-7: 32px;
+  --space-page-x: var(--rm-space-4); --space-section: var(--rm-space-5);
+  --space-2: 2px; --space-4: var(--rm-space-1); --space-6: 6px;
+  --space-8: var(--rm-space-2); --space-10: 10px; --space-12: var(--rm-space-3);
+  --space-16: var(--rm-space-4); --space-20: var(--rm-space-5); --space-24: var(--rm-space-6);
+  --row-h: 50px; --row-h-dense: 42px; --control-h: 48px;
+  --control-h-compact: 36px; --card-pad: 14px;
 
-  /* ---- Radius (only these four steps, blueprint §15.1) ---- */
-  --r-card: 16px;
-  --r-control: 12px;
-  --r-sheet: 24px;
-  --r-pill: 999px;
+  /* Radius. */
+  --rm-radius-compact: 11px;
+  --rm-radius-field: 15px;
+  --rm-radius-card: 19px;
+  --rm-radius-large: 23px;
+  --rm-radius-sheet: 30px;
+  --rm-radius-pill: 999px;
+  --r-control: var(--rm-radius-field); --r-card: var(--rm-radius-card);
+  --r-sheet: var(--rm-radius-sheet); --r-pill: var(--rm-radius-pill);
 
-  /* ---- Motion ---- */
-  --dur-fast: 160ms;
-  --dur-base: 240ms;
-  --dur-slow: 420ms;
-  --dur-amount: 480ms;
-  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* Liquid Chrome: a non-uniform optical ring plus shallow contact depth. */
+  --rm-chrome-border: transparent;
+  --rm-chrome-highlight: rgba(255, 255, 255, .94);
+  --rm-chrome-lowlight: rgba(46, 55, 68, .28);
+  --rm-chrome-glint: rgba(255, 255, 255, 1);
+  --rm-chrome-ice: rgba(190, 224, 255, .86);
+  --rm-chrome-perimeter: linear-gradient(180deg,
+    rgba(242,248,254,.98) 0%,
+    rgba(190,204,220,.94) 52%,
+    rgba(171,188,207,.94) 100%);
+  --rm-chrome-perimeter-hero: linear-gradient(180deg,
+    rgba(250,253,255,1) 0%,
+    rgba(185,202,221,.97) 50%,
+    rgba(159,180,203,.97) 100%);
+  /* A complete moving chrome texture, not a single travelling spark. */
+  --rm-chrome-flowing-stops:
+    rgba(248,252,255,.96) 0deg,
+    rgba(86,101,119,.72) 34deg,
+    rgba(255,255,255,1) 62deg,
+    rgba(185,220,247,.94) 88deg,
+    rgba(47,59,75,.76) 126deg,
+    rgba(242,249,255,.98) 164deg,
+    rgba(255,255,255,1) 196deg,
+    rgba(104,121,142,.76) 226deg,
+    rgba(205,231,251,.96) 254deg,
+    rgba(52,64,80,.75) 292deg,
+    rgba(255,255,255,1) 326deg,
+    rgba(248,252,255,.96) 360deg;
+  --rm-shadow-flat: 0 1px 1px rgba(27, 34, 43, .035);
+  --rm-shadow-control: 0 2px 5px rgba(35, 44, 56, .08), 0 8px 18px rgba(49, 59, 72, .055);
+  --rm-shadow-card: 0 2px 6px rgba(28, 36, 46, .075), 0 13px 30px rgba(48, 59, 73, .07);
+  --rm-shadow-floating: 0 3px 8px rgba(24, 31, 40, .09), 0 18px 38px rgba(42, 52, 65, .115);
+  --rm-shadow-overlay: 0 -1px 2px rgba(255,255,255,.7), 0 14px 40px rgba(27, 35, 45, .16);
+  --shadow-1: var(--rm-shadow-control); --shadow-2: var(--rm-shadow-floating);
 
-  /* ---- Shadows ---- */
-  --shadow-1: 0 2px 8px rgba(0, 0, 0, 0.04);
-  --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.08);
+  /* Finite Liquid Chrome recipes. Compatibility recipe names remain stable. */
+  --rm-glass-canvas-bg: linear-gradient(145deg, rgba(255,255,255,.24), rgba(226,237,248,.1));
+  --rm-glass-chrome-bg: linear-gradient(145deg, rgba(255,255,255,.58), rgba(232,240,248,.28) 46%, rgba(255,255,255,.4));
+  --rm-glass-chrome-blur: 24px;
+  --rm-glass-chrome-saturation: 1.26;
+  --rm-glass-sheet-bg: linear-gradient(145deg, rgba(255,255,255,.66), rgba(231,239,248,.4) 49%, rgba(255,255,255,.5));
+  --rm-glass-sheet-blur: 20px;
+  --rm-glass-sheet-saturation: 1.24;
+  --rm-glass-compact-bg: linear-gradient(145deg, rgba(255,255,255,.54), rgba(230,238,247,.26) 54%, rgba(255,255,255,.38));
+  --rm-glass-compact-blur: 14px;
+  --rm-glass-compact-saturation: 1.22;
+  --rm-glass-content-bg: linear-gradient(145deg, rgba(255,255,255,.62), rgba(233,241,249,.33) 48%, rgba(255,255,255,.48));
+  --rm-glass-content-blur: 20px;
+  --rm-glass-content-saturation: 1.18;
+  --rm-glass-dense-bg: linear-gradient(145deg, rgba(255,255,255,.82), rgba(238,244,250,.64));
+  --glass-chrome-bg: var(--rm-glass-chrome-bg); --glass-chrome-blur: var(--rm-glass-chrome-blur);
+  --glass-sheet-bg: var(--rm-glass-sheet-bg); --glass-sheet-blur: var(--rm-glass-sheet-blur);
+  --glass-accent-bg: var(--rm-glass-compact-bg); --glass-accent-blur: var(--rm-glass-compact-blur);
+  --glass-edge: var(--rm-color-edge-highlight); --glass-outline: var(--rm-color-border);
+  --glass-tint: rgba(255, 255, 255, .08);
 
-  /* Safe areas */
+  /* Tactile and edge-light motion. */
+  --rm-motion-tap: 150ms; --rm-motion-control: 210ms; --rm-motion-sheet: 340ms;
+  --rm-motion-drag: 170ms; --rm-motion-toast: 220ms;
+  --rm-motion-edge-orbit: 6.4s; --rm-motion-edge-sweep: 720ms;
+  --rm-motion-liquid-sweep: 540ms;
+  --rm-motion-edge-entrance: 920ms;
+  --rm-ease-standard: cubic-bezier(.2,.72,.2,1);
+  --rm-ease-emphasized: cubic-bezier(.16,.84,.2,1);
+  --dur-fast: var(--rm-motion-control); --dur-base: 240ms;
+  --dur-slow: var(--rm-motion-sheet); --dur-amount: 480ms; --ease-out: var(--rm-ease-standard);
+
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --rm-bottom-nav-height: 62px;
 }
 
-/* ============================================================
-   Light theme surfaces (S0 page / S1 card / S2 raised card)
-   ============================================================ */
-:root,
-:root[data-theme="light"] {
-  color-scheme: light;
-  --accent: var(--jade-600);
-  --accent-soft: rgba(10, 138, 84, 0.1);
-  --s0: var(--mist-50);
-  --s1: #ffffff;
-  --s2: #ffffff;
-  --text-1: #17171a;
-  --text-2: var(--mist-500);
-  --text-3: var(--mist-400);
-  --line: rgba(0, 0, 0, 0.07);
-  --line-strong: rgba(0, 0, 0, 0.12);
-
-  /* Glass materials G3 chrome / G2 sheet / G1 accent (blueprint §11.1) */
-  --glass-chrome-bg: rgba(255, 255, 255, 0.12);
-  --glass-chrome-blur: 28px;
-  --glass-sheet-bg: rgba(250, 250, 252, 0.65);
-  --glass-sheet-blur: 20px;
-  --glass-accent-bg: rgba(255, 255, 255, 0.3);
-  --glass-accent-blur: 10px;
-  --glass-edge: rgba(255, 255, 255, 0.35);
-  --glass-outline: rgba(0, 0, 0, 0.06);
-  --glass-tint: color-mix(in srgb, var(--accent) 6%, transparent);
-  --scrim: rgba(0, 0, 0, 0.3);
-}
-
-/* ============================================================
-   Dark theme (glass +8–10% opacity, halved highlight)
-   ============================================================ */
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --accent: var(--jade-400);
-  --accent-soft: rgba(52, 210, 127, 0.14);
-  --s0: #000000;
-  --s1: #17171a;
-  --s2: #202024;
-  --text-1: #f2f2f5;
-  --text-2: var(--mist-400);
-  --text-3: var(--mist-500);
-  --line: rgba(255, 255, 255, 0.08);
-  --line-strong: rgba(255, 255, 255, 0.16);
-  --sem-red: #f26d6d;
-  --sem-green: #34d27f;
-  --sem-orange: #e8934a;
-  --sem-blue: #58a8dc;
+  --rm-color-canvas: #101216;
+  --rm-color-canvas-elevated: #16191e;
+  --rm-color-surface-solid: #1c2026;
+  --rm-color-surface-tonal: #22272e;
+  --rm-color-surface-control: #2a3038;
+  --rm-color-surface-frosted: rgba(30, 35, 42, .72);
+  --rm-color-surface-frosted-strong: rgba(28, 33, 40, .92);
+  --rm-color-border: rgba(229, 234, 240, .1);
+  --rm-color-border-strong: rgba(235, 239, 244, .19);
+  --rm-color-edge-highlight: rgba(255, 255, 255, .15);
+  --rm-color-edge-lowlight: rgba(0, 0, 0, .44);
+  --rm-color-text-primary: #f4f6f8;
+  --rm-color-text-secondary: #b1b7c0;
+  --rm-color-text-tertiary: #858d97;
+  --rm-color-text-disabled: #626a74;
+  --rm-color-interactive: #f1f3f6;
+  --rm-color-interactive-pressed: #ffffff;
+  --rm-color-interactive-subtle: rgba(242, 245, 248, .1);
+  --rm-color-interactive-focus: rgba(236, 240, 245, .22);
+  --rm-color-success: #48c18b;
+  --rm-color-danger: #f0767e;
+  --rm-color-warning: #dda05d;
+  --rm-color-information: #7caed1;
+  --rm-color-divider: rgba(230, 235, 241, .08);
+  --rm-color-scrim: rgba(3, 5, 8, .7);
+  --rm-glass-canvas-bg: linear-gradient(145deg, rgba(255,255,255,.055), rgba(76,89,106,.035));
+  --rm-glass-chrome-bg: linear-gradient(145deg, rgba(57,66,78,.54), rgba(19,24,30,.42) 50%, rgba(45,54,66,.4));
+  --rm-glass-sheet-bg: linear-gradient(145deg, rgba(50,59,70,.7), rgba(17,22,28,.58) 52%, rgba(38,46,57,.62));
+  --rm-glass-compact-bg: linear-gradient(145deg, rgba(61,71,84,.54), rgba(22,27,34,.4) 54%, rgba(46,55,67,.42));
+  --rm-glass-content-bg: linear-gradient(145deg, rgba(54,64,76,.68), rgba(22,28,35,.54) 52%, rgba(43,51,62,.58));
+  --rm-glass-dense-bg: linear-gradient(145deg, rgba(43,51,61,.88), rgba(22,27,33,.82));
+  --rm-chrome-border: transparent;
+  --rm-chrome-highlight: rgba(255, 255, 255, .18);
+  --rm-chrome-lowlight: rgba(0, 0, 0, .58);
+  --rm-chrome-glint: rgba(255, 255, 255, .8);
+  --sem-red: var(--rm-color-danger); --sem-green: var(--rm-color-success);
+  --sem-orange: var(--rm-color-warning); --sem-blue: var(--rm-color-information);
+  --rm-chrome-perimeter: linear-gradient(180deg, rgba(222,232,244,.82), rgba(153,170,190,.76));
+  --rm-chrome-perimeter-hero: linear-gradient(180deg, rgba(244,249,255,.94), rgba(166,187,210,.86));
+  --rm-shadow-control: 0 2px 6px rgba(0,0,0,.28), 0 9px 20px rgba(0,0,0,.16);
+  --rm-shadow-card: 0 3px 8px rgba(0,0,0,.28), 0 14px 32px rgba(0,0,0,.22);
+  --rm-shadow-floating: 0 4px 10px rgba(0,0,0,.34), 0 20px 42px rgba(0,0,0,.32);
+  --rm-shadow-overlay: 0 16px 46px rgba(0,0,0,.48);
+}
 
-  --glass-chrome-bg: rgba(22, 22, 26, 0.22);
-  --glass-sheet-bg: rgba(24, 24, 28, 0.74);
-  --glass-accent-bg: rgba(40, 40, 46, 0.42);
-  --glass-edge: rgba(255, 255, 255, 0.12);
-  --glass-outline: rgba(255, 255, 255, 0.05);
-  --shadow-1: 0 2px 8px rgba(0, 0, 0, 0.3);
-  --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.5);
-  --scrim: rgba(0, 0, 0, 0.55);
+@media (prefers-reduced-motion: reduce) {
+  :root { --rm-motion-tap: 1ms; --rm-motion-control: 1ms; --rm-motion-sheet: 1ms;
+    --rm-motion-drag: 1ms; --rm-motion-toast: 1ms; --rm-motion-edge-orbit: 1ms;
+    --rm-motion-edge-sweep: 1ms; --rm-motion-liquid-sweep: 1ms; --rm-motion-edge-entrance: 1ms; --dur-fast: 1ms; --dur-base: 1ms;
+    --dur-slow: 1ms; --dur-amount: 1ms; }
+}
+:root[data-reduced-motion="true"] {
+  --rm-motion-tap: 1ms; --rm-motion-control: 1ms; --rm-motion-sheet: 1ms;
+  --rm-motion-drag: 1ms; --rm-motion-toast: 1ms; --rm-motion-edge-orbit: 1ms;
+  --rm-motion-edge-sweep: 1ms; --rm-motion-liquid-sweep: 1ms; --rm-motion-edge-entrance: 1ms; --dur-fast: 1ms; --dur-base: 1ms;
+  --dur-slow: 1ms; --dur-amount: 1ms;
 }

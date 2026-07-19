@@ -17,6 +17,7 @@ const TABS = [
 export function renderTabBar(parent) {
   const nav = document.createElement('nav');
   nav.className = 'tabbar glass-chrome';
+  nav.dataset.rmComponent = 'BottomNavigation';
   nav.setAttribute('aria-label', '主导航');
   parent.appendChild(nav);
   updateTabBar(nav);

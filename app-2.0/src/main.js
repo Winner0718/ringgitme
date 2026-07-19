@@ -8,7 +8,7 @@
 
 import { mountShell } from './app/shell.js';
 import { initializeNavigationHistory, renderCurrentPage } from './app/router.js';
-import { data, ui, applyTheme, watchSystemTheme, dispatchAction } from './app/state.js';
+import { data, ui, applyTheme, watchSystemTheme, applyChromeMotion, watchSystemMotion, dispatchAction } from './app/state.js';
 import { registerTodayFeature } from './features/today/index.js';
 import { registerAssetsFeature } from './features/assets/index.js';
 import { registerCaptureFeature } from './features/capture/index.js';
@@ -18,14 +18,18 @@ import { openCaptureSheet } from './components/CaptureSheet.js';
 import { openMoneyFlowConfirmation } from './components/MoneyFlowConfirmation.js';
 import { buildConfirmationDebugPreview } from './components/ConfirmationDebugPreview.js';
 import { openSplitComposerDebugPreview } from './components/SplitComposerDebugPreview.js';
+import { mountDesignSystemLab } from './design-system/DesignSystemLab.js';
 
 const params = new URLSearchParams(location.search);
 
 // Screenshot-only deterministic override; no production control is exposed.
 if (params.get('reducedMotion') === '1') document.documentElement.dataset.reducedMotion = 'true';
+if (params.get('blurFallback') === '1') document.documentElement.dataset.blurFallback = 'true';
 
 applyTheme(['light', 'dark'].includes(params.get('theme')) ? params.get('theme') : 'auto');
 watchSystemTheme();
+applyChromeMotion(params.get('chromeMotion') === '0' ? false : ui.chromeMotion);
+watchSystemMotion();
 
 const tab = params.get('tab');
 if (['today', 'assets', 'activity', 'ledger'].includes(tab)) ui.tab = tab;
@@ -70,6 +74,7 @@ if (params.get('plan')) {
 initializeNavigationHistory();
 
 mountShell(document.getElementById('app'));
+applyChromeMotion(ui.chromeMotion);
 
 registerTodayFeature();
 registerAssetsFeature();
@@ -78,6 +83,11 @@ registerActivityFeature();
 registerLedgerFeature();
 
 renderCurrentPage();
+
+// Internal QA route only. The Lab mounts the actual production components
+// after their normal action contracts have registered, and never appears in
+// customer navigation.
+if (params.get('designSystem') === '1') mountDesignSystemLab(document.getElementById('app'));
 
 if (params.get('capture') === '1') {
   openCaptureSheet();

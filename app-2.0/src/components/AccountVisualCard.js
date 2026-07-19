@@ -28,7 +28,7 @@ export function accountIdentityBarHTML(account, { status = '已更新', roleLabe
 
 function accountAmount(account, amountMinor) {
   if (Number.isFinite(amountMinor)) return Number(amountMinor) / 100;
-  return account.type === 'cc' ? account.outstanding : account.balance;
+  return account.type === 'cc' ? Number(account.totalCardDebt ?? account.outstanding ?? 0) : account.balance;
 }
 
 function fallbackVisual(account, { minimal = false } = {}) {
@@ -68,7 +68,7 @@ export function accountVisualCardHTML(account, {
     ${identity}
     <span class="account-visual-badge">${TYPE_BADGE[account.type]}</span>
     <div class="account-visual-overlay">
-      <span class="account-visual-digits num">${account.last4 ? `•••• ${escapeHTML(account.last4)}` : escapeHTML(account.short || account.name)}</span>
+      <span class="account-visual-digits num">${account.creditCardLast4 || account.last4 ? `•••• ${escapeHTML(account.creditCardLast4 || account.last4)}` : escapeHTML(account.short || account.name)}</span>
       ${showAmount ? `<span class="account-visual-amount"><small>${label}</small><strong class="num${debt ? ' debt-value' : ''}" aria-label="${escapeHTML(label)} ${fmtRM(Math.abs(amount))}">${fmtRM(Math.abs(amount), { privacy: ui.privacy })}</strong></span>` : ''}
     </div>
   </div>`;

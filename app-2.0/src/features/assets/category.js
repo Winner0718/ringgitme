@@ -10,6 +10,7 @@ import { walletStackCategoryDeckHTML } from '../../components/WalletStackCategor
 import { renderActivityRow } from '../../components/ActivityRow.js';
 import { icon } from '../../components/Icons.js';
 import { pushRoute } from '../../app/router.js';
+import { maskAssetIdentifier } from '../../domain/assetFinancialModel.js';
 
 const EW_COPY = { totalLabel: 'eWallet 总余额', listTitle: '全部钱包', recentTitle: '最近记录' };
 
@@ -43,9 +44,13 @@ export function creditMonthStats(activities, accountIds, month = '2026-07') {
 
 export function availableCreditForAccount(account, accounts) {
   if (!account) return 0;
-  if (!account.sharedPool) return Math.max(0, Number(account.limit || 0) - Number(account.outstanding || 0));
+  if (!account.sharedPool) return Number(account.limit || 0) - Number(account.outstanding || 0);
   const poolOutstanding = accounts.filter((candidate) => candidate.sharedPool === account.sharedPool).reduce((sum, candidate) => sum + Number(candidate.outstanding || 0), 0);
-  return Math.max(0, Number(account.sharedPoolTotal || 0) - poolOutstanding);
+  return Number(account.sharedPoolTotal || 0) - poolOutstanding;
+}
+
+function canonicalAvailableCreditForAccount(account) {
+  return Number.isInteger(account?.availableCreditMinor) ? account.availableCreditMinor / 100 : Number(account?.limit || 0) - Number(account?.outstanding || 0);
 }
 
 function categoryStatsHTML(type, list, activities) {
@@ -84,15 +89,17 @@ function selectedSummaryHTML(type, selected, list, activities) {
       <button type="button" class="wallet-detail-cta" data-action="assets-open-detail" data-acc="${escapeHTML(selected.id)}">${copy.detailPrefix}${escapeHTML(selected.name)}${copy.detailSuffix} ${icon('chevronRight', 14)}</button>
     </section>`;
   }
-  const instalmentDue = data.getInstalments(selected.id).reduce((sum, item) => sum + item.monthly, 0);
-  const monthlyDue = (selected.duePaid ? 0 : Number(selected.monthlyDue || 0)) + instalmentDue;
+  // monthlyDue is the canonical cycle total and already includes the current
+  // installment occurrence. Adding installments here would double-count it.
+  const monthlyDue = selected.duePaid ? 0 : Number(selected.monthCardDue || 0);
+  const available = canonicalAvailableCreditForAccount(selected);
   return `<section class="section surface wallet-selected-summary" data-summary-account-id="${escapeHTML(selected.id)}">
     <div class="wallet-selected-heading"><span class="caption">${copy.currentLabel}</span><strong>${escapeHTML(selected.name)}</strong></div>
     <div class="wallet-selected-grid">
-      <span>${copy.balanceLabel}<strong class="num amt-neg">${fmtRM(selected.outstanding, { privacy: ui.privacy })}</strong></span>
+      <span>${copy.balanceLabel}<strong class="num amt-neg">${fmtRM(selected.totalCardDebt, { privacy: ui.privacy })}</strong></span>
       <span>${copy.dueLabel}<strong class="num amt-neg">${fmtRM(monthlyDue, { privacy: ui.privacy })}</strong></span>
       <span>${copy.dueDateLabel}<strong class="num">${selected.dueDate ? fmtDateMY(selected.dueDate) : '暂无到期日'}</strong></span>
-      <span>${copy.availableLabel}<strong class="num">${fmtRM(availableCreditForAccount(selected, list), { privacy: ui.privacy })}</strong></span>
+      <span>${copy.availableLabel}<strong class="num${available < 0 ? ' amt-neg' : ''}">${fmtRM(available, { privacy: ui.privacy })}</strong></span>
     </div>
     <button type="button" class="wallet-detail-cta" data-action="assets-open-detail" data-acc="${escapeHTML(selected.id)}">${copy.detailPrefix}${escapeHTML(selected.name)}${copy.detailSuffix} ${icon('chevronRight', 14)}</button>
   </section>`;
@@ -116,7 +123,7 @@ function renderWalletCategory(container, type, list) {
   ui.selectedAccountId[type] = selected.id;
   ui.categoryIndex[type] = list.findIndex((account) => account.id === selectedId);
   const copy = ASSET_CATEGORY_COPY[type];
-  const total = list.reduce((sum, account) => sum + (type === 'cc' ? account.outstanding : account.balance), 0);
+  const total = list.reduce((sum, account) => sum + (type === 'cc' ? Number(account.totalCardDebt ?? account.outstanding ?? 0) : account.balance), 0);
   container.innerHTML = `<section class="section cat-summary wallet-category-summary">
       <div class="caption">${copy.totalLabel}</div>
       <div class="num cat-total ${type === 'cc' ? 'amt-neg' : 'assets-net-primary'}">${fmtRM(total, { privacy: ui.privacy })}</div>
@@ -128,7 +135,7 @@ function renderWalletCategory(container, type, list) {
 }
 
 function allRowsHTML(list) {
-  return `<section class="section"><h2 class="sec-title">${EW_COPY.listTitle} (${list.length})</h2><div class="surface"><ul>${list.map((account) => `<li class="row" data-action="assets-open-detail" data-acc="${account.id}"><span class="acc-chip" style="--brand:${account.brandColor}">${escapeHTML(account.name[0])}</span><div class="row-main"><div class="row-title">${escapeHTML(account.name)}</div><div class="caption num">${account.last4 ? `•••• ${account.last4}` : escapeHTML(account.bank)}</div></div><span class="num row-amt">${fmtRM(account.balance, { privacy: ui.privacy })}</span>${icon('chevronRight', 15)}</li>`).join('')}</ul></div></section>`;
+  return `<section class="section"><h2 class="sec-title">${EW_COPY.listTitle} (${list.length})</h2><div class="surface"><ul>${list.map((account) => `<li class="row" data-action="assets-open-detail" data-acc="${account.id}"><span class="acc-chip" style="--brand:${account.brandColor}">${escapeHTML(account.name[0])}</span><div class="row-main"><div class="row-title">${escapeHTML(account.name)}</div><div class="caption num">${escapeHTML(maskAssetIdentifier(account.walletIdentifier) || account.bank)}</div></div><span class="num row-amt">${fmtRM(account.balance, { privacy: ui.privacy })}</span>${icon('chevronRight', 15)}</li>`).join('')}</ul></div></section>`;
 }
 
 function renderEWalletCategory(container, list) {

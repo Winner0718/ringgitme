@@ -2,6 +2,7 @@ import { escapeHTML } from '../app/format.js';
 import { registerOwnedModalHistory } from '../app/modalHistory.js';
 import { icon } from './Icons.js';
 import { isTopModal, mountModalLayer, pushModalLayer } from '../app/modalStack.js';
+import { attachSheetVisualViewport } from './AppSheet.js';
 
 // RinggitMe picker — replaces raw native <select> in transaction and
 // relationship flows. Renders as its own layer (like the time picker) so it
@@ -26,9 +27,9 @@ export function openPickerSheet({ title, options, selectedValue = null, onSelect
   if (activePickerCancel && !activePickerCancel()) return null;
   if (activePickerCancel) return null;
   const wrapper = document.createElement('div');
-  wrapper.innerHTML = `<div class="picker-layer modal-layer" role="presentation">
+  wrapper.innerHTML = `<div class="picker-layer modal-layer" data-sheet-detent="medium" role="presentation">
     <button class="picker-scrim" data-modal-backdrop data-picker-cancel aria-label="取消选择"></button>
-    <section class="picker-sheet glass-sheet" data-modal-surface role="dialog" aria-modal="true" aria-label="${escapeHTML(title)}" tabindex="-1">
+    <section class="picker-sheet glass-sheet" data-sheet-detent="medium" data-modal-surface role="dialog" aria-modal="true" aria-label="${escapeHTML(title)}" tabindex="-1">
       <div class="time-picker-grabber"><span></span></div>
       <header class="time-picker-title">${escapeHTML(title)}</header>
       ${searchable ? `<label class="search-field surface picker-search">${icon('search', 15)}<input type="search" data-picker-search placeholder="搜索" aria-label="搜索选项" /></label>` : ''}
@@ -38,6 +39,7 @@ export function openPickerSheet({ title, options, selectedValue = null, onSelect
   </div>`;
   const layer = wrapper.firstElementChild;
   mountModalLayer(layer);
+  const viewportCleanup = attachSheetVisualViewport(layer);
   const pickerId = id || `picker:${++pickerSequence}`;
   const releaseModal = pushModalLayer(layer, { id: pickerId, parentId, kind: 'picker', trigger, surface: layer.querySelector('.picker-sheet'), backdrop: layer.querySelector('.picker-scrim') });
   let closed = false;
@@ -48,6 +50,7 @@ export function openPickerSheet({ title, options, selectedValue = null, onSelect
     if (closed) return false;
     if (!isTopModal(layer)) return false;
     releaseModal(pickerId);
+    viewportCleanup();
     closed = true;
     activePickerCancel = null;
     layer.classList.remove('open');
@@ -96,7 +99,7 @@ export function openPickerSheet({ title, options, selectedValue = null, onSelect
 // Compact display field that opens the picker — shared markup for forms.
 export function pickerFieldHTML({ label, key, valueLabel, caption = '' }) {
   return `<div class="cap-field"><span class="caption">${escapeHTML(label)}</span>
-    <button type="button" class="native-picker-display picker-field" data-picker-field="${escapeHTML(key)}" aria-label="${escapeHTML(label)}，当前 ${escapeHTML(valueLabel)}">
+    <button type="button" class="native-picker-display picker-field rm-picker-field" data-rm-component="PickerField" data-picker-field="${escapeHTML(key)}" aria-label="${escapeHTML(label)}，当前 ${escapeHTML(valueLabel)}">
       <span class="picker-field-value" data-picker-field-label="${escapeHTML(key)}">${escapeHTML(valueLabel)}</span>${caption ? `<span class="caption">${escapeHTML(caption)}</span>` : ''}${icon('chevronRight', 15)}
     </button>
   </div>`;

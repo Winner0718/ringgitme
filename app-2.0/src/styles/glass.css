@@ -1,36 +1,31 @@
 /* ============================================================
-   RinggitMe 2.0 — Liquid Glass materials (blueprint §11)
-   Glass ONLY on: top chrome, tab bar, sheets, segmented
-   controls, floating controls. All money content stays solid.
+   RinggitMe Liquid Chrome compatibility aliases.
+   The optical perimeter is owned by design-system.css; this file only maps
+   legacy material class names to the finite canonical recipes.
    ============================================================ */
 
 /* G3 — chrome (tab bar, top bar, floating controls) */
 .glass-chrome {
-  background: linear-gradient(var(--glass-tint), var(--glass-tint)),
-    var(--glass-chrome-bg);
-  -webkit-backdrop-filter: blur(var(--glass-chrome-blur)) saturate(1.6);
-  backdrop-filter: blur(var(--glass-chrome-blur)) saturate(1.6);
-  box-shadow: inset 0 1px 0 var(--glass-edge), 0 0 0 1px var(--glass-outline),
-    var(--shadow-2);
+  background: var(--rm-glass-chrome-bg);
+  -webkit-backdrop-filter: blur(var(--rm-glass-chrome-blur)) saturate(var(--rm-glass-chrome-saturation));
+  backdrop-filter: blur(var(--rm-glass-chrome-blur)) saturate(var(--rm-glass-chrome-saturation));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.82), inset 0 -1px 0 rgba(50,59,72,.15), var(--rm-shadow-floating);
 }
 
 /* G2 — sheets, segmented controls, context surfaces */
 .glass-sheet {
-  background: linear-gradient(var(--glass-tint), var(--glass-tint)),
-    var(--glass-sheet-bg);
-  -webkit-backdrop-filter: blur(var(--glass-sheet-blur)) saturate(1.4);
-  backdrop-filter: blur(var(--glass-sheet-blur)) saturate(1.4);
-  box-shadow: inset 0 1px 0 var(--glass-edge), 0 0 0 1px var(--glass-outline),
-    var(--shadow-2);
+  background: var(--rm-glass-sheet-bg);
+  -webkit-backdrop-filter: blur(var(--rm-glass-sheet-blur)) saturate(var(--rm-glass-sheet-saturation));
+  backdrop-filter: blur(var(--rm-glass-sheet-blur)) saturate(var(--rm-glass-sheet-saturation));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.84), inset 0 -1px 0 rgba(44,53,66,.16), var(--rm-shadow-overlay);
 }
 
 /* G1 — accent overlays (pinned item, deck selected overlay). No drop shadow. */
 .glass-accent {
-  background: linear-gradient(var(--glass-tint), var(--glass-tint)),
-    var(--glass-accent-bg);
-  -webkit-backdrop-filter: blur(var(--glass-accent-blur));
-  backdrop-filter: blur(var(--glass-accent-blur));
-  box-shadow: inset 0 1px 0 var(--glass-edge), 0 0 0 1px var(--glass-outline);
+  background: var(--rm-glass-compact-bg);
+  -webkit-backdrop-filter: blur(var(--rm-glass-compact-blur)) saturate(var(--rm-glass-compact-saturation));
+  backdrop-filter: blur(var(--rm-glass-compact-blur)) saturate(var(--rm-glass-compact-saturation));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.76), inset 0 -1px 0 rgba(52,62,76,.14), var(--rm-shadow-control);
 }
 
 /* ---- Fallback chain (blueprint §11.2) ---- */
@@ -55,15 +50,17 @@
   }
 }
 
-/* Solid surfaces S1 / S2 (all financial content) */
+/* Legacy content classes now map to readable translucent frost. */
 .surface {
-  background: var(--s1);
+  background: var(--rm-glass-content-bg);
   border-radius: var(--r-card);
-  box-shadow: 0 0 0 1px var(--line), var(--shadow-1);
+  -webkit-backdrop-filter: blur(var(--rm-glass-content-blur)) saturate(var(--rm-glass-content-saturation));
+  backdrop-filter: blur(var(--rm-glass-content-blur)) saturate(var(--rm-glass-content-saturation));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.74), inset 0 -1px 0 rgba(51,61,74,.12), var(--rm-shadow-card);
 }
 
 .surface-2 {
-  background: var(--s2);
+  background: var(--rm-glass-compact-bg);
   border-radius: var(--r-card);
-  box-shadow: 0 0 0 1px var(--line), var(--shadow-2);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.66), var(--rm-shadow-control);
 }

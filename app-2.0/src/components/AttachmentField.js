@@ -1,7 +1,7 @@
 import { escapeHTML } from '../app/format.js';
 import { icon } from './Icons.js';
 import { data, ui } from '../app/state.js';
-import { toast } from './AppSheet.js';
+import { attachSheetVisualViewport, toast } from './AppSheet.js';
 import { attachmentSizeLabel } from '../domain/attachmentSession.js';
 import { MAX_POSTING_EVIDENCE_ATTACHMENTS, validateAttachmentFile, validatePostingEvidenceFile } from '../domain/attachmentRepository.js';
 import { isTopModal, mountModalLayer, pushModalLayer } from '../app/modalStack.js';
@@ -134,11 +134,12 @@ export function openAttachmentManager({ ownerType, ownerId, evidenceOnly = false
   const trigger = document.activeElement;
   const layer = document.createElement('div');
   layer.className = 'picker-layer attachment-manager-layer modal-layer';
+  layer.dataset.sheetDetent = 'content';
   const render = () => {
     const items = data.getAttachments(ownerType, ownerId);
     const attachmentLimit = evidenceOnly ? MAX_POSTING_EVIDENCE_ATTACHMENTS : data.getAttachmentLimit();
     layer.innerHTML = `<button class="picker-scrim" data-manager-close aria-label="完成"></button>
-      <section class="picker-sheet glass-sheet" data-modal-surface role="dialog" aria-modal="true" aria-label="附件管理" tabindex="-1">
+      <section class="picker-sheet glass-sheet" data-sheet-detent="content" data-modal-surface role="dialog" aria-modal="true" aria-label="附件管理" tabindex="-1">
         <div class="time-picker-grabber"><span></span></div>
         <header class="time-picker-title">附件 · ${items.length}/${attachmentLimit}</header>
         <div class="attachment-manager-list">
@@ -163,11 +164,13 @@ export function openAttachmentManager({ ownerType, ownerId, evidenceOnly = false
   const backdrop = layer.querySelector('.picker-scrim');
   backdrop?.setAttribute('data-modal-backdrop', '');
   mountModalLayer(layer);
+  const viewportCleanup = attachSheetVisualViewport(layer);
   const releaseModal = pushModalLayer(layer, { kind: 'attachment-manager', trigger, surface, backdrop });
   requestAnimationFrame(() => layer.classList.add('open'));
   const close = () => {
     if (!isTopModal(layer)) return false;
     releaseModal();
+    viewportCleanup();
     activeAttachmentManagerClose = null;
     layer.classList.remove('open');
     setTimeout(() => layer.remove(), 200);
@@ -219,7 +222,8 @@ export function openAttachmentGallery(items, startIndex = 0) {
   if (!items.length) return;
   document.querySelector('.attachment-gallery-layer')?.remove();
   const layer = document.createElement('div');
-  layer.className = 'picker-layer attachment-gallery-layer';
+  layer.className = 'picker-layer attachment-gallery-layer modal-layer';
+  layer.dataset.sheetDetent = 'large';
   let index = Math.min(Math.max(0, startIndex), items.length - 1);
   let renaming = false;
   const refreshItem = () => {
@@ -234,7 +238,7 @@ export function openAttachmentGallery(items, startIndex = 0) {
     const canDownload = attachmentCanDownload(item);
     const canShare = attachmentCanShare(item);
     layer.innerHTML = `<button class="picker-scrim" data-gallery-close aria-label="关闭预览"></button>
-      <section class="picker-sheet glass-sheet attachment-gallery" role="dialog" aria-modal="true" aria-label="附件预览">
+      <section class="picker-sheet glass-sheet attachment-gallery" data-sheet-detent="large" data-modal-surface role="dialog" aria-modal="true" aria-label="附件预览">
         <header class="attachment-gallery-header"><strong>附件 ${index + 1} / ${items.length}</strong><span class="attachment-name" title="${escapeHTML(attachmentDisplayName(item, index))}">${escapeHTML(attachmentDisplayName(item, index))}</span></header>
         <div class="attachment-gallery-stage">
           ${item.kind === 'photo' && item.localObjectUrl
@@ -255,10 +259,11 @@ export function openAttachmentGallery(items, startIndex = 0) {
       </section>`;
   };
   render();
-  document.getElementById('app').appendChild(layer);
-  const releaseModal = pushModalLayer(layer);
+  mountModalLayer(layer);
+  const viewportCleanup = attachSheetVisualViewport(layer);
+  const releaseModal = pushModalLayer(layer, { kind: 'attachment-gallery', surface: layer.querySelector('.attachment-gallery'), backdrop: layer.querySelector('.picker-scrim') });
   requestAnimationFrame(() => layer.classList.add('open'));
-  const close = () => { releaseModal(); layer.classList.remove('open'); setTimeout(() => layer.remove(), 200); };
+  const close = () => { releaseModal(); viewportCleanup(); layer.classList.remove('open'); setTimeout(() => layer.remove(), 200); };
   let touchStartX = null;
   layer.addEventListener('click', (event) => {
     if (event.target.closest('[data-gallery-close]')) return close();

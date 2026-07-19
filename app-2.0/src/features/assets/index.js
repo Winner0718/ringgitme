@@ -15,6 +15,8 @@ import { resolveAccountBrand } from '../../domain/brandRegistry.js';
 import { renderCategoryPage, activateCategoryPage, registerCategoryActions } from './category.js';
 import { renderDetailPage, activateDetailPage, registerDetailActions } from './detail.js';
 import { runSharedCardTransition } from '../../app/motion.js';
+import { registerAssetManagementActions } from './AssetManagementSheets.js';
+import { maskAssetIdentifier } from '../../domain/assetFinancialModel.js';
 
 function summaryHTML(pulse) {
   return `
@@ -64,9 +66,15 @@ function brandTileHTML(account) {
 
 function compactAccountRows(list, { debt = false } = {}) {
   return `<ul class="asset-account-list asset-card-stack">${list.map((account, index) => `<li class="asset-account-row asset-stack-row" style="--account-brand:${account.brandColor || 'var(--accent)'};--stack-index:${index}" data-action="assets-open-detail" data-acc="${escapeHTML(account.id)}" role="button" tabindex="0">
-    ${brandTileHTML(account)}<span class="asset-account-copy"><strong>${escapeHTML(account.name)}</strong><small class="num">${account.last4 ? `•••• •••• ${escapeHTML(account.last4)}` : escapeHTML(account.bank)}</small></span>
-    <span class="asset-account-amount num${debt ? ' debt' : ''}">${fmtRM(debt ? account.outstanding : account.balance, { privacy: ui.privacy })}</span>${icon('chevronRight', 15)}
+    ${brandTileHTML(account)}<span class="asset-account-copy"><strong>${escapeHTML(account.name)}</strong><small class="num">${escapeHTML(account.type === 'cc' ? (account.creditCardLast4 ? `•••• ${account.creditCardLast4}` : account.bank) : maskAssetIdentifier(account.bankAccountNumber || account.debitCardNumber || account.walletIdentifier) || account.bank)}</small></span>
+    <span class="asset-account-amount num${debt ? ' debt' : ''}">${accountDisplayAmount(account, debt)}</span>${icon('chevronRight', 15)}
   </li>`).join('')}</ul>`;
+}
+
+function accountDisplayAmount(account, debt) {
+  if (debt && Number.isFinite(account.totalCardDebt)) return fmtRM(account.totalCardDebt, { privacy: ui.privacy });
+  // Compatibility fallback for pre-2D1A records without canonical debt fields.
+  return fmtRM(debt ? account.outstanding : account.balance, { privacy: ui.privacy });
 }
 
 function savingsSection() {
@@ -82,7 +90,7 @@ function savingsSection() {
 
 function creditSection() {
   const list = data.getAccountsByType('cc');
-  const total = list.reduce((s, a) => s + a.outstanding, 0);
+  const total = list.reduce((s, a) => s + (Number.isFinite(a.totalCardDebt) ? a.totalCardDebt : a.outstanding), 0);
   return `
     <section class="section surface asset-sec">
       ${sectionHeader({ iconName: 'wallet', title: '信用卡', valueLabel: '总欠款', value: fmtRM(total, { privacy: ui.privacy }), valueCls: 'amt-neg', action: 'assets-open-cc', count: list.length })}
@@ -204,6 +212,7 @@ export function registerAssetsFeature() {
   registerPage('assets', renderAssets);
   registerCategoryActions();
   registerDetailActions();
+  registerAssetManagementActions();
 
   registerAction('assets-segment', (el) => update({ assetsSegment: el.dataset.seg }));
   registerAction('assets-open-saving', () => pushRoute({ assetsView: { name: 'category', type: 'saving' } }));

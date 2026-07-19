@@ -113,7 +113,7 @@ function sourceAccountOptions(action) {
       value: account.id,
       label: account.name,
       caption: account.type === 'cc'
-        ? `信用卡 · 当前欠款 ${fmtRM(account.outstanding, { privacy: ui.privacy })}`
+        ? `信用卡 · 当前欠款 ${fmtRM(account.totalCardDebt ?? account.outstanding ?? 0, { privacy: ui.privacy })}`
         : `可用余额 ${fmtRM(account.balance, { privacy: ui.privacy })}`,
     }));
 }

@@ -11,7 +11,7 @@ export function walletStackPresentationOrder(accounts = [], selectedAccountId = 
 function inactiveLayerHTML(account, type) {
   const identity = resolveAccountIdentity(account);
   const debt = type === 'cc';
-  const value = debt ? account.outstanding : account.balance;
+  const value = debt ? Number(account.totalCardDebt ?? account.outstanding ?? 0) : account.balance;
   const due = debt && account.dueDate
     ? `<small class="wallet-stack-due">到期 ${fmtDateMY(account.dueDate)}</small>`
     : '';
@@ -29,7 +29,7 @@ export function walletStackCategoryDeckHTML(accounts = [], selectedAccountId = n
   return `<div class="wallet-stack-category-deck wallet-stack-${type}" data-wallet-stack data-selected-account-id="${escapeHTML(selected.id)}" role="listbox" aria-label="${type === 'cc' ? '信用卡' : '储蓄卡'}账户">
     ${presentation.map((account, index) => {
       const active = index === 0;
-      const accessibleValue = fmtRM(Math.abs(type === 'cc' ? account.outstanding : account.balance), { privacy: ui.privacy });
+      const accessibleValue = fmtRM(Math.abs(type === 'cc' ? Number(account.totalCardDebt ?? account.outstanding ?? 0) : account.balance), { privacy: ui.privacy });
       return `<button type="button" class="wallet-stack-card${active ? ' is-selected' : ' is-inactive'}" data-action="wallet-stack-account" data-acc="${escapeHTML(account.id)}" data-wallet-account-id="${escapeHTML(account.id)}" role="option" aria-selected="${active}" aria-label="${active ? '打开' : '选择'}${escapeHTML(account.name)}，${account.last4 ? `尾号 ${escapeHTML(account.last4)}，` : ''}${accessibleValue}" style="--wallet-stack-index:${index};--account-brand:${escapeHTML(account.brandColor || 'var(--accent)')}">
         ${active ? accountVisualCardHTML(account, { variant: 'wallet-stack' }) : inactiveLayerHTML(account, type)}
       </button>`;

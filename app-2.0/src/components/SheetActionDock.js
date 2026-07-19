@@ -18,10 +18,10 @@ export function sheetActionDockHTML({
 } = {}) {
   const disabledClass = primaryDisabledVisual ? ' visually-disabled' : '';
   const disabledAttributes = primaryDisabledVisual ? ' aria-disabled="true"' : '';
-  return `<footer class="sheet-action-dock ${escapeHTML(className)}" data-sheet-action-dock data-dock-context="${escapeHTML(context || 'sheet')}">
+  return `<footer class="sheet-action-dock rm-sheet-footer ${escapeHTML(className)}" data-rm-component="SheetFooter" data-sheet-action-dock data-dock-context="${escapeHTML(context || 'sheet')}">
     <div class="sheet-action-dock-surface">
-      <button type="button" class="sheet-primary sheet-action-dock-primary${disabledClass}"${safeAttributes(primaryAttributes)}${disabledAttributes}>${escapeHTML(primaryLabel)}</button>
-      <button type="button" class="sheet-secondary sheet-action-dock-secondary"${safeAttributes(secondaryAttributes)}>${escapeHTML(secondaryLabel)}</button>
+      <button type="button" class="sheet-primary rm-button rm-chrome-edge rm-chrome-priority rm-button--primary sheet-action-dock-primary${disabledClass}"${safeAttributes(primaryAttributes)}${disabledAttributes}>${escapeHTML(primaryLabel)}</button>
+      <button type="button" class="sheet-secondary rm-button rm-button--secondary sheet-action-dock-secondary"${safeAttributes(secondaryAttributes)}>${escapeHTML(secondaryLabel)}</button>
     </div>
   </footer>`;
 }

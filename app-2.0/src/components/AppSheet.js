@@ -4,10 +4,29 @@
 
 import { ensureModalPortalRoot, isTopModal, modalDepth, mountModalLayer, pushModalLayer } from '../app/modalStack.js';
 import { dispatchAction } from '../app/state.js';
+import { triggerLiquidChromeInteraction } from '../design-system/DesignSystem.js';
 
 let host = null;
 const sheets = [];
 let sheetHistorySequence = 0;
+
+export const SHEET_DETENTS = Object.freeze(['compact', 'medium', 'large', 'content']);
+
+const COMPACT_SHEET_PATTERN = /(?:confirm|confirmation|discard|delete|reverse|alert|compact-action|确认|删除|归档|撤销|重置|放弃|无法|警告)/;
+const LARGE_SHEET_PATTERN = /(?:capture|editor|detail|operation|relationship|settlement|payment-assistant|posting|result|directory|registry|recently-deleted|ledger-create|installment|attachment)/;
+const MEDIUM_SHEET_PATTERN = /(?:profile|manager|overflow|picker|participant|menu|habit)/;
+
+export function resolveSheetDetent({ detent, className = '', title = '' } = {}) {
+  if (detent != null) {
+    if (!SHEET_DETENTS.includes(detent)) throw new Error(`Unsupported sheet detent: ${detent}`);
+    return detent;
+  }
+  const identity = `${className} ${title}`.toLowerCase();
+  if (COMPACT_SHEET_PATTERN.test(identity)) return 'compact';
+  if (LARGE_SHEET_PATTERN.test(identity)) return 'large';
+  if (MEDIUM_SHEET_PATTERN.test(identity)) return 'medium';
+  return 'content';
+}
 
 function sheetPopstateHandler(event) {
   if (!sheets.length) return;
@@ -27,7 +46,22 @@ export function mountSheetHost(parent) {
   return host;
 }
 
-export function openSheet({ title, contentHTML, className = '', onClose, onOpen, onRequestClose, stacked = false, id, parentId, trigger = document.activeElement }) {
+export function openSheet({
+  title,
+  contentHTML,
+  className = '',
+  detent,
+  dismissOnBackdrop = true,
+  dismissOnEscape = true,
+  dismissOnDrag = true,
+  onClose,
+  onOpen,
+  onRequestClose,
+  stacked = false,
+  id,
+  parentId,
+  trigger = document.activeElement,
+}) {
   // Every layer is ultimately mounted beneath document.body by modalStack.
   // Compatibility contract: pushModalLayer(layer) is enriched with metadata below.
   const replacing = !stacked && sheets.length > 0;
@@ -35,17 +69,24 @@ export function openSheet({ title, contentHTML, className = '', onClose, onOpen,
   const layer = document.createElement('div');
   layer.className = `sheet-layer modal-layer${stacked ? ' sheet-layer-stacked' : ''}`;
   const scrim = document.createElement('div');
-  scrim.className = `sheet-scrim${stacked ? ' stacked-sheet-scrim' : ''}`;
+  scrim.className = `sheet-scrim rm-scrim${stacked ? ' stacked-sheet-scrim' : ''}`;
   const sheet = document.createElement('section');
-  sheet.className = `sheet glass-sheet ${className}${stacked ? ' stacked-sheet' : ''}`;
+  sheet.className = `sheet glass-sheet rm-sheet ${className}${stacked ? ' stacked-sheet' : ''}`;
+  const resolvedDetent = resolveSheetDetent({ detent, className, title });
+  sheet.dataset.sheetDetent = resolvedDetent;
+  layer.dataset.sheetDetent = resolvedDetent;
+  layer.dataset.dismissBackdrop = String(Boolean(dismissOnBackdrop));
+  layer.dataset.dismissEscape = String(Boolean(dismissOnEscape));
+  layer.dataset.dismissDrag = String(Boolean(dismissOnDrag));
+  sheet.dataset.rmComponent = 'Sheet';
   sheet.setAttribute('role', 'dialog');
   sheet.setAttribute('aria-modal', 'true');
   sheet.tabIndex = -1;
   if (title) sheet.setAttribute('aria-label', title);
   sheet.innerHTML = `
     <div class="sheet-grabber" data-action="sheet-close-drag"><span></span></div>
-    ${title ? `<header class="sheet-title">${title}</header>` : ''}
-    <div class="sheet-body">${contentHTML}</div>
+    ${title ? `<header class="sheet-title rm-sheet-title">${title}</header>` : ''}
+    <div class="sheet-body rm-sheet-body">${contentHTML}</div>
   `;
   scrim.setAttribute('data-modal-backdrop', '');
   sheet.setAttribute('data-modal-surface', '');
@@ -55,8 +96,22 @@ export function openSheet({ title, contentHTML, className = '', onClose, onOpen,
   const releaseModal = pushModalLayer(layer, { id, parentId, kind: className.includes('capture-relationship-sheet') ? 'relationship' : className.includes('capture-sheet') ? 'capture' : 'sheet', trigger, surface: sheet, backdrop: scrim });
   const historyToken = `sheet-${++sheetHistorySequence}`;
   history[replacing ? 'replaceState' : 'pushState']({ ...(history.state || {}), ringgitmeSheet: historyToken }, '', location.href);
-  const entry = { layer, scrim, sheet, onClose, onRequestClose, releaseModal, historyToken };
+  const entry = {
+    layer,
+    scrim,
+    sheet,
+    onClose,
+    onRequestClose,
+    releaseModal,
+    historyToken,
+    detent: resolvedDetent,
+    dismissOnBackdrop: Boolean(dismissOnBackdrop),
+    dismissOnEscape: Boolean(dismissOnEscape),
+    dismissOnDrag: Boolean(dismissOnDrag),
+    viewportCleanup: null,
+  };
   sheets.push(entry);
+  entry.viewportCleanup = attachSheetVisualViewport(layer);
   syncCaptureOpen();
 
   requestAnimationFrame(() => {
@@ -71,7 +126,7 @@ export function openSheet({ title, contentHTML, className = '', onClose, onOpen,
   scrim.addEventListener('click', (event) => {
     event.preventDefault();
     event.stopPropagation();
-    if (sheets.at(-1) === entry && isTopModal(layer)) closeSheet();
+    if (entry.dismissOnBackdrop && sheets.at(-1) === entry && isTopModal(layer)) closeSheet();
   });
   attachDragToClose(sheet, entry);
   if (sheets.length === 1) {
@@ -85,7 +140,7 @@ export function openSheet({ title, contentHTML, className = '', onClose, onOpen,
 function escHandler(event) {
   if (event.key === 'Escape' && !event.defaultPrevented) {
     const entry = sheets.at(-1);
-    if (!entry || !isTopModal(entry.layer)) return;
+    if (!entry || !entry.dismissOnEscape || !isTopModal(entry.layer)) return;
     event.preventDefault();
     event.stopPropagation();
     closeSheet();
@@ -112,7 +167,8 @@ export function closeTopSheet(expectedLayerId, instant = false, { fromHistory = 
   }
   if (!instant && entry.onRequestClose?.() === false) return false;
   sheets.pop();
-  const { layer, scrim, sheet, onClose, releaseModal, historyToken } = entry;
+  const { layer, scrim, sheet, onClose, releaseModal, historyToken, viewportCleanup } = entry;
+  viewportCleanup?.();
   releaseModal();
   onClose?.();
   syncCaptureOpen();
@@ -147,10 +203,14 @@ export function closeAllSheets({ instant = true } = {}) {
 }
 
 export function appSheetStackSnapshot() {
-  return sheets.map(({ layer, sheet }) => ({
+  return sheets.map(({ layer, sheet, detent, dismissOnBackdrop, dismissOnEscape, dismissOnDrag }) => ({
     id: layer.dataset.sheetId || '',
     kind: layer.dataset.modalKind || '',
     className: sheet.className,
+    detent,
+    dismissOnBackdrop,
+    dismissOnEscape,
+    dismissOnDrag,
   }));
 }
 
@@ -164,6 +224,7 @@ export function sheetDepth() {
 
 function attachActionDelegation(layer) {
   layer.addEventListener('click', (event) => {
+    triggerLiquidChromeInteraction(event.target);
     const element = event.target.closest('[data-action]');
     if (!element || element.disabled) return;
     dispatchAction(element.dataset.action, element, event);
@@ -185,7 +246,7 @@ function attachDragToClose(sheet, entry) {
   let dragging = false;
 
   grabber.addEventListener('pointerdown', (event) => {
-    if (sheets.at(-1) !== entry || !isTopModal(entry.layer)) return;
+    if (!entry.dismissOnDrag || sheets.at(-1) !== entry || !isTopModal(entry.layer)) return;
     dragging = true;
     startY = event.clientY;
     delta = 0;
@@ -206,6 +267,28 @@ function attachDragToClose(sheet, entry) {
   };
   grabber.addEventListener('pointerup', end);
   grabber.addEventListener('pointercancel', end);
+}
+
+export function attachSheetVisualViewport(layer) {
+  const viewport = window.visualViewport;
+  const sync = () => {
+    const top = Math.max(0, viewport?.offsetTop || 0);
+    const height = Math.max(240, viewport?.height || window.innerHeight);
+    const keyboardInset = Math.max(0, window.innerHeight - height - top);
+    layer.style.setProperty('--rm-sheet-viewport-top', `${Math.round(top)}px`);
+    layer.style.setProperty('--rm-sheet-viewport-height', `${Math.round(height)}px`);
+    layer.style.setProperty('--rm-sheet-keyboard-inset', `${Math.round(keyboardInset)}px`);
+    layer.dataset.keyboardOpen = String(keyboardInset > 96);
+  };
+  sync();
+  viewport?.addEventListener('resize', sync, { passive: true });
+  viewport?.addEventListener('scroll', sync, { passive: true });
+  window.addEventListener('resize', sync, { passive: true });
+  return () => {
+    viewport?.removeEventListener('resize', sync);
+    viewport?.removeEventListener('scroll', sync);
+    window.removeEventListener('resize', sync);
+  };
 }
 
 let toastTimer = null;

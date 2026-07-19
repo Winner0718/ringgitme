@@ -13,8 +13,8 @@
   border: 1px solid color-mix(in srgb, var(--glass-outline) 72%, var(--glass-edge));
   border-radius: calc(var(--r-card) + 2px);
   background: color-mix(in srgb, var(--glass-sheet-bg) 82%, transparent);
-  -webkit-backdrop-filter: blur(24px) saturate(135%);
-  backdrop-filter: blur(24px) saturate(135%);
+  -webkit-backdrop-filter: blur(var(--rm-glass-chrome-blur)) saturate(var(--rm-glass-chrome-saturation));
+  backdrop-filter: blur(var(--rm-glass-chrome-blur)) saturate(var(--rm-glass-chrome-saturation));
   box-shadow: 0 12px 30px color-mix(in srgb, var(--shadow-color, #18231d) 13%, transparent),
     inset 0 1px 0 color-mix(in srgb, var(--glass-edge) 86%, transparent);
 }

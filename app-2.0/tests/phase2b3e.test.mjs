@@ -73,7 +73,7 @@ add('stable account-ID keys', () => assert.match(walletStackCategoryDeckHTML(sav
 add('one selected card', () => assert.equal((walletStackCategoryDeckHTML(savings, 'sv-cimb').match(/class="wallet-stack-card is-selected"/g) || []).length, 1));
 add('inactive exposed layers', () => assert.equal((walletStackCategoryDeckHTML(savings, 'sv-cimb').match(/is-inactive/g) || []).length, 3));
 add('inactive Savings information', () => assert.match(walletStackCategoryDeckHTML(savings, 'sv-cimb'), /Public Bank Savings[\s\S]*•••• 1357[\s\S]*RM 3,180\.50/));
-add('inactive Credit information', () => assert.match(walletStackCategoryDeckHTML(credit, 'cc-mbb-visa', { type: 'cc' }), /Maybank Islamic Ikhwan[\s\S]*4421[\s\S]*到期 02\/08\/2026[\s\S]*RM 1,120\.45/));
+add('inactive Credit information', () => assert.match(walletStackCategoryDeckHTML(credit, 'cc-mbb-visa', { type: 'cc' }), /Maybank Islamic Ikhwan[\s\S]*4421[\s\S]*到期 02\/08\/2026[\s\S]*RM 3,460\.45/));
 add('selected card full visual', () => assert.match(walletStackCategoryDeckHTML(savings, 'sv-mbb'), /account-visual-wallet-stack/));
 add('no anonymous color-only layer', () => { const html = walletStackCategoryDeckHTML(savings, 'sv-mbb'); assert.equal((html.match(/wallet-stack-layer-copy/g) || []).length, 3); });
 add('card width capped', () => assert.match(source.css, /width: min\(100%, 440px\)/));
@@ -121,7 +121,7 @@ add('exact Account Detail CTA', () => assert.match(source.category, /wallet-deta
 
 // 51–60 Credit category
 add('Credit total debt unchanged', () => assert.equal(sum(credit, 'outstanding'), 5258.25));
-add('debt displayed without redundant minus', () => assert.match(walletStackCategoryDeckHTML(credit, credit[0].id, { type: 'cc' }), /RM 3,247\.80/));
+add('debt displayed without redundant minus', () => assert.match(walletStackCategoryDeckHTML(credit, credit[0].id, { type: 'cc' }), /RM 8,047\.80/));
 add('Credit card count unchanged', () => assert.equal(credit.length, 3));
 add('selected current debt correct', () => assert.equal(data.getAccount('cc-mbb-visa').outstanding, 3247.8));
 add('selected monthly due includes instalment', () => assert.equal(data.getAccount('cc-mbb-visa').monthlyDue + data.getInstalments('cc-mbb-visa').reduce((s, item) => s + item.monthly, 0), 1250));

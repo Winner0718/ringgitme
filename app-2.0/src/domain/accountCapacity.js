@@ -37,8 +37,10 @@ export function capacityFingerprint({ transaction, account, requiredMinor }) {
     relationshipMode: transaction.relationshipMode || null,
     clientEventId: transaction.submissionKey || transaction.clientEventId || null,
     requiredMinor,
-    creditLimitMinor: account.creditLimitMinor ?? null,
+    creditLimitMinor: account.effectiveCreditLimitMinor ?? account.creditLimitMinor ?? null,
     outstandingMinor: account.currentOutstandingMinor ?? null,
+    availableCreditMinor: account.availableCreditMinor ?? null,
+    sharedLimitPoolId: account.sharedLimitPoolId ?? null,
   }));
 }
 
@@ -60,7 +62,9 @@ export function inspectAccountCapacity(accounts, transaction, authorization = nu
       continue;
     }
 
-    const creditLimitMinor = Number.isInteger(account.creditLimitMinor) ? account.creditLimitMinor : null;
+    const creditLimitMinor = Number.isInteger(account.effectiveCreditLimitMinor)
+      ? account.effectiveCreditLimitMinor
+      : Number.isInteger(account.creditLimitMinor) ? account.creditLimitMinor : null;
     const outstandingMinor = Number(account.currentOutstandingMinor || 0);
     const confirmationFingerprint = capacityFingerprint({ transaction, account, requiredMinor });
     if (creditLimitMinor == null) {
@@ -72,14 +76,19 @@ export function inspectAccountCapacity(accounts, transaction, authorization = nu
         confirmationFingerprint,
       };
     }
-    const availableCreditMinor = creditLimitMinor - outstandingMinor;
+    // Shared-pool cards receive their canonical pool availability from the
+    // asset model. Negative availability is meaningful over-limit state and
+    // must never be hidden by clamping it to zero.
+    const availableCreditMinor = Number.isInteger(account.availableCreditMinor)
+      ? account.availableCreditMinor
+      : creditLimitMinor - outstandingMinor;
     if (requiredMinor > availableCreditMinor) {
       if (authorization?.fingerprint === confirmationFingerprint) continue;
       return {
         status: 'credit-over-limit', accountId: account.id, accountType: account.type,
         accountName: account.name, role: posting.role, requiredMinor, outstandingMinor,
-        creditLimitMinor, availableCreditMinor: Math.max(0, availableCreditMinor),
-        overLimitMinor: outstandingMinor + requiredMinor - creditLimitMinor,
+        creditLimitMinor, availableCreditMinor,
+        overLimitMinor: requiredMinor - availableCreditMinor,
         confirmationFingerprint,
       };
     }

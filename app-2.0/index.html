@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="color-scheme" content="light dark" />
   <title>RinggitMe</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230a8a54'/%3E%3Ctext x='16' y='22' font-family='-apple-system,sans-serif' font-size='16' font-weight='700' fill='white' text-anchor='middle'%3ERM%3C/text%3E%3C/svg%3E" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x2='0' y2='1'%3E%3Cstop stop-color='%23474d56'/%3E%3Cstop offset='1' stop-color='%230b0d10'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Crect x='.75' y='.75' width='30.5' height='30.5' rx='7.25' fill='none' stroke='%23d8dde3'/%3E%3Ctext x='16' y='22' font-family='-apple-system,sans-serif' font-size='16' font-weight='700' fill='white' text-anchor='middle'%3ERM%3C/text%3E%3C/svg%3E" />
   <link rel="stylesheet" href="/src/styles/tokens.css" />
   <link rel="stylesheet" href="/src/styles/base.css" />
   <link rel="stylesheet" href="/src/styles/glass.css" />
@@ -38,6 +38,11 @@
   <link rel="stylesheet" href="/src/styles/phase2c3a.css" />
   <link rel="stylesheet" href="/src/styles/phase2c3a-fix1.css" />
   <link rel="stylesheet" href="/src/styles/phase2c3b.css" />
+  <link rel="stylesheet" href="/src/styles/phase2d1a.css" />
+  <!-- Canonical RinggitMe Design System migration layer. It is deliberately
+       last so legacy feature selectors become compatibility callers rather
+       than competing visual owners. -->
+  <link rel="stylesheet" href="/src/styles/design-system.css" />
 </head>
 <body>
   <div id="app" aria-live="polite"></div>

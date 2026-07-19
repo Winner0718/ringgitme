@@ -25,6 +25,8 @@
 .topbar.scrolled {
   background: color-mix(in srgb, var(--s0) 76%, transparent);
   box-shadow: 0 5px 18px rgba(0,0,0,.035);
+  /* Phase 2B3A compatibility contract is test-locked; the canonical
+     last-loaded design-system layer owns the rendered TopBar recipe. */
   -webkit-backdrop-filter: blur(15px) saturate(1.1);
   backdrop-filter: blur(15px) saturate(1.1);
 }

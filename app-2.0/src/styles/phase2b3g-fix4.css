@@ -228,7 +228,7 @@
 :root[data-reduced-motion="true"] .money-glyph-transition > i { transition: none !important; }
 
 .split-debug-parent { display: grid; place-items: end center; pointer-events: none; }
-.split-debug-backdrop { position: absolute; inset: 0; background: color-mix(in srgb, var(--s0) 76%, transparent); backdrop-filter: blur(12px); }
+.split-debug-backdrop { position: absolute; inset: 0; background: color-mix(in srgb, var(--s0) 76%, transparent); backdrop-filter: blur(var(--rm-glass-compact-blur)) saturate(var(--rm-glass-compact-saturation)); }
 .split-debug-parent-sheet { position: relative; width: min(100%, 520px); height: min(86dvh, 760px); padding: 24px 18px max(20px, env(safe-area-inset-bottom)); border-radius: 32px 32px 0 0; pointer-events: auto; overflow: hidden; }
 .split-debug-parent-sheet header h2 { margin: 3px 0; }
 .split-debug-parent-sheet header p { margin: 0 0 12px; color: var(--text-2); }

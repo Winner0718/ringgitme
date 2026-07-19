@@ -4,11 +4,12 @@
 // handlers anywhere in the app).
 // ============================================================
 
-import { data, ui, update, subscribe, dispatchAction, registerAction, applyTheme } from './state.js';
+import { data, ui, update, subscribe, dispatchAction, registerAction, applyTheme, applyChromeMotion } from './state.js';
 import { mountContent, renderCurrentPage, navigate } from './router.js';
 import { renderTabBar, updateTabBar } from '../components/GlassTabBar.js';
 import { mountSheetHost, openSheet, closeSheet, toast } from '../components/AppSheet.js';
 import { icon } from '../components/Icons.js';
+import { triggerLiquidChromeInteraction } from '../design-system/DesignSystem.js';
 
 const TITLES = { today: '今天', assets: '资产', activity: '动态', ledger: '账本' };
 const CATEGORY_TITLES = { saving: '储蓄卡', cc: '信用卡', ew: 'eWallet' };
@@ -19,23 +20,26 @@ function topbarSpec() {
     return { title: '固定与订阅', back: true, backAction: 'fixed-center-back', eye: true, menu: false };
   }
   if (ui.tab === 'assets' && ui.assetsView.name === 'category') {
-    return { title: CATEGORY_TITLES[ui.assetsView.type], back: true, backAction: 'assets-back', eye: true, menu: true };
+    return { title: CATEGORY_TITLES[ui.assetsView.type], back: true, backAction: 'assets-back', eye: true, manage: true };
   }
   if (ui.tab === 'assets' && ui.assetsView.name === 'detail') {
-    return { title: '账户详情', back: true, backAction: 'assets-back', eye: true, menu: true };
+    return { title: '账户详情', back: true, backAction: 'assets-back', eye: true, menuAction: 'asset-detail-menu' };
   }
-  return { title: TITLES[ui.tab] || 'RinggitMe', back: false, eye: ui.tab === 'today' || ui.tab === 'assets', menu: false };
+  return { title: TITLES[ui.tab] || 'RinggitMe', back: false, eye: ui.tab === 'today' || ui.tab === 'assets', manage: ui.tab === 'assets' };
 }
 
 let topbarEl = null;
 let tabbarEl = null;
 let contentEl = null;
+let appRootEl = null;
 
 export function mountShell(root) {
+  appRootEl = root;
   root.innerHTML = '';
 
   topbarEl = document.createElement('header');
-  topbarEl.className = 'topbar glass-chrome';
+  topbarEl.className = 'topbar glass-chrome rm-topbar';
+  topbarEl.dataset.rmComponent = 'TopBar';
   root.appendChild(topbarEl);
 
   contentEl = document.createElement('main');
@@ -53,6 +57,7 @@ export function mountShell(root) {
 
   // One delegated listener for every data-action in the app
   root.addEventListener('click', (e) => {
+    triggerLiquidChromeInteraction(e.target);
     const el = e.target.closest('[data-action]');
     if (!el || el.disabled) return;
     dispatchAction(el.dataset.action, el, e);
@@ -77,6 +82,8 @@ export function mountShell(root) {
 
 function renderTopbar() {
   const spec = topbarSpec();
+  appRootEl.dataset.rmPage = ui.tab;
+  appRootEl.dataset.rmView = ui.tab === 'assets' ? ui.assetsView.name : ui.tab === 'today' ? ui.todayView : 'overview';
   topbarEl.innerHTML = `
     <div class="topbar-lead">
       ${spec.back ? `<button class="topbar-btn" data-action="${spec.backAction}" aria-label="返回">${icon('chevronLeft', 22)}</button>` : ''}
@@ -86,8 +93,9 @@ function renderTopbar() {
       ${spec.eye ? `<button class="topbar-btn" data-action="toggle-privacy" aria-label="${ui.privacy ? '显示金额' : '隐藏金额'}" aria-pressed="${ui.privacy}">
         ${icon(ui.privacy ? 'eyeOff' : 'eye')}
       </button>` : ''}
+      ${spec.manage ? '<button class="topbar-text-action" data-action="assets-manage" aria-label="管理账户">管理</button>' : ''}
       <button class="topbar-avatar" data-action="open-profile" aria-label="个人与设置">W</button>
-      ${spec.menu ? `<button class="topbar-btn" data-action="page-menu" aria-label="更多操作">${icon('dots', 20)}</button>` : ''}
+      ${spec.menuAction ? `<button class="topbar-btn" data-action="${spec.menuAction}" aria-label="账户更多操作">${icon('dots', 20)}</button>` : ''}
     </div>
   `;
 }
@@ -99,40 +107,31 @@ function registerShellActions() {
 
   registerAction('open-profile', () => {
     openSheet({
+      id: 'profile-settings',
       title: '我的',
-      contentHTML: `
-        <div class="profile-head">
-          <div class="profile-avatar">W</div>
-          <div>
-            <div class="profile-name">Winner</div>
-            <div class="caption">个人资料与偏好</div>
-          </div>
-        </div>
-        <div class="sheet-group">
-          <div class="caption sheet-group-label">外观</div>
-          <div class="segmented" role="radiogroup" aria-label="外观模式">
-            ${['auto', 'light', 'dark'].map((t) => `
-              <button class="seg-item${ui.theme === t ? ' active' : ''}" data-action="set-theme" data-theme-value="${t}" role="radio" aria-checked="${ui.theme === t}">
-                ${{ auto: '自动', light: '浅色', dark: '深色' }[t]}
-              </button>`).join('')}
-          </div>
-        </div>
-        <button class="sheet-secondary" data-action="open-demo-reset">重置示例数据</button>
-      `,
+      className: 'profile-settings-sheet',
+      detent: 'medium',
+      contentHTML: profileSettingsHTML(),
+      onOpen: syncProfileSettingsControls,
     });
   });
 
-  registerAction('page-menu', () => toast('此功能暂未开放'));
-
   registerAction('set-theme', (el) => {
     applyTheme(el.dataset.themeValue);
-    update({});
-    closeSheet();
+    syncProfileSettingsControls();
+  });
+
+  registerAction('toggle-chrome-motion', (el) => {
+    applyChromeMotion(el.checked);
+    syncProfileSettingsControls();
   });
 
   registerAction('open-demo-reset', () => {
     openSheet({
       title: '重置示例数据',
+      className: 'profile-reset-confirm-sheet',
+      detent: 'compact',
+      stacked: true,
       contentHTML: `
         <div class="detail-hero">
           <div class="row-title">恢复到最初状态？</div>
@@ -173,4 +172,47 @@ function registerShellActions() {
   });
 
   registerAction('sheet-close', () => closeSheet());
+}
+
+function profileSettingsHTML() {
+  return `
+        <div class="profile-head">
+          <div class="profile-avatar">W</div>
+          <div>
+            <div class="profile-name">Winner</div>
+            <div class="caption">个人资料与偏好</div>
+          </div>
+        </div>
+        <div class="sheet-group">
+          <div class="caption sheet-group-label">外观</div>
+          <div class="segmented" role="radiogroup" aria-label="外观模式">
+            ${['auto', 'light', 'dark'].map((t) => `
+              <button class="seg-item${ui.theme === t ? ' active' : ''}" data-action="set-theme" data-theme-value="${t}" role="radio" aria-checked="${ui.theme === t}">
+                ${{ auto: '自动', light: '浅色', dark: '深色' }[t]}
+              </button>`).join('')}
+          </div>
+        </div>
+        <div class="sheet-group profile-motion-group">
+          <label class="rm-toggle-row profile-chrome-motion">
+            <span>
+              <strong>镀铬动效</strong>
+              <small id="chrome-motion-caption">控制边框反射与流动高光</small>
+            </span>
+            <input type="checkbox" data-action="toggle-chrome-motion" aria-label="镀铬动效" aria-describedby="chrome-motion-caption" ${ui.chromeMotion ? 'checked' : ''} />
+            <span class="rm-switch" aria-hidden="true"><i></i></span>
+          </label>
+        </div>
+        <button class="sheet-secondary" data-action="open-demo-reset">重置示例数据</button>
+  `;
+}
+
+function syncProfileSettingsControls(sheet = document.querySelector('.profile-settings-sheet')) {
+  if (!sheet) return;
+  sheet.querySelectorAll('[data-action="set-theme"]').forEach((button) => {
+    const selected = button.dataset.themeValue === ui.theme;
+    button.classList.toggle('active', selected);
+    button.setAttribute('aria-checked', String(selected));
+  });
+  const toggle = sheet.querySelector('[data-action="toggle-chrome-motion"]');
+  if (toggle) toggle.checked = ui.chromeMotion;
 }

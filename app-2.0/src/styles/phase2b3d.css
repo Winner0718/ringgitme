@@ -250,7 +250,6 @@
   .capture-sheet, .native-snap-card.deck-card, .account-identity-bar { transition: none; animation: none; }
 }
 @media (max-height: 720px) {
-  .capture-sheet { top: 4px; height: calc(100dvh - 4px); }
   .cap-amount { min-height: 60px; }
   .cap-amount-value { font-size: 29px; }
   .capture-calculator { flex-basis: 280px; }

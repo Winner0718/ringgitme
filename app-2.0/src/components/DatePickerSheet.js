@@ -2,6 +2,7 @@ import { fmtDateMY } from '../app/format.js';
 import { registerOwnedModalHistory } from '../app/modalHistory.js';
 import { prefersReducedMotion } from '../app/motion.js';
 import { isTopModal, mountModalLayer, pushModalLayer } from '../app/modalStack.js';
+import { attachSheetVisualViewport } from './AppSheet.js';
 
 const MIN_YEAR = 1900;
 const MAX_YEAR = 2100;
@@ -76,7 +77,7 @@ function calendarHTML({ selected, today, viewYear, viewMonth, chooser }) {
   const previous = shiftMonth({ year: viewYear, month: viewMonth }, -1);
   const next = shiftMonth({ year: viewYear, month: viewMonth }, 1);
   return `<button class="date-picker-scrim" data-date-cancel aria-label="取消选择日期"></button>
-    <section class="date-picker-sheet glass-sheet" role="dialog" aria-modal="true" aria-label="选择日期">
+    <section class="date-picker-sheet glass-sheet" data-sheet-detent="medium" role="dialog" aria-modal="true" aria-label="选择日期">
       <div class="time-picker-grabber"><span></span></div>
       <header class="time-picker-title">选择日期</header>
       <div class="date-picker-nav">
@@ -101,7 +102,7 @@ function calendarHTML({ selected, today, viewYear, viewMonth, chooser }) {
 export function datePickerHTML(value, { today = localISO(), chooser = false } = {}) {
   const selected = isISODate(value) ? value : today;
   const { year, month } = dateParts(selected);
-  return `<div class="date-picker-layer" role="presentation">${calendarHTML({ selected, today, viewYear: year, viewMonth: month, chooser })}</div>`;
+  return `<div class="date-picker-layer" data-sheet-detent="medium" role="presentation">${calendarHTML({ selected, today, viewYear: year, viewMonth: month, chooser })}</div>`;
 }
 
 let datePickerSequence = 0;
@@ -121,6 +122,7 @@ export function openDatePickerSheet({ value, onComplete, today = () => localISO(
   const layer = document.createElement('div');
   layer.className = 'date-picker-layer modal-layer';
   let releaseModal = () => {};
+  let viewportCleanup = () => {};
   let ownedHistory = null;
   let closed = false;
 
@@ -156,6 +158,7 @@ export function openDatePickerSheet({ value, onComplete, today = () => localISO(
     closed = true;
     clearTimeout(transitionTimer);
     releaseModal(datePickerId);
+    viewportCleanup();
     activeDatePickerCancel = null;
     layer.classList.remove('open');
     setTimeout(() => layer.remove(), 220);
@@ -172,6 +175,8 @@ export function openDatePickerSheet({ value, onComplete, today = () => localISO(
 
   render();
   mountModalLayer(layer);
+  layer.dataset.sheetDetent = 'medium';
+  viewportCleanup = attachSheetVisualViewport(layer);
   const datePickerId = id || `date-picker:${++datePickerSequence}`;
   releaseModal = pushModalLayer(layer, { id: datePickerId, parentId, kind: 'date-picker', trigger, surface: layer.querySelector('.date-picker-sheet'), backdrop: layer.querySelector('.date-picker-scrim') });
   ownedHistory = registerOwnedModalHistory({ layerId: datePickerId, isTop: () => isTopModal(layer), onPop: finishClose });

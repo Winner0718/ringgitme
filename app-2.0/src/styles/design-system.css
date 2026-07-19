@@ -1,0 +1,610 @@
+/* ============================================================
+   RINGGITME LIQUID CHROME iOS
+   Canonical full-App component presentation. Loaded last by index.html.
+   ============================================================ */
+
+html { background: var(--rm-color-canvas); }
+html, body, button, input, select, textarea { font-family: var(--font-ui); }
+body {
+  color: var(--rm-color-text-primary);
+  font-variant-numeric: tabular-nums lining-nums;
+  background:
+    radial-gradient(ellipse 86% 54% at -12% -7%, rgba(255,255,255,1), transparent 64%),
+    radial-gradient(ellipse 58% 44% at 108% 15%, rgba(188,214,239,.56), transparent 67%),
+    radial-gradient(ellipse 48% 36% at 8% 71%, rgba(255,255,255,.82), transparent 70%),
+    radial-gradient(ellipse 72% 46% at 58% 108%, rgba(201,215,230,.58), transparent 71%),
+    linear-gradient(145deg, #fbfcfd 0%, #eef3f7 48%, #e9eff5 100%);
+  background-attachment: fixed;
+}
+:root[data-theme="dark"] body {
+  background:
+    radial-gradient(ellipse 74% 48% at -8% -6%, rgba(117,126,139,.17), transparent 66%),
+    radial-gradient(ellipse 68% 42% at 106% 16%, rgba(94,103,116,.12), transparent 64%),
+    linear-gradient(145deg,#171a20,var(--rm-color-canvas) 52%,#111318);
+}
+#app {
+  isolation: isolate;
+  color: var(--rm-color-text-primary);
+  background:
+    radial-gradient(ellipse 36% 24% at 88% 26%, rgba(255,255,255,.34), transparent 72%),
+    linear-gradient(155deg,rgba(255,255,255,.16),transparent 38%);
+}
+.app-content { padding-bottom: calc(var(--safe-bottom) + var(--rm-bottom-nav-height) + 32px); }
+.page-title,.topbar-title { color: var(--rm-color-text-primary); letter-spacing: -.025em; }
+.caption { color: var(--rm-color-text-secondary); }
+
+/* Liquid Chrome geometry. Every optical layer is border-only and inert. */
+.rm-chrome-edge,
+.rm-button,.sheet-primary,.sheet-secondary,.sheet-danger,.cap-save,
+.topbar-btn,.topbar-avatar,.topbar-text-action,.rm-icon-button,
+.segmented,.rm-segmented,.rm-chip,.cap-cat,.cap-acc,
+.calculator-key,.key,.capture-calculator-key,.tab-capture,.rm-lab-capture,
+.rm-field-control,.money-field-button,.picker-field,.native-picker-display,
+.rm-glass-chrome,.glass-chrome,.glass-sheet,.glass-accent,.rm-surface,
+.surface,.surface-2,.asset-sec,.rm-action-tile,.recurring-action-card,.asset-soft-action,
+.asset-menu-list,.compact-action-list,.rm-state,.rm-lab-section,.rm-lab-edge-ambient,
+.asset-manager-tabs,.asset-manage-row,.asset-account-settings,.asset-operation-summary,
+.asset-pool-card,.asset-purchase-row,.asset-purchase-detail,.asset-installment-preview,
+.asset-mode-cards button,.asset-action-grid button,.ledger-metrics > div,.ledger-action-grid button,
+.habit-manager-list,.habit-icon-choice,.recipient-payment-method-row,.recipient-payment-picker-list button,
+.recipient-profile-picker-field,.recipient-profile-default,.payment-assistant-method,
+.payment-assistant-copy-row button,.payment-assistant-source > button,.ledger-payment-directory-entry,
+.semantic-action-control,.fixed-plan-card,.obligation-card {
+  position: relative;
+  isolation: isolate;
+  --rm-edge-width: 1.8px;
+  --rm-edge-radius: var(--rm-radius-card);
+  border-color: transparent;
+}
+
+/* Static mirror perimeter: continuous silver, never a grey CSS stroke or a
+   locally dark "bald" gap. Local highlights belong only to the travelling ray. */
+.rm-chrome-priority::before,
+.rm-chrome-edge::before,
+.rm-button::before,.sheet-primary::before,.sheet-secondary::before,.sheet-danger::before,.cap-save::before,
+.topbar-btn::before,.topbar-avatar::before,.topbar-text-action::before,.rm-icon-button::before,
+.segmented::before,.rm-segmented::before,.seg-item.active::before,.rm-segment.is-selected::before,
+.rm-chip::before,.cap-cat::before,.cap-acc::before,
+.calculator-key::before,.key::before,.capture-calculator-key::before,.tab-capture::before,.rm-lab-capture::before,
+.rm-field-control::before,.money-field-button::before,.picker-field::before,.native-picker-display::before,
+.rm-glass-chrome::before,.glass-chrome::before,.glass-sheet::before,.glass-accent::before,.rm-surface::before,
+.surface::before,.surface-2::before,.asset-sec::before,
+.rm-action-tile::before,.recurring-action-card::before,.asset-soft-action::before,
+.asset-menu-list::before,.compact-action-list::before,.rm-state::before,.rm-lab-section::before,.rm-lab-edge-ambient::before {
+  content:"";
+  position:absolute;
+  z-index:3;
+  inset:0;
+  padding:var(--rm-edge-width);
+  border-radius:inherit;
+  pointer-events:none;
+  background:var(--rm-chrome-perimeter); /* canonical conic-gradient token */
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask-composite:exclude;
+  animation:none;
+  transform:none;
+}
+.asset-manager-tabs::before,.asset-manage-row::before,.asset-account-settings::before,
+.asset-operation-summary::before,.asset-pool-card::before,.asset-purchase-row::before,
+.asset-purchase-detail::before,.asset-installment-preview::before,.asset-mode-cards button::before,
+.asset-action-grid button::before,.ledger-metrics > div::before,.ledger-action-grid button::before,
+.habit-manager-list::before,.habit-icon-choice::before,.recipient-payment-method-row::before,
+.recipient-payment-picker-list button::before,.recipient-profile-picker-field::before,
+.recipient-profile-default::before,.payment-assistant-method::before,
+.payment-assistant-copy-row button::before,.payment-assistant-source > button::before,
+.ledger-payment-directory-entry::before,.semantic-action-control::before,
+.fixed-plan-card::before,.obligation-card::before {
+  content:"";
+  position:absolute;
+  z-index:3;
+  inset:0;
+  padding:var(--rm-edge-width);
+  border-radius:inherit;
+  pointer-events:none;
+  background:var(--rm-chrome-perimeter);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask-composite:exclude;
+  animation:none;
+  transform:none;
+}
+.tab-capture::before,.rm-lab-capture::before { background:var(--rm-chrome-perimeter-hero); }
+.seg-item.active,.rm-segment.is-selected,.rm-button,.sheet-primary,.sheet-secondary,.cap-save,
+.topbar-btn,.topbar-avatar,.topbar-text-action,.rm-icon-button,.rm-chip,.cap-cat,.cap-acc,
+.calculator-key,.key,.capture-calculator-key,.rm-field-control,.money-field-button,.picker-field,.native-picker-display { --rm-edge-width:2px;--rm-edge-radius:var(--rm-radius-field); }
+.topbar.glass-chrome,.tabbar.glass-chrome,.glass-sheet,.rm-lab-topbar,.rm-lab-bottom-nav { --rm-edge-width:2.25px;--rm-edge-radius:var(--rm-radius-large); }
+.tab-capture,.rm-lab-capture,.topbar-btn,.topbar-avatar { --rm-edge-radius:999px; }
+
+@property --rm-chrome-flow-angle {
+  syntax:"<angle>";
+  inherits:false;
+  initial-value:0deg;
+}
+
+/* The whole reflective texture moves around the rim. This is deliberately a
+   complete masked ring, never a small dot or "rocket" travelling by itself. */
+#app[data-rm-page="today"]:not(.capture-open) .tab-capture::after,
+#app[data-rm-page="assets"]:not(.capture-open) .app-content > .segmented .seg-item.active::after,
+.rm-design-lab .rm-lab-capture::after,
+.rm-design-lab .rm-lab-edge-ambient::after,
+.rm-edge-sweep::after,
+.sheet.open::after {
+  content:"";
+  position:absolute;
+  z-index:4;
+  inset:0;
+  padding:var(--rm-edge-width,2px);
+  border-radius:inherit;
+  pointer-events:none;
+  background:conic-gradient(from var(--rm-chrome-flow-angle),var(--rm-chrome-flowing-stops));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask-composite:exclude;
+  filter:drop-shadow(0 0 1px rgba(232,245,255,.52));
+}
+#app[data-rm-page="today"]:not(.capture-open) .tab-capture::after,
+#app[data-rm-page="assets"]:not(.capture-open) .app-content > .segmented .seg-item.active::after,
+.rm-design-lab .rm-lab-capture::after {
+  animation:rm-chrome-orbit var(--rm-motion-edge-orbit) linear infinite;
+}
+.rm-design-lab .rm-lab-edge-ambient::after { animation:rm-chrome-orbit var(--rm-motion-edge-orbit) linear infinite; }
+.rm-edge-sweep::after { animation:rm-chrome-sweep var(--rm-motion-liquid-sweep) var(--rm-ease-emphasized) 1 both; }
+.sheet.open::after { animation:rm-chrome-entrance var(--rm-motion-edge-entrance) var(--rm-ease-emphasized) 1 both; }
+/* Linear angular progress: every bright and dark reflection in the complete
+   ring advances together, without easing pauses or catch-up jumps. */
+@keyframes rm-chrome-orbit { from { --rm-chrome-flow-angle:0deg; } to { --rm-chrome-flow-angle:360deg; } }
+@keyframes rm-chrome-sweep { from { --rm-chrome-flow-angle:0deg;opacity:.28; } 24% { opacity:1; } to { --rm-chrome-flow-angle:360deg;opacity:.12; } }
+@keyframes rm-chrome-entrance { 0%,12% { --rm-chrome-flow-angle:0deg;opacity:0; } 30% { opacity:1; } 88% { opacity:.92; } 100% { --rm-chrome-flow-angle:360deg;opacity:0; } }
+
+/* Visible chrome surfaces receive independent deterministic phases. This
+   prevents copied edge catches while keeping the animation compositor-only. */
+#app :is(.topbar.glass-chrome,.tabbar.glass-chrome,.surface,.surface-2,.asset-sec,
+  .fixed-plan-card,.obligation-card,.ledger-metrics > div,.ledger-payment-directory-row,
+  .recipient-payment-method-row,.asset-manage-row,.asset-operation-summary,.asset-pool-card,
+  .asset-purchase-row,.rm-action-tile,.recurring-action-card,.asset-soft-action,
+  .calculator-key,.key,.capture-calculator-key,.seg-item.active,.rm-segment.is-selected,
+  .rm-chip.is-selected,.cap-cat.active,.cap-acc.active,.topbar-btn,.topbar-avatar)::after {
+  content:"";
+  position:absolute;
+  z-index:4;
+  inset:0;
+  padding:var(--rm-edge-width,2px);
+  border-radius:inherit;
+  pointer-events:none;
+  background:conic-gradient(from var(--rm-chrome-flow-angle),var(--rm-chrome-flowing-stops));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask-composite:exclude;
+  filter:drop-shadow(0 0 1px rgba(232,245,255,.52));
+  animation:rm-chrome-orbit var(--rm-motion-edge-orbit) linear infinite;
+  animation-delay:var(--rm-edge-delay,-.15s);
+}
+#app :is(.surface,.surface-2,.asset-sec,.fixed-plan-card,.obligation-card,
+  .ledger-payment-directory-row,.recipient-payment-method-row,.asset-manage-row,
+  .asset-operation-summary,.asset-pool-card,.asset-purchase-row,.rm-action-tile,
+  .recurring-action-card,.asset-soft-action,.calculator-key,.key,.capture-calculator-key,
+  .rm-chip,.cap-cat,.cap-acc):nth-child(7n+1) { --rm-edge-phase:31deg;--rm-edge-delay:-.25s; }
+#app :is(.surface,.surface-2,.asset-sec,.fixed-plan-card,.obligation-card,
+  .ledger-payment-directory-row,.recipient-payment-method-row,.asset-manage-row,
+  .asset-operation-summary,.asset-pool-card,.asset-purchase-row,.rm-action-tile,
+  .recurring-action-card,.asset-soft-action,.calculator-key,.key,.capture-calculator-key,
+  .rm-chip,.cap-cat,.cap-acc):nth-child(7n+2) { --rm-edge-phase:96deg;--rm-edge-delay:-.72s; }
+#app :is(.surface,.surface-2,.asset-sec,.fixed-plan-card,.obligation-card,
+  .ledger-payment-directory-row,.recipient-payment-method-row,.asset-manage-row,
+  .asset-operation-summary,.asset-pool-card,.asset-purchase-row,.rm-action-tile,
+  .recurring-action-card,.asset-soft-action,.calculator-key,.key,.capture-calculator-key,
+  .rm-chip,.cap-cat,.cap-acc):nth-child(7n+3) { --rm-edge-phase:158deg;--rm-edge-delay:-1.18s; }
+#app :is(.surface,.surface-2,.asset-sec,.fixed-plan-card,.obligation-card,
+  .ledger-payment-directory-row,.recipient-payment-method-row,.asset-manage-row,
+  .asset-operation-summary,.asset-pool-card,.asset-purchase-row,.rm-action-tile,
+  .recurring-action-card,.asset-soft-action,.calculator-key,.key,.capture-calculator-key,
+  .rm-chip,.cap-cat,.cap-acc):nth-child(7n+4) { --rm-edge-phase:219deg;--rm-edge-delay:-1.63s; }
+#app :is(.surface,.surface-2,.asset-sec,.fixed-plan-card,.obligation-card,
+  .ledger-payment-directory-row,.recipient-payment-method-row,.asset-manage-row,
+  .asset-operation-summary,.asset-pool-card,.asset-purchase-row,.rm-action-tile,
+  .recurring-action-card,.asset-soft-action,.calculator-key,.key,.capture-calculator-key,
+  .rm-chip,.cap-cat,.cap-acc):nth-child(7n+5) { --rm-edge-phase:273deg;--rm-edge-delay:-2.08s; }
+#app :is(.surface,.surface-2,.asset-sec,.fixed-plan-card,.obligation-card,
+  .ledger-payment-directory-row,.recipient-payment-method-row,.asset-manage-row,
+  .asset-operation-summary,.asset-pool-card,.asset-purchase-row,.rm-action-tile,
+  .recurring-action-card,.asset-soft-action,.calculator-key,.key,.capture-calculator-key,
+  .rm-chip,.cap-cat,.cap-acc):nth-child(7n+6) { --rm-edge-phase:327deg;--rm-edge-delay:-2.52s; }
+#app :is(.topbar.glass-chrome,.tabbar.glass-chrome,.seg-item.active,.rm-segment.is-selected,
+  .topbar-btn,.topbar-avatar):nth-child(odd) { --rm-edge-phase:68deg;--rm-edge-delay:-.58s; }
+#app :is(.topbar.glass-chrome,.tabbar.glass-chrome,.seg-item.active,.rm-segment.is-selected,
+  .topbar-btn,.topbar-avatar):nth-child(even) { --rm-edge-phase:241deg;--rm-edge-delay:-1.9s; }
+
+/* True translucent materials: fill, blur, inner reflection and shallow depth. */
+.rm-glass-chrome,.glass-chrome,.topbar.glass-chrome,.tabbar.glass-chrome,
+.rm-lab-topbar,.rm-lab-bottom-nav {
+  border:1px solid transparent;
+  background:var(--rm-glass-chrome-bg);
+  -webkit-backdrop-filter:blur(var(--rm-glass-chrome-blur)) saturate(var(--rm-glass-chrome-saturation)) brightness(1.04);
+  backdrop-filter:blur(var(--rm-glass-chrome-blur)) saturate(var(--rm-glass-chrome-saturation)) brightness(1.04);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.82),inset 1px 0 0 rgba(255,255,255,.27),inset 0 -1px 0 rgba(50,59,72,.15),var(--rm-shadow-floating);
+}
+.glass-sheet,.rm-surface--frosted,.picker-sheet,.date-picker-sheet,.time-picker-sheet,.calculator-sheet {
+  border:1px solid transparent;
+  background:var(--rm-glass-sheet-bg);
+  -webkit-backdrop-filter:blur(var(--rm-glass-sheet-blur)) saturate(var(--rm-glass-sheet-saturation)) brightness(1.025);
+  backdrop-filter:blur(var(--rm-glass-sheet-blur)) saturate(var(--rm-glass-sheet-saturation)) brightness(1.025);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.84),inset 1px 0 0 rgba(255,255,255,.2),inset 0 -1px 0 rgba(44,53,66,.16),var(--rm-shadow-overlay);
+}
+.modal-suspended > .glass-sheet,.modal-suspended > .picker-sheet,
+.modal-suspended > .date-picker-sheet,.modal-suspended > .time-picker-sheet,
+.modal-suspended > .calculator-sheet { -webkit-backdrop-filter:none; backdrop-filter:none; }
+.glass-accent,.segmented,.rm-segmented,.rm-icon-button--glass,.rm-button--secondary,
+.sheet-secondary,.calculator-cancel,.time-picker-now,.date-picker-today {
+  border:1px solid transparent;
+  background:var(--rm-glass-compact-bg);
+  -webkit-backdrop-filter:blur(var(--rm-glass-compact-blur)) saturate(var(--rm-glass-compact-saturation));
+  backdrop-filter:blur(var(--rm-glass-compact-blur)) saturate(var(--rm-glass-compact-saturation));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.78),inset 0 -1px 0 rgba(52,62,76,.14),var(--rm-shadow-control);
+}
+
+/* App chrome and navigation. */
+.topbar.glass-chrome { top:7px;left:10px;right:10px;min-height:54px;padding:calc(var(--safe-top) + 7px) 10px 7px;border-radius:var(--rm-radius-large); }
+.topbar.glass-chrome:not(.scrolled) { background-color:transparent; }
+.topbar-title { font-size:26px;font-weight:700;line-height:1.14; }
+.topbar-actions { gap:6px; }
+.topbar-btn,.topbar-avatar,.topbar-text-action,.rm-icon-button {
+  min-width:44px;min-height:44px;border-radius:var(--rm-radius-pill);
+  color:var(--rm-color-text-primary);
+  background:var(--rm-glass-compact-bg);
+  -webkit-backdrop-filter:blur(var(--rm-glass-compact-blur)) saturate(var(--rm-glass-compact-saturation));
+  backdrop-filter:blur(var(--rm-glass-compact-blur)) saturate(var(--rm-glass-compact-saturation));
+  transition:transform var(--rm-motion-tap) var(--rm-ease-standard),box-shadow var(--rm-motion-tap) var(--rm-ease-standard),color var(--rm-motion-control) var(--rm-ease-standard);
+}
+.topbar-btn:active,.topbar-avatar:active,.topbar-text-action:active,.rm-icon-button:active { transform:scale(.988);box-shadow:inset 0 2px 5px rgba(24,29,36,.13),0 1px 3px rgba(29,35,43,.07); }
+.topbar-avatar { color:var(--rm-color-text-primary);background:var(--rm-glass-compact-bg); }
+.topbar-text-action { color:var(--rm-color-interactive);font:var(--type-label); }
+.rm-icon-button--danger { color:var(--rm-color-danger);background:color-mix(in srgb,var(--rm-color-danger) 7%,var(--rm-glass-compact-bg)); }
+.rm-icon-button--selected { color:white;background:linear-gradient(145deg,var(--graphite-700),var(--graphite-950)); }
+.tabbar.glass-chrome { height:var(--rm-bottom-nav-height);left:10px;right:10px;bottom:calc(var(--safe-bottom) + 8px);border-radius:25px;padding:0 8px; }
+.tab-item { color:var(--rm-color-text-secondary);font:var(--type-tab); }
+.tab-item.active { color:var(--rm-color-text-primary);text-shadow:0 1px 0 var(--rm-chrome-highlight); }
+.tab-item:active { transform:translateY(1px) scale(.96); }
+.tab-capture,.rm-lab-capture {
+  --rm-edge-width:3.2px;
+  width:52px;height:52px;border-radius:50%;overflow:hidden;
+  color:var(--rm-color-text-primary)!important;
+  background:radial-gradient(circle at 29% 20%,rgba(255,255,255,.88),rgba(255,255,255,.22) 38%,rgba(161,177,196,.16) 72%),var(--rm-glass-chrome-bg);
+  border:1px solid transparent;
+  -webkit-backdrop-filter:blur(18px) saturate(1.26);backdrop-filter:blur(18px) saturate(1.26);
+  box-shadow:inset 0 2px 0 rgba(255,255,255,.86),inset 0 -1px 2px rgba(43,52,65,.2),0 8px 18px rgba(35,42,51,.17);
+}
+
+/* Content glass stays readable; dense tables use the stronger frost below. */
+.surface,.rm-surface,.fixed-plan-card,.obligation-card,.asset-sec,.section.surface,
+.relationship-preview,.recipient-profile-card,.payment-assistant-card,.plan-preview,
+.posting-preview-effect {
+  border:1px solid transparent;border-radius:var(--rm-radius-card);
+  background:var(--rm-glass-content-bg);
+  -webkit-backdrop-filter:blur(var(--rm-glass-content-blur)) saturate(var(--rm-glass-content-saturation));
+  backdrop-filter:blur(var(--rm-glass-content-blur)) saturate(var(--rm-glass-content-saturation));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.74),inset 0 -1px 0 rgba(51,61,74,.12),var(--rm-shadow-card);
+}
+.transaction-list,.ledger-list,.financial-table {
+  border:1px solid transparent;border-radius:var(--rm-radius-card);
+  background:var(--rm-glass-dense-bg);box-shadow:inset 0 1px 0 rgba(255,255,255,.68),var(--rm-shadow-card);
+}
+.surface-2,.rm-surface--tonal,.asset-form-note,.asset-current-balance-card,
+.asset-purchase-detail,.asset-empty-state,.fixed-empty,.empty {
+  border:1px solid transparent;border-radius:var(--rm-radius-card);
+  background:var(--rm-glass-compact-bg);box-shadow:inset 0 1px 0 rgba(255,255,255,.66),var(--rm-shadow-control);
+}
+.rm-surface { padding:16px; }.rm-surface p { margin-top:5px;color:var(--rm-color-text-secondary);line-height:1.45; }
+.rm-surface--raised { background:var(--rm-color-surface-solid);box-shadow:var(--rm-shadow-floating); }
+
+/* Canonical action hierarchy. */
+.rm-button,.sheet-primary,.sheet-secondary,.sheet-danger,.cap-save,.calculator-cancel,.time-picker-now,.date-picker-today {
+  min-height:48px;padding:0 16px;border-radius:var(--rm-radius-field);font:var(--type-button);
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;overflow:hidden;
+  transition:transform var(--rm-motion-tap) var(--rm-ease-standard),box-shadow var(--rm-motion-tap) var(--rm-ease-standard),filter var(--rm-motion-control) var(--rm-ease-standard),opacity var(--rm-motion-control) var(--rm-ease-standard);
+}
+.rm-button--primary,.sheet-primary,.cap-save {
+  color:#fff;border:1px solid transparent;
+  background:linear-gradient(145deg,#3c424b 0%,#171a1f 48%,#080a0d 100%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.3),inset 0 -1px 0 rgba(0,0,0,.68),0 7px 17px rgba(16,20,26,.2);
+}
+.rm-button--secondary,.sheet-secondary { color:var(--rm-color-text-primary); }
+.rm-button--tertiary { color:var(--rm-color-text-primary);background:transparent; }
+.rm-button--danger,.sheet-danger { color:var(--rm-color-danger);background:color-mix(in srgb,var(--rm-color-danger) 7%,var(--rm-glass-compact-bg)); }
+.rm-button--compact { min-height:40px;padding:0 13px;font-size:13px; }
+.rm-button:active,.sheet-primary:active,.sheet-secondary:active,.sheet-danger:active,.cap-save:active,.calculator-cancel:active { transform:scale(.988);box-shadow:inset 0 2px 6px rgba(8,11,15,.24),0 2px 4px rgba(20,25,31,.08); }
+.rm-button:active::after,.sheet-primary:active::after,.cap-save:active::after { content:"";position:absolute;z-index:4;inset:0;padding:var(--rm-edge-width,2px);border-radius:inherit;pointer-events:none;background:conic-gradient(from var(--rm-chrome-flow-angle),var(--rm-chrome-flowing-stops));-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:rm-chrome-sweep var(--rm-motion-liquid-sweep) linear 1; }
+.rm-button[disabled],.rm-button[aria-disabled="true"],.sheet-primary[disabled],.cap-save[disabled] { opacity:.42;filter:saturate(.2);pointer-events:none; }
+.rm-spinner { width:18px;height:18px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:rm-spin .8s linear infinite; }
+@keyframes rm-spin { to { transform:rotate(1turn); } }
+
+/* Canonical Sheet shell and integrated dock. The modal layer is sized to the
+   active VisualViewport so iOS keyboard changes never detach the surface from
+   the bottom edge. Detents own height; feature styles own content only. */
+.modal-portal-root > :is(.sheet-layer,.picker-layer,.date-picker-layer,.time-picker-layer,.calculator-layer) {
+  position:fixed;
+  inset-inline:0;
+  top:var(--rm-sheet-viewport-top,0px);
+  bottom:auto;
+  height:var(--rm-sheet-viewport-height,100dvh);
+}
+.sheet-scrim,.picker-scrim,.date-picker-scrim,.time-picker-scrim,.calculator-scrim { background:rgba(235,241,247,.30);-webkit-backdrop-filter:blur(4px) saturate(.45);backdrop-filter:blur(4px) saturate(.45); }
+.sheet-layer > .sheet,
+.picker-layer > .picker-sheet,
+.date-picker-layer > .date-picker-sheet,
+.time-picker-layer > .time-picker-sheet,
+.calculator-layer > .calculator-sheet {
+  position:absolute;
+  inset-inline:0;
+  top:auto!important;
+  bottom:0!important;
+  width:min(100%,480px);
+  margin-inline:auto;
+  border-radius:var(--rm-radius-sheet) var(--rm-radius-sheet) 0 0;
+}
+.sheet { display:flex;flex-direction:column;height:auto;max-height:min(91dvh,820px);padding:0;overflow:hidden;border-radius:var(--rm-radius-sheet) var(--rm-radius-sheet) 0 0; }
+.sheet[data-sheet-detent="compact"] { height:auto!important;max-height:min(48%,420px)!important; }
+.sheet[data-sheet-detent="medium"] { height:min(64%,620px)!important;max-height:calc(100% - max(12px,var(--safe-top)))!important; }
+.sheet[data-sheet-detent="large"] { height:min(92%,840px)!important;max-height:calc(100% - max(8px,var(--safe-top)))!important; }
+.sheet[data-sheet-detent="content"] { height:auto!important;max-height:min(78%,720px)!important; }
+:is(.picker-sheet,.date-picker-sheet,.time-picker-sheet,.calculator-sheet)[data-sheet-detent="medium"] {
+  height:min(64%,620px);
+  max-height:calc(100% - max(12px,var(--safe-top)));
+  overflow:auto;
+}
+:is(.sheet-layer,.picker-layer,.date-picker-layer,.time-picker-layer,.calculator-layer)[data-keyboard-open="true"] > :is(.sheet,.picker-sheet,.date-picker-sheet,.time-picker-sheet,.calculator-sheet) {
+  height:calc(100% - 6px)!important;
+  max-height:calc(100% - 6px)!important;
+}
+.sheet-grabber,.time-picker-grabber { flex:0 0 auto;padding:10px 0 6px; }
+.sheet-grabber span,.time-picker-grabber span { width:40px;height:5px;background:linear-gradient(180deg,#dfe3e8,#89919c);box-shadow:inset 0 1px 0 rgba(255,255,255,.9); }
+.sheet-title,.time-picker-title { flex:0 0 auto;padding:4px 18px 12px;font:var(--type-section); }
+.sheet-body { flex:1 1 auto;min-height:0;overflow:auto;padding:0 18px calc(var(--safe-bottom) + 16px);overscroll-behavior:contain; }
+.sheet-action-dock,.asset-sheet-footer,.cap-save-wrap {
+  position:sticky;z-index:12;bottom:calc(-1 * (var(--safe-bottom) + 16px));
+  margin:12px -18px calc(-1 * (var(--safe-bottom) + 16px));padding:11px 18px calc(var(--safe-bottom) + 15px);
+  border-top:1px solid transparent;
+  background:var(--rm-glass-chrome-bg);
+  -webkit-backdrop-filter:blur(var(--rm-glass-chrome-blur)) saturate(var(--rm-glass-chrome-saturation));
+  backdrop-filter:blur(var(--rm-glass-chrome-blur)) saturate(var(--rm-glass-chrome-saturation));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.74),0 -8px 20px rgba(36,43,52,.07);
+}
+.capture-sheet .cap-save-wrap {
+  bottom:0;
+  margin:12px -18px 0;
+  padding:11px 18px max(calc(var(--safe-bottom) + 8px),12px);
+}
+.sheet-action-dock-surface,.asset-sheet-footer { display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:9px; }
+.sheet-action-dock button,.asset-sheet-footer button { width:100%;margin:0; }
+.profile-settings-sheet .sheet-body { display:grid;align-content:start;gap:12px; }
+.profile-motion-group { border:1px solid transparent;border-radius:var(--rm-radius-card);background:var(--rm-glass-content-bg);box-shadow:inset 0 1px 0 rgba(255,255,255,.72),var(--rm-shadow-control);overflow:hidden; }
+.profile-chrome-motion { border-bottom:0; }
+.profile-chrome-motion strong { color:var(--rm-color-text-primary);font:var(--type-label); }
+
+/* Forms: readable translucent neutral material, chrome focus. */
+.rm-field,.asset-form-field,.plan-field,.recipient-profile-field,.cap-field { display:grid;gap:7px;color:var(--rm-color-text-secondary);font:var(--type-secondary); }
+.rm-field-label { font:var(--type-label); }
+.rm-field-control,.asset-form-field input,.asset-form-field select,.asset-form-field textarea,
+.plan-field input,.plan-field textarea,.recipient-profile-field input,.recipient-profile-field textarea,
+.cap-field input,.search-field,.native-picker-display,.picker-field,.money-field-button {
+  width:100%;min-height:48px;border:1px solid transparent;border-radius:var(--rm-radius-field);
+  color:var(--rm-color-text-primary);background:var(--rm-glass-dense-bg);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.76),inset 0 -1px 0 rgba(50,59,72,.12),var(--rm-shadow-control);outline:none;
+}
+.rm-field-control,.asset-form-field input,.asset-form-field select,.asset-form-field textarea,.plan-field input,.recipient-profile-field input { padding:11px 13px; }
+.rm-field-control:focus-visible,.asset-form-field input:focus-visible,.asset-form-field select:focus-visible,.asset-form-field textarea:focus-visible,.plan-field input:focus-visible,.recipient-profile-field input:focus-visible,.native-picker-display:focus-visible,.money-field-button:focus-visible { border-color:var(--rm-color-interactive);box-shadow:0 0 0 3px var(--rm-color-interactive-focus),inset 0 1px 0 var(--rm-chrome-highlight); }
+.rm-field-error,.form-error { color:var(--rm-color-danger);font:var(--type-caption); }.rm-field.has-error .rm-field-control { border-color:var(--rm-color-danger); }
+select { appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--rm-color-text-tertiary) 50%),linear-gradient(135deg,var(--rm-color-text-tertiary) 50%,transparent 50%);background-position:calc(100% - 17px) 52%,calc(100% - 12px) 52%;background-size:5px 5px;background-repeat:no-repeat; }
+
+/* Toggles, chips, segments, action tiles and rows. */
+.rm-toggle-row,.asset-switch-row { min-height:58px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 13px;border-bottom:1px solid var(--rm-color-divider); }
+.rm-toggle-row > span:first-child { display:grid;gap:2px; }.rm-toggle-row small { color:var(--rm-color-text-secondary); }.rm-toggle-row input { position:absolute;opacity:0;pointer-events:none; }
+.rm-switch,.ringgit-switch { width:50px;height:30px;padding:3px;border-radius:var(--rm-radius-pill);background:var(--rm-color-surface-control);box-shadow:inset 0 2px 6px rgba(20,25,31,.2),0 1px 0 var(--rm-chrome-highlight);transition:background var(--rm-motion-control) var(--rm-ease-standard); }
+.rm-switch i,.ringgit-switch b { display:block;width:24px;height:24px;border-radius:50%;background:linear-gradient(145deg,#fff,#e3e7ec);box-shadow:0 3px 9px rgba(20,25,31,.22),inset 0 1px 0 #fff;transition:transform var(--rm-motion-control) var(--rm-ease-standard); }
+.rm-toggle-row input:checked + .rm-switch,.asset-switch-row input:checked + .ringgit-switch { background:linear-gradient(145deg,#4b525c,#16191e); }.rm-toggle-row input:checked + .rm-switch i,.asset-switch-row input:checked + .ringgit-switch b { transform:translateX(20px); }
+.segmented,.rm-segmented { display:flex;gap:4px;padding:4px;border-radius:var(--rm-radius-field); }
+.seg-item,.rm-segment { position:relative;flex:1;min-height:38px;padding:0 10px;border:1px solid transparent;border-radius:var(--rm-radius-compact);color:var(--rm-color-text-secondary);font:var(--type-label);overflow:hidden; }
+.seg-item.active,.rm-segment.is-selected { --rm-edge-width:1.5px;color:var(--rm-color-text-primary);background:var(--rm-glass-chrome-bg);-webkit-backdrop-filter:blur(18px) saturate(1.25);backdrop-filter:blur(18px) saturate(1.25);box-shadow:inset 0 1px 0 rgba(255,255,255,.84),inset 0 -1px 0 rgba(47,57,70,.13),0 4px 10px rgba(30,37,46,.09); }
+:root[data-theme="dark"] .seg-item.active,:root[data-theme="dark"] .rm-segment.is-selected { background:linear-gradient(145deg,#555d68,#23272e); }
+.rm-chip-row { display:flex;flex-wrap:wrap;gap:7px; }
+.rm-chip,.cap-cat,.cap-acc { min-height:36px;padding:0 13px;border:1px solid transparent;border-radius:var(--rm-radius-pill);background:var(--rm-glass-compact-bg);color:var(--rm-color-text-secondary);font:var(--type-label);white-space:nowrap;-webkit-backdrop-filter:blur(var(--rm-glass-compact-blur)) saturate(var(--rm-glass-compact-saturation));backdrop-filter:blur(var(--rm-glass-compact-blur)) saturate(var(--rm-glass-compact-saturation));box-shadow:inset 0 1px 0 rgba(255,255,255,.7),var(--rm-shadow-control); }
+.rm-chip.is-selected,.cap-cat.active,.cap-acc.active { --rm-legacy-selected-audit:rgba(215,221,228,0);color:var(--rm-color-text-primary);border-color:transparent;background:var(--rm-glass-chrome-bg);box-shadow:inset 0 1px 0 rgba(255,255,255,.86),0 4px 10px rgba(30,37,46,.09); }
+:root[data-theme="dark"] .rm-chip.is-selected,:root[data-theme="dark"] .cap-cat.active,:root[data-theme="dark"] .cap-acc.active { color:white;background:linear-gradient(145deg,#4b525c,#171a1f); }
+.rm-chip--warning { color:var(--rm-color-warning);background:color-mix(in srgb,var(--rm-color-warning) 9%,var(--rm-color-surface-solid)); }.rm-chip--danger { color:var(--rm-color-danger);background:color-mix(in srgb,var(--rm-color-danger) 8%,var(--rm-color-surface-solid)); }
+.rm-action-tile,.recurring-action-card,.asset-soft-action { width:100%;min-height:62px;display:flex;align-items:center;gap:11px;padding:11px 13px;border:1px solid transparent;border-radius:var(--rm-radius-card);background:var(--rm-glass-content-bg);-webkit-backdrop-filter:blur(var(--rm-glass-content-blur)) saturate(var(--rm-glass-content-saturation));backdrop-filter:blur(var(--rm-glass-content-blur)) saturate(var(--rm-glass-content-saturation));box-shadow:inset 0 1px 0 rgba(255,255,255,.76),var(--rm-shadow-control);text-align:left; }
+.rm-action-tile-icon,.rm-list-row-icon { width:38px;height:38px;display:grid;place-items:center;border-radius:50%;color:var(--rm-color-text-primary);background:linear-gradient(145deg,rgba(255,255,255,.72),rgba(183,191,201,.24));border:1px solid var(--rm-chrome-border); }
+.rm-action-tile-copy,.rm-list-row-copy { flex:1;min-width:0;display:grid;gap:2px; }.rm-action-tile-copy small,.rm-list-row-copy small { color:var(--rm-color-text-secondary); }
+.rm-list-row,.row { width:100%;min-height:52px;display:flex;align-items:center;gap:10px;padding:8px 13px;border-bottom:1px solid var(--rm-color-divider);text-align:left; }
+.rm-list-row-icon { width:34px;height:34px; }.rm-list-row-value { font:var(--type-amount-row);white-space:nowrap; }
+.rm-financial-row,.detail-row { min-height:50px;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:10px 13px;border-bottom:1px solid var(--rm-color-divider); }.rm-financial-row span { display:grid;color:var(--rm-color-text-secondary); }.rm-financial-row small { color:var(--rm-color-text-tertiary); }.rm-financial-row--danger strong { color:var(--rm-color-danger); }
+
+/* One canonical calculator: tactile neutral glass, graphite equals. */
+.calculator-sheet { overflow:hidden;border-radius:var(--rm-radius-sheet) var(--rm-radius-sheet) 0 0; }
+.calculator-display { margin:0 16px 12px;padding:13px 15px;border:1px solid transparent;border-radius:var(--rm-radius-card);background:var(--rm-glass-dense-bg);box-shadow:inset 0 1px 0 rgba(255,255,255,.7),var(--rm-shadow-card); }
+.calculator-keypad { gap:8px;padding:0 16px; }
+.calculator-key,.key,.capture-calculator-key { border:1px solid transparent;border-radius:var(--rm-radius-field);color:var(--rm-color-text-primary);background:var(--rm-glass-compact-bg);-webkit-backdrop-filter:blur(var(--rm-glass-compact-blur)) saturate(var(--rm-glass-compact-saturation));backdrop-filter:blur(var(--rm-glass-compact-blur)) saturate(var(--rm-glass-compact-saturation));box-shadow:inset 0 1px 0 rgba(255,255,255,.78),inset 0 -1px 0 rgba(49,59,72,.13),0 3px 8px rgba(32,40,50,.09);transition:transform var(--rm-motion-tap) var(--rm-ease-standard),box-shadow var(--rm-motion-tap) var(--rm-ease-standard); }
+.calculator-key.operator,.key.operator,.capture-calculator-key.operator { color:var(--rm-color-text-primary);background:linear-gradient(145deg,rgba(255,255,255,.58),rgba(151,160,172,.16)),var(--rm-glass-compact-bg); }
+.calculator-key[data-calculator-key="="],.key[data-key="="],.capture-calculator-key.equals,
+.calculator-key.apply,.capture-calculator-key.apply { color:white;background:linear-gradient(145deg,var(--graphite-700),var(--graphite-900) 52%,var(--graphite-950));box-shadow:inset 0 1px 0 rgba(255,255,255,.32),0 7px 17px rgba(13,17,22,.22); }
+.calculator-key:active,.key:active,.capture-calculator-key:active { transform:scale(.986);box-shadow:inset 0 2px 5px rgba(17,22,28,.17),0 1px 3px rgba(22,27,34,.07); }
+
+/* Pickers, menus, dialogs and feedback. */
+.picker-sheet,.date-picker-sheet,.time-picker-sheet { border-radius:var(--rm-radius-sheet) var(--rm-radius-sheet) 0 0; }
+.picker-option,.asset-menu-row,.compact-action-row { min-height:52px;border-bottom:1px solid var(--rm-color-divider); }.picker-option.active { color:var(--rm-color-text-primary);background:var(--rm-color-interactive-subtle); }
+.asset-menu-list,.compact-action-list { border:1px solid transparent;border-radius:var(--rm-radius-card);background:var(--rm-glass-content-bg);-webkit-backdrop-filter:blur(var(--rm-glass-content-blur)) saturate(var(--rm-glass-content-saturation));backdrop-filter:blur(var(--rm-glass-content-blur)) saturate(var(--rm-glass-content-saturation));box-shadow:var(--rm-shadow-card); }
+.plan-confirm-copy,.asset-confirm-copy,.capacity-alert-hero { padding:14px;border:1px solid var(--rm-color-border);border-radius:var(--rm-radius-card);background:var(--rm-color-surface-tonal); }
+.toast-portal-root { position:fixed;inset:0;pointer-events:none;z-index:9999; }.toast { top:calc(var(--safe-top) + 12px);color:var(--rm-color-text-primary);border:1px solid var(--rm-chrome-border);background:var(--rm-glass-sheet-bg);-webkit-backdrop-filter:blur(var(--rm-glass-sheet-blur)) saturate(var(--rm-glass-sheet-saturation));backdrop-filter:blur(var(--rm-glass-sheet-blur)) saturate(var(--rm-glass-sheet-saturation));box-shadow:inset 0 1px 0 var(--rm-chrome-highlight),var(--rm-shadow-floating); }
+.rm-state { min-height:154px;padding:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;text-align:center;border:1px solid transparent;border-radius:var(--rm-radius-card);background:var(--rm-glass-content-bg);-webkit-backdrop-filter:blur(var(--rm-glass-content-blur)) saturate(var(--rm-glass-content-saturation));backdrop-filter:blur(var(--rm-glass-content-blur)) saturate(var(--rm-glass-content-saturation)); }.rm-state p { color:var(--rm-color-text-secondary); }.rm-state-icon { width:42px;height:42px;display:grid;place-items:center;border-radius:50%;color:var(--rm-color-text-primary);background:var(--rm-color-interactive-subtle); }.rm-state--error .rm-state-icon { color:var(--rm-color-danger);background:color-mix(in srgb,var(--rm-color-danger) 10%,transparent); }
+.rm-section-header { min-height:36px;display:flex;align-items:center;justify-content:space-between;gap:12px; }.rm-section-header h2 { font:var(--type-section); }.rm-link-button { display:inline-flex;align-items:center;color:var(--rm-color-text-primary);font:var(--type-label); }.rm-privacy-value { font-variant-numeric:tabular-nums; }
+.rm-drag-handle { width:44px;min-height:44px;display:grid;place-items:center;border-radius:var(--rm-radius-compact);color:var(--rm-color-text-tertiary);touch-action:none; }.rm-reorder-demo { min-height:60px;display:flex;align-items:center;gap:10px;padding:8px;border:1px solid var(--rm-color-border);border-radius:var(--rm-radius-card);background:var(--rm-color-surface-solid); }.rm-reorder-demo > span { display:grid;gap:2px; }.rm-reorder-demo small { color:var(--rm-color-text-secondary); }
+
+/* Compatibility neutralisation for reachable legacy decorative states. */
+.asset-manager-tabs button.active,.asset-operation-item.active,.asset-mode-card.active,
+.fixed-plan-new,.payment-copy-button.is-copied,.recipient-method-card.is-selected,
+.relationship-type-card.active,.split-mode button.active,.cap-type.active,
+.plan-kind-segment button.active,.plan-binary-segment button.active,
+.subscription-funding-grid button.active,.ledger-member-picker button.active,
+.fixed-filter-rail button.active,.fixed-workspace-nav .seg-item.active,
+.habit-icon-choice.active,.habit-mini.active,.relation-mode-grid button.active,
+.date-month-grid button.active,.date-day.selected,.split-member.active {
+  color:var(--rm-color-text-primary)!important;
+  border-color:transparent!important;
+  background:var(--rm-glass-chrome-bg)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.8),var(--rm-shadow-control)!important;
+}
+:root[data-theme="dark"] .asset-manager-tabs button.active,
+:root[data-theme="dark"] .asset-operation-item.active,
+:root[data-theme="dark"] .asset-mode-card.active,
+:root[data-theme="dark"] .relationship-type-card.active,
+:root[data-theme="dark"] .split-mode button.active { color:white!important;background:linear-gradient(145deg,#505863,#1d2127)!important; }
+
+/* Full-App caller migration. Legacy features retain their DOM and behavior,
+   while the canonical owner assigns the same finite materials everywhere. */
+.ledger-metrics > div,.motion-relationship-card,.motion-balance-hero,
+.split-participant-row,.plan-period-row,.plan-payment-row,.avatar-stack-row,
+.plan-detail-hero,.plan-relationship-summary,.plan-preview,.first-occurrence-preview,
+.plan-registry-row,.smart-split-summary,.equal-split-preview span,
+.recipient-method-card,.recipient-profile-summary,.payment-assistant-card,
+.payment-assistant-direction,.payment-assistant-destination,.posting-preview-effect,
+.attachment-card,.attachment-preview-card,.recently-deleted-card,
+.fixed-overview-hero,.fixed-plan-card,.fixed-summary-grid,.obligation-card,.ledger-planned-summary,
+.habit-manager-list,.asset-account-settings,.asset-purchase-detail,.asset-installment-preview {
+  position:relative;
+  isolation:isolate;
+  --rm-edge-width:1.8px;
+  border:1px solid transparent;
+  background:var(--rm-glass-content-bg);
+  -webkit-backdrop-filter:blur(var(--rm-glass-content-blur)) saturate(var(--rm-glass-content-saturation));
+  backdrop-filter:blur(var(--rm-glass-content-blur)) saturate(var(--rm-glass-content-saturation));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.72),inset 0 -1px 0 rgba(51,61,74,.11),var(--rm-shadow-card);
+}
+.plan-kind-segment,.plan-binary-segment,.fixed-workspace-nav,
+.fixed-filter-rail button,.ledger-action-grid button,.relation-mode-grid button,
+.split-mode button,.subscription-funding-grid button,.ledger-member-picker button,
+.date-month-grid button,.habit-icon-choice,.attachment-strip-more,.attachment-strip-add,
+.plan-visual-row > button,.plan-logo-upload,.plan-readonly-visual,.plan-link-row,
+.plan-more-toggle,.plan-date-button,.plan-share-grid label,.obligation-new,
+.asset-reorder-handle span,.asset-restore-btn,.asset-current-balance-card button {
+  border:1px solid transparent;
+  color:var(--rm-color-text-primary);
+  background:var(--rm-glass-compact-bg);
+  -webkit-backdrop-filter:blur(var(--rm-glass-compact-blur)) saturate(var(--rm-glass-compact-saturation));
+  backdrop-filter:blur(var(--rm-glass-compact-blur)) saturate(var(--rm-glass-compact-saturation));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.72),inset 0 -1px 0 rgba(52,62,76,.12),var(--rm-shadow-control);
+}
+.plan-field input,.plan-field select,.plan-field textarea,.due-inline select,
+.custom-shares input,.asset-money-input,.time-wheel,.native-picker-display,
+.money-field-button {
+  border:1px solid transparent;
+  color:var(--rm-color-text-primary);
+  background:var(--rm-glass-dense-bg);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.74),inset 0 -1px 0 rgba(50,59,72,.12),var(--rm-shadow-control);
+}
+.obligation-actions button.primary,.plan-inline-primary,.calculator-key.apply,
+.capture-calculator-key.apply,.capture-calculator-key.equals {
+  color:#fff!important;
+  border-color:transparent!important;
+  background:linear-gradient(145deg,var(--graphite-700),var(--graphite-900) 52%,var(--graphite-950))!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 7px 17px rgba(13,17,22,.22)!important;
+}
+.asset-manage-icon,.asset-action-grid button > span:first-child,.plan-visual,
+.participant-avatar,.split-editor-avatar,.attachment-file-icon {
+  color:var(--rm-color-text-primary);
+  background:linear-gradient(145deg,rgba(255,255,255,.7),rgba(177,188,201,.22));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.78),var(--rm-shadow-control);
+}
+:is(.motion-relationship-card,.motion-balance-hero,.split-participant-row,
+  .plan-period-row,.plan-payment-row,.avatar-stack-row,.plan-detail-hero,
+  .plan-relationship-summary,.plan-preview,.first-occurrence-preview,.plan-registry-row,
+  .recipient-method-card,.recipient-profile-summary,.payment-assistant-card,
+  .payment-assistant-direction,.payment-assistant-destination,.attachment-card,
+.recently-deleted-card,.fixed-overview-hero,.fixed-summary-grid)::before {
+  content:"";
+  position:absolute;
+  z-index:3;
+  inset:0;
+  padding:var(--rm-edge-width,1.2px);
+  border-radius:inherit;
+  pointer-events:none;
+  background:var(--rm-chrome-perimeter);
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;
+  mask-composite:exclude;
+}
+.ledger-action-grid button:nth-last-child(2) {
+  color:var(--rm-color-text-primary);
+  background:var(--rm-glass-compact-bg);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.72),var(--rm-shadow-control);
+}
+.ledger-action-grid button:last-child {
+  color:#fff;
+  background:linear-gradient(145deg,var(--graphite-700),var(--graphite-900) 52%,var(--graphite-950));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 7px 17px rgba(13,17,22,.22);
+}
+
+/* Design System Lab uses the actual production materials. */
+.design-system-lab-host { max-width:none!important;overflow:auto!important; }
+.rm-design-lab { min-height:100dvh;padding:88px max(16px,calc((100vw - 980px)/2)) 110px;background:transparent; }
+.rm-lab-topbar { position:fixed;z-index:20;top:10px;left:50%;width:min(calc(100% - 20px),980px);transform:translateX(-50%);min-height:66px;padding:10px 14px;display:flex;align-items:center;justify-content:space-between;border-radius:var(--rm-radius-large); }
+.rm-lab-topbar small { color:var(--rm-color-text-secondary);font:var(--type-label); }.rm-lab-topbar h1 { font:var(--type-section); }.rm-lab-top-actions { display:flex;gap:7px; }
+.rm-lab-content { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px; }.rm-lab-section { min-width:0;padding:16px;border:1px solid transparent;border-radius:var(--rm-radius-large);background:var(--rm-glass-content-bg);-webkit-backdrop-filter:blur(var(--rm-glass-content-blur)) saturate(var(--rm-glass-content-saturation));backdrop-filter:blur(var(--rm-glass-content-blur)) saturate(var(--rm-glass-content-saturation));box-shadow:inset 0 1px 0 rgba(255,255,255,.7),var(--rm-shadow-card); }.rm-lab-grid { display:grid;gap:10px;margin-top:10px; }.rm-lab-inline-actions { display:flex;flex-wrap:wrap;gap:8px;margin-top:12px; }.rm-long-copy { padding:14px;border-radius:var(--rm-radius-card);background:var(--rm-glass-dense-bg);line-height:1.5;overflow-wrap:anywhere; }.rm-long-copy p { margin-top:6px;color:var(--rm-color-text-secondary); }
+.rm-lab-edge-ambient { min-height:76px;padding:14px;border:1px solid transparent;border-radius:var(--rm-radius-card);display:grid;align-content:center;gap:3px;background:var(--rm-glass-chrome-bg);-webkit-backdrop-filter:blur(var(--rm-glass-chrome-blur)) saturate(var(--rm-glass-chrome-saturation));backdrop-filter:blur(var(--rm-glass-chrome-blur)) saturate(var(--rm-glass-chrome-saturation));box-shadow:inset 0 1px 0 rgba(255,255,255,.8),var(--rm-shadow-control); }.rm-lab-edge-ambient span { color:var(--rm-color-text-secondary);font:var(--type-secondary); }
+.rm-lab-bottom-nav { position:fixed;z-index:20;left:50%;bottom:calc(var(--safe-bottom) + 10px);transform:translateX(-50%);width:min(calc(100% - 20px),480px);min-height:62px;display:grid;grid-template-columns:1fr 1fr auto 1fr 1fr;align-items:center;padding:0 9px;border-radius:25px; }.rm-lab-bottom-nav button { display:flex;flex-direction:column;align-items:center;gap:2px;color:var(--rm-color-text-secondary);font:var(--type-tab); }.rm-lab-bottom-nav button.is-selected { color:var(--rm-color-text-primary); }.rm-lab-capture { margin-top:-18px;justify-content:center; }
+
+/* Smoked architectural glass, never neon. */
+:root[data-theme="dark"] .rm-glass-chrome,:root[data-theme="dark"] .glass-chrome,
+:root[data-theme="dark"] .topbar.glass-chrome,:root[data-theme="dark"] .tabbar.glass-chrome { box-shadow:inset 0 1px 0 rgba(255,255,255,.17),inset 1px 0 0 rgba(255,255,255,.055),inset 0 -1px 0 rgba(0,0,0,.46),0 18px 42px rgba(0,0,0,.32); }
+:root[data-theme="dark"] .calculator-key,:root[data-theme="dark"] .key { box-shadow:inset 0 1px 0 rgba(255,255,255,.13),inset 0 -1px 0 rgba(0,0,0,.45),0 5px 13px rgba(0,0,0,.26); }
+:root[data-theme="dark"] .tab-capture,:root[data-theme="dark"] .rm-lab-capture { color:white!important;background:radial-gradient(circle at 32% 22%,rgba(255,255,255,.22),rgba(255,255,255,.06) 36%,rgba(0,0,0,.18) 68%),var(--rm-glass-chrome-bg); }
+:root[data-theme="dark"] .sheet-scrim,:root[data-theme="dark"] .picker-scrim,:root[data-theme="dark"] .date-picker-scrim,:root[data-theme="dark"] .time-picker-scrim,:root[data-theme="dark"] .calculator-scrim { background:rgba(3,6,10,.42);-webkit-backdrop-filter:blur(4px) saturate(.72);backdrop-filter:blur(4px) saturate(.72); }
+
+/* Blur/mask unsupported and explicit reduced-transparency fallbacks. */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
+  .rm-glass-chrome,.glass-chrome,.glass-sheet,.rm-surface--frosted,.picker-sheet,.date-picker-sheet,.time-picker-sheet,.calculator-sheet,.sheet-action-dock,.asset-sheet-footer,.cap-save-wrap,.rm-button--secondary,.sheet-secondary,.segmented,.rm-segmented,.rm-icon-button--glass,.toast { -webkit-backdrop-filter:none;backdrop-filter:none;background:var(--rm-color-surface-frosted-strong); }
+}
+:root[data-blur-fallback="true"] .rm-glass-chrome,:root[data-blur-fallback="true"] .glass-chrome,
+:root[data-blur-fallback="true"] .glass-sheet,:root[data-blur-fallback="true"] .rm-surface--frosted,
+:root[data-blur-fallback="true"] .picker-sheet,:root[data-blur-fallback="true"] .date-picker-sheet,
+:root[data-blur-fallback="true"] .time-picker-sheet,:root[data-blur-fallback="true"] .calculator-sheet,
+:root[data-blur-fallback="true"] .sheet-action-dock,:root[data-blur-fallback="true"] .asset-sheet-footer,
+:root[data-blur-fallback="true"] .cap-save-wrap,:root[data-blur-fallback="true"] .rm-button--secondary,
+:root[data-blur-fallback="true"] .sheet-secondary,:root[data-blur-fallback="true"] .segmented,
+:root[data-blur-fallback="true"] .rm-segmented,:root[data-blur-fallback="true"] .toast { -webkit-backdrop-filter:none!important;backdrop-filter:none!important;background:var(--rm-color-surface-frosted-strong)!important; }
+
+/* Session preference: keep the complete static chrome perimeter (::before),
+   but remove every ambient orbit and interaction/entrance sweep (::after).
+   No invisible animation continues when the preference is off. */
+:root[data-chrome-motion="off"] #app :is(.topbar.glass-chrome,.tabbar.glass-chrome,.surface,.surface-2,.asset-sec,.fixed-plan-card,.obligation-card,.ledger-metrics > div,.ledger-payment-directory-row,.recipient-payment-method-row,.asset-manage-row,.asset-operation-summary,.asset-pool-card,.asset-purchase-row,.rm-action-tile,.recurring-action-card,.asset-soft-action,.calculator-key,.key,.capture-calculator-key,.seg-item.active,.rm-segment.is-selected,.rm-chip.is-selected,.cap-cat.active,.cap-acc.active,.topbar-btn,.topbar-avatar)::after,
+:root[data-chrome-motion="off"] #app[data-rm-page="today"] .tab-capture::after,
+:root[data-chrome-motion="off"] #app[data-rm-page="assets"] .seg-item.active::after,
+:root[data-chrome-motion="off"] .rm-design-lab .rm-lab-capture::after,
+:root[data-chrome-motion="off"] .rm-design-lab .rm-lab-edge-ambient::after,
+:root[data-chrome-motion="off"] .rm-edge-sweep::after,
+:root[data-chrome-motion="off"] .sheet.open::after,
+:root[data-chrome-motion="off"] .rm-button:active::after,
+:root[data-chrome-motion="off"] .sheet-primary:active::after,
+:root[data-chrome-motion="off"] .cap-save:active::after {
+  animation:none!important;
+  content:none!important;
+}
+
+@media (max-width:640px) { .rm-lab-content { grid-template-columns:1fr; }.rm-design-lab { padding-inline:12px; } }
+@media (max-width:390px) { .sheet-action-dock-surface,.asset-sheet-footer { grid-template-columns:minmax(0,.82fr) minmax(0,1.18fr); }.rm-button,.sheet-primary,.sheet-secondary,.sheet-danger { min-width:0; } }
+@supports not (height:100dvh) {
+  .modal-portal-root > :is(.sheet-layer,.picker-layer,.date-picker-layer,.time-picker-layer,.calculator-layer) { height:var(--rm-sheet-viewport-height,100vh); }
+}
+@media (prefers-reduced-motion:reduce) {
+  .rm-design-lab *,.sheet *,.tabbar *,.topbar * { scroll-behavior:auto!important; }
+  .rm-chrome-priority::before,.seg-item.active::before,.rm-segment.is-selected::before,.tab-capture::before,.rm-lab-capture::before { animation:none!important; }
+  #app :is(.topbar.glass-chrome,.tabbar.glass-chrome,.surface,.surface-2,.asset-sec,.fixed-plan-card,.obligation-card,.ledger-metrics > div,.ledger-payment-directory-row,.recipient-payment-method-row,.asset-manage-row,.asset-operation-summary,.asset-pool-card,.asset-purchase-row,.rm-action-tile,.recurring-action-card,.asset-soft-action,.calculator-key,.key,.capture-calculator-key,.seg-item.active,.rm-segment.is-selected,.rm-chip.is-selected,.cap-cat.active,.cap-acc.active,.topbar-btn,.topbar-avatar)::after,#app[data-rm-page="today"] .tab-capture::after,#app[data-rm-page="assets"] .seg-item.active::after,.rm-design-lab .rm-lab-capture::after,.rm-design-lab .rm-lab-edge-ambient::after,.rm-edge-sweep::after,.sheet.open::after,.rm-button:active::after,.sheet-primary:active::after,.cap-save:active::after { animation:none!important;content:none!important; }
+}
+:root[data-reduced-motion="true"] .rm-design-lab *,:root[data-reduced-motion="true"] .sheet *,:root[data-reduced-motion="true"] .tabbar *,:root[data-reduced-motion="true"] .topbar * { scroll-behavior:auto!important;animation-duration:1ms!important;transition-duration:1ms!important; }
+:root[data-reduced-motion="true"] .rm-chrome-priority::before,:root[data-reduced-motion="true"] .seg-item.active::before,:root[data-reduced-motion="true"] .rm-segment.is-selected::before,:root[data-reduced-motion="true"] .tab-capture::before,:root[data-reduced-motion="true"] .rm-lab-capture::before { animation:none!important; }
+:root[data-reduced-motion="true"] #app :is(.topbar.glass-chrome,.tabbar.glass-chrome,.surface,.surface-2,.asset-sec,.fixed-plan-card,.obligation-card,.ledger-metrics > div,.ledger-payment-directory-row,.recipient-payment-method-row,.asset-manage-row,.asset-operation-summary,.asset-pool-card,.asset-purchase-row,.rm-action-tile,.recurring-action-card,.asset-soft-action,.calculator-key,.key,.capture-calculator-key,.seg-item.active,.rm-segment.is-selected,.rm-chip.is-selected,.cap-cat.active,.cap-acc.active,.topbar-btn,.topbar-avatar)::after,:root[data-reduced-motion="true"] #app[data-rm-page="today"] .tab-capture::after,:root[data-reduced-motion="true"] #app[data-rm-page="assets"] .seg-item.active::after,:root[data-reduced-motion="true"] .rm-design-lab .rm-lab-capture::after,:root[data-reduced-motion="true"] .rm-design-lab .rm-lab-edge-ambient::after,:root[data-reduced-motion="true"] .rm-edge-sweep::after,:root[data-reduced-motion="true"] .sheet.open::after { animation:none!important;content:none!important; }
+@supports not ((-webkit-mask-composite:xor) or (mask-composite:exclude)) {
+  .rm-chrome-priority::before,.seg-item.active::before,.rm-segment.is-selected::before,.tab-capture::before,.rm-lab-capture::before { animation:none;background:transparent;border:1px solid var(--rm-chrome-highlight); }
+  #app[data-rm-page="today"] .tab-capture::after,#app[data-rm-page="assets"] .seg-item.active::after,.rm-design-lab .rm-lab-capture::after,.rm-edge-sweep::after,.sheet.open::after { animation:none;content:none; }
+}
+@supports not (background:conic-gradient(from 1deg, #fff, #777, #fff)) {
+  #app :is(.topbar.glass-chrome,.tabbar.glass-chrome,.surface,.surface-2,.asset-sec,.fixed-plan-card,.obligation-card,.ledger-metrics > div,.ledger-payment-directory-row,.recipient-payment-method-row,.asset-manage-row,.asset-operation-summary,.asset-pool-card,.asset-purchase-row,.rm-action-tile,.recurring-action-card,.asset-soft-action,.calculator-key,.key,.capture-calculator-key,.seg-item.active,.rm-segment.is-selected,.rm-chip.is-selected,.cap-cat.active,.cap-acc.active,.topbar-btn,.topbar-avatar)::after,#app[data-rm-page="today"] .tab-capture::after,#app[data-rm-page="assets"] .seg-item.active::after,.rm-design-lab .rm-lab-capture::after,.rm-design-lab .rm-lab-edge-ambient::after,.rm-edge-sweep::after,.sheet.open::after { animation:none;content:none; }
+}

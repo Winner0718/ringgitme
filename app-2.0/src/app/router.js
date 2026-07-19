@@ -8,7 +8,7 @@ import { closeSheet, isSheetOpen } from '../components/AppSheet.js';
 
 const pages = new Map();
 const TAB_ORDER = ['today', 'assets', 'activity', 'ledger'];
-const PRESENTATION_QUERY_KEYS = ['theme', 'capture', 'more', 'profile', 'confirmationDemo', 'motionFrame', 'motionPhase', 'motionProgress', 'splitComposerDemo', 'carouselPosition', 'reducedMotion', 'imageFailure'];
+const PRESENTATION_QUERY_KEYS = ['theme', 'capture', 'more', 'profile', 'confirmationDemo', 'motionFrame', 'motionPhase', 'motionProgress', 'splitComposerDemo', 'carouselPosition', 'reducedMotion', 'blurFallback', 'designSystem', 'imageFailure'];
 
 export function registerPage(name, renderFn) {
   pages.set(name, renderFn);

@@ -339,7 +339,7 @@ export function detailSheet(t, { stacked = false, onClose = null } = {}) {
       ${recurringPosting ? `<div class="sheet-actions recurring-posting-detail-actions">
         ${recurringPosting.status === 'posted' ? `<button class="sheet-danger" data-action="activity-recurring-reverse-request" data-posting-id="${escapeHTML(recurringPosting.postingId)}">撤销这次记账</button>` : ''}
         <button class="sheet-primary" data-action="sheet-close">完成</button>
-      </div>` : mutation.canEdit && mutation.canDelete ? `<div class="sheet-actions">
+      </div>` : t.assetOperation ? `<div class="sheet-actions">${t.status === 'active' ? `<button class="sheet-danger" data-action="activity-asset-operation-reverse-request" data-operation-id="${escapeHTML(t.id)}">安全撤销这次操作</button>` : ''}<button class="sheet-primary" data-action="sheet-close">完成</button></div>` : mutation.canEdit && mutation.canDelete ? `<div class="sheet-actions">
         <button class="sheet-primary" data-action="activity-edit" data-txn="${t.id}">编辑</button>
         <button class="sheet-danger" data-action="activity-delete" data-txn="${t.id}">删除记录</button>
       </div>` : `<div class="mutation-lock-note caption">${escapeHTML(mutation.reason)}</div>
@@ -352,7 +352,7 @@ export function detailSheet(t, { stacked = false, onClose = null } = {}) {
 function accountPickerOptions(includeCredit = true) {
   return data.getAccounts()
     .filter((account) => includeCredit || account.type !== 'cc')
-    .map((account) => ({ value: account.id, label: account.name, caption: account.type === 'cc' ? `欠款 ${fmtRM(account.outstanding)}` : `余额 ${fmtRM(account.balance)}` }));
+    .map((account) => ({ value: account.id, label: account.name, caption: account.type === 'cc' ? `欠款 ${fmtRM(account.totalCardDebt ?? account.outstanding ?? 0)}` : `余额 ${fmtRM(account.balance)}` }));
 }
 
 function categoryPickerOptions(type, t) {
@@ -557,6 +557,20 @@ export function registerActivityFeature() {
     } catch (error) {
       toast(error.message || '无法删除记录');
     }
+  });
+  registerAction('activity-asset-operation-reverse-request', (el) => {
+    const operation = data.getAssetOperation(el.dataset.operationId);
+    if (!operation || operation.status !== 'active') return;
+    openSheet({
+      title: '安全撤销这次操作？', stacked: true,
+      contentHTML: `<div class="asset-confirm-copy"><p>只有后续财务状态没有变化时才会完整还原；原操作记录会继续保留。</p><button class="sheet-danger" data-action="activity-asset-operation-reverse-confirm" data-operation-id="${escapeHTML(operation.id)}">确认撤销</button><button class="sheet-secondary" data-action="sheet-close">取消</button></div>`,
+    });
+  });
+  registerAction('activity-asset-operation-reverse-confirm', (el) => {
+    try {
+      data.reverseAssetOperation(el.dataset.operationId, { reason: '用户从记录详情撤销' });
+      closeSheet(true); closeSheet(true); update({}); toast('账户金额已完整还原');
+    } catch (error) { toast(error.message || '当前状态无法安全撤销。'); }
   });
   registerAction('activity-recurring-reverse-request', (el) => {
     const posting = data.getRecurringOccurrencePosting(el.dataset.postingId);

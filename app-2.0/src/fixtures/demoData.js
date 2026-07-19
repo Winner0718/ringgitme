@@ -271,7 +271,7 @@ function buildActivities() {
 
 // ---- Data source interface (the adapter boundary) ----------
 export function createDemoDataSource({ recurringPostingFaultInjector = null } = {}) {
-  const engine = createMoneyEngine({ accounts, transactions: buildActivities(), today: FIXTURE_TODAY });
+  const engine = createMoneyEngine({ accounts, transactions: buildActivities(), installments: instalments, today: FIXTURE_TODAY });
   const categoryRepo = createCategoryRepository();
   const participantRepo = createParticipantRepository(RELATIONSHIP_PARTICIPANTS);
   const ledgerRepo = createRelationshipLedgerRepository({ ledgers: RELATIONSHIP_LEDGERS, entries: RELATIONSHIP_ENTRIES });
@@ -381,11 +381,7 @@ export function createDemoDataSource({ recurringPostingFaultInjector = null } = 
   });
   let commitmentState = structuredClone(commitments);
 
-  const ofType = (type) => engine.getAccounts().filter((account) => account.type === type);
-  const instalmentRemaining = () => instalments.reduce((sum, item) => sum + item.remaining, 0);
-  const instalmentMonthly = () => instalments.reduce((sum, item) => sum + item.monthly, 0);
-  const cardDueThisMonth = () =>
-    ofType('cc').filter((account) => !account.duePaid).reduce((sum, account) => sum + account.monthlyDue, 0) + instalmentMonthly();
+  const ofType = (type) => engine.getAccounts().filter((account) => account.type === type && account.status === 'active' && !account.isHidden);
   const aaReceivable = () => relationship.getOverview().totals.receivableMinor / 100;
   const userTransactions = () => engine.getUserTransactions();
   const decorateTransaction = (transaction) => {
@@ -396,6 +392,60 @@ export function createDemoDataSource({ recurringPostingFaultInjector = null } = 
     const attachments = attachmentStore.getMany(transaction.attachmentIds || []);
     const attachmentCount = attachments.length || (transaction.attachment || transaction.receipt || transaction.photo ? 1 : 0);
     return { ...transaction, catLabel: label, category: label, categoryArchived: Boolean(category?.isArchived && !category?.isSystemFallback), categoryIcon: category?.icon || null, categoryThemeToken: category?.themeToken || 'slate', attachments, attachmentCount };
+  };
+  const decorateAssetOperation = (operation) => {
+    if (!operation) return operation;
+    const labels = {
+      asset_adjustment: ['余额调整', '账户调整'],
+      asset_opening_balance: ['初始余额', '账户初始值'],
+      card_opening_debt: ['导入已有欠款', '信用卡欠款'],
+      card_opening_credit: ['导入卡片溢缴余额', '信用卡初始值'],
+      card_fee: [operation.metadata?.description || '费用与利息', '信用卡费用'],
+      card_installment_purchase: ['新增信用卡分期', '信用卡分期'],
+      card_installment_conversion: ['消费转为分期', '信用卡分期'],
+      card_installment_import: ['导入已有分期', '信用卡分期'],
+      card_payment: ['信用卡还款', '信用卡还款'],
+      card_refund: [operation.metadata?.description || '信用卡退款', '信用卡退款'],
+      card_linked_refund: ['原消费退款', '信用卡退款'],
+      card_general_credit: ['一般卡片退款', '信用卡退款'],
+    };
+    const [desc, catLabel] = labels[operation.type] || ['账户操作', '账户操作'];
+    const cardId = operation.metadata?.cardId || null;
+    const accountId = operation.metadata?.accountId || cardId;
+    const sourceAccountId = operation.type === 'card_payment' ? operation.metadata?.sourceAccountId : ['card_fee', 'card_installment_purchase'].includes(operation.type) ? cardId : null;
+    const destinationAccountId = operation.type === 'card_payment' ? cardId : operation.type === 'card_refund' ? cardId : null;
+    const signedMinor = operation.metadata?.deltaMinor ?? operation.metadata?.amountMinor
+      ?? operation.result?.amountMinor ?? operation.result?.deltaMinor ?? 0;
+    const occurredAt = operation.createdAt || `${FIXTURE_TODAY}T09:00:00+08:00`;
+    return {
+      id: operation.id,
+      assetOperation: true,
+      assetOperationType: operation.type,
+      kind: ['card_fee', 'card_installment_purchase'].includes(operation.type) ? 'expense' : 'transfer',
+      desc,
+      catId: null,
+      catLabel,
+      category: catLabel,
+      categoryThemeToken: operation.type === 'card_refund' ? 'mint' : 'slate',
+      accountId,
+      sourceAccountId,
+      destinationAccountId,
+      amountMinor: Math.abs(Number(signedMinor)),
+      amount: Math.abs(Number(signedMinor)) / 100,
+      accountEffect: 'asset_operation',
+      date: occurredAt.slice(0, 10),
+      time: occurredAt.slice(11, 16),
+      occurredAt,
+      createdAt: occurredAt,
+      updatedAt: operation.updatedAt || occurredAt,
+      status: operation.status,
+      reversalAudit: operation.status === 'reversed' ? operation.reversal || { restoredExactly: true } : null,
+      editHistory: [],
+      attachmentIds: [],
+      attachments: [],
+      attachmentCount: 0,
+      lockedReason: '资产与信用卡操作请使用安全撤销。',
+    };
   };
   const fixedCenterProjection = (monthKey = FIXTURE_TODAY.slice(0, 7), referenceDate = FIXTURE_TODAY) => {
     const fixedPlans = recurringPlans.listPlans();
@@ -434,8 +484,6 @@ export function createDemoDataSource({ recurringPostingFaultInjector = null } = 
       return engine.getDerivedMetrics({
         investmentTotal: investments.total,
         fixedDepositTotal: fixedDeposits.total,
-        instalmentRemaining: instalmentRemaining(),
-        monthCardDue: cardDueThisMonth(),
         aaReceivable: aaReceivable(),
         myFixed: fixed.summary.myFixedMinor / 100,
       });
@@ -526,7 +574,66 @@ export function createDemoDataSource({ recurringPostingFaultInjector = null } = 
     getAccountsByType: (type) => ofType(type),
     getAccount: (id) => engine.getAccount(id),
     getAccountBalance: (id) => engine.getAccountBalance(id),
-    getInstalments: (cardId) => instalments.filter((i) => i.cardId === cardId),
+    getInstalments: (cardId) => engine.getCardInstallments(cardId).map((item) => {
+      const next = item.schedule.find((occurrence) => occurrence.status !== 'paid');
+      return {
+        ...item,
+        monthly: (next?.amountMinor || 0) / 100,
+        remaining: item.remainingPrincipalMinor / 100,
+        totalTerms: item.termCount,
+        paidTerms: item.paidTerms,
+      };
+    }),
+    getSharedLimitPools: () => engine.getSharedLimitPools(),
+    getSharedLimitPool: (id) => engine.getSharedLimitPool(id),
+    getAssetOperations: (options) => engine.getAssetOperations(options),
+    getAssetOperation: (id) => engine.getAssetOperation(id),
+    getAssetFinancialSummary(input = {}) {
+      const fixed = fixedCenterProjection(FIXTURE_TODAY.slice(0, 7), FIXTURE_TODAY);
+      return engine.getAssetFinancialSummary({ investmentMinor: Math.round(investments.total * 100), fixedDepositMinor: Math.round(fixedDeposits.total * 100), aaReceivableMinor: Math.round(aaReceivable() * 100), myFixedMinor: fixed.summary.myFixedMinor, ...input });
+    },
+    getAssetFinancialIntegrity: () => engine.getAssetFinancialIntegrity(),
+    createAsset: (input) => engine.createAsset(input),
+    updateAsset: (id, changes) => engine.updateAsset(id, changes),
+    archiveAsset: (id) => engine.archiveAsset(id),
+    restoreAsset: (id) => engine.restoreAsset(id),
+    setAssetHidden: (id, hidden) => engine.setAssetHidden(id, hidden),
+    setAssetIncludedInTotals: (id, included) => engine.setAssetIncludedInTotals(id, included),
+    setAssetActive: (id, active) => engine.setAssetActive(id, active),
+    setDefaultAsset: (type, id) => engine.setDefaultAsset(type, id),
+    reorderAssets: (type, orderedIds) => engine.reorderAssets(type, orderedIds),
+    canHardDeleteAsset(id) {
+      const base = engine.canHardDeleteAsset(id);
+      if (!base.allowed) return base;
+      const recurringReference = recurringPlans.listPlans().some((plan) => plan.paymentSourceAccountId === id)
+        || obligationRepo.getPlans().some((plan) => plan.defaultAccountId === id)
+        || commitmentState.some((commitment) => commitment.sourceId === id);
+      if (recurringReference) return { allowed: false, reason: '账户仍被固定计划或付款安排使用，请改为归档。' };
+      return base;
+    },
+    hardDeleteAsset(id) {
+      const policy = this.canHardDeleteAsset(id);
+      if (!policy.allowed) throw new Error(policy.reason);
+      return engine.hardDeleteAsset(id);
+    },
+    createSharedLimitPool: (input) => engine.createSharedLimitPool(input),
+    updateSharedLimitPool: (id, changes) => engine.updateSharedLimitPool(id, changes),
+    assignCardToSharedLimitPool: (cardId, poolId) => engine.assignCardToSharedLimitPool(cardId, poolId),
+    removeSharedLimitPool: (id) => engine.removeSharedLimitPool(id),
+    recordAssetAdjustment: (command) => engine.recordAssetAdjustment(command),
+    recordAssetTargetBalance: (command) => engine.recordAssetTargetBalance(command),
+    recordAssetOpeningBalance: (command) => engine.recordAssetOpeningBalance(command),
+    recordOpeningCardDebt: (command) => engine.recordOpeningCardDebt(command),
+    recordOpeningCardCredit: (command) => engine.recordOpeningCardCredit(command),
+    recordCardFee: (command) => engine.recordCardFee(command),
+    createCardInstallment: (command) => engine.createCardInstallment(command),
+    convertPurchaseToInstallment: (command) => engine.convertPurchaseToInstallment(command),
+    importCardInstallment: (command) => engine.importCardInstallment(command),
+    recordCardPayment: (command) => engine.recordCardPayment(command),
+    recordCardRefund: (command) => engine.recordCardRefund(command),
+    recordLinkedCardRefund: (command) => engine.recordLinkedCardRefund(command),
+    recordGeneralCardCredit: (command) => engine.recordGeneralCardCredit(command),
+    reverseAssetOperation: (id, options) => engine.reverseAssetOperation(id, options),
     getInvestments: () => investments,
     getFixedDeposits: () => fixedDeposits,
     getSavingsFlow() {
@@ -547,7 +654,9 @@ export function createDemoDataSource({ recurringPostingFaultInjector = null } = 
       const addedSpend = userTransactions()
         .filter((transaction) => transaction.accountEffect === 'posted' && transaction.kind === 'expense' && transaction.date.startsWith('2026-07'))
         .reduce((sum, transaction) => sum + transaction.amount, 0);
-      return { month: '2026-07', total: 2500, used: 1684.3 + addedSpend };
+      const operationSpend = engine.getAssetOperations({ includeReversed: false })
+        .reduce((sum, operation) => sum + Number(operation.metadata?.spendingDeltaMinor || 0), 0) / 100;
+      return { month: '2026-07', total: 2500, used: 1684.3 + addedSpend + operationSpend };
     },
     getCategories: (type = 'expense', options) => categoryRepo.getCategories(type, options),
     getCategory: (id) => categoryRepo.getCategory(id),
@@ -570,18 +679,25 @@ export function createDemoDataSource({ recurringPostingFaultInjector = null } = 
     resetCategoryType: (type) => categoryRepo.resetType(type),
     getRecentCategories: () => categoryRepo.getQuickCategories('expense'),
 
-    getActivities: () => engine.getTransactions({ includeReversed: true })
-      .filter((transaction) => transaction.status === 'active' || transaction.recurringPostingId)
-      .map(decorateTransaction),
+    getActivities: () => [
+      ...engine.getTransactions({ includeReversed: true })
+        .filter((transaction) => transaction.status === 'active' || transaction.recurringPostingId)
+        .map(decorateTransaction),
+      ...engine.getAssetOperations().map(decorateAssetOperation),
+    ].sort((a, b) => String(b.occurredAt || `${b.date}T${b.time}`).localeCompare(String(a.occurredAt || `${a.date}T${a.time}`))),
     getTransactions: (options) => engine.getTransactions(options).map(decorateTransaction),
-    getActivity: (id) => decorateTransaction(engine.getTransaction(id)),
+    getActivity: (id) => decorateTransaction(engine.getTransaction(id)) || decorateAssetOperation(engine.getAssetOperation(id)),
     getTransaction: (id) => decorateTransaction(engine.getTransaction(id)),
     recordTransactionConfirmationPresented(transactionOrId) {
       const transaction = typeof transactionOrId === 'string' ? engine.getTransaction(transactionOrId) : transactionOrId;
       if (!transaction) return null;
       return outbox.emit({ clientEventId: `confirmation-${transaction.id}-${transaction.revision}`, eventType: 'transaction.confirmation.presented', sourceChannel: 'app', actorUserId: 'user-winner', participantId: null, ledgerId: null, entityId: transaction.id, revision: transaction.revision, occurredAt: new Date().toISOString(), payload: { confirmationId: transaction.confirmation?.confirmationId || null } });
     },
-    getTransactionMutationPolicy: (transactionOrId) => engine.getTransactionMutationPolicy(transactionOrId),
+    getTransactionMutationPolicy(transactionOrId) {
+      const candidate = typeof transactionOrId === 'string' ? this.getActivity(transactionOrId) : transactionOrId;
+      if (candidate?.assetOperation) return { canEdit: false, canDelete: false, reason: candidate.status === 'reversed' ? '这次账户操作已撤销，原审计记录会保留。' : '资产与信用卡操作请使用安全撤销。' };
+      return engine.getTransactionMutationPolicy(transactionOrId);
+    },
     inspectTransactionCapacity: (draft, options) => engine.inspectTransactionCapacity(draft, options),
     assertTransactionCapacity: (draft, options) => engine.assertTransactionCapacity(draft, options),
     addTransaction(draft) {
@@ -629,10 +745,14 @@ export function createDemoDataSource({ recurringPostingFaultInjector = null } = 
     getTransactionAccountLabel(transaction) {
       const source = transaction.sourceAccountId ? engine.getAccount(transaction.sourceAccountId) : null;
       const destination = transaction.destinationAccountId ? engine.getAccount(transaction.destinationAccountId) : null;
+      if (transaction.assetOperation && transaction.kind === 'transfer') {
+        if (source && destination) return `${source.name} → ${destination.name}`;
+        return engine.getAccount(transaction.accountId)?.name || destination?.name || source?.name || '—';
+      }
       if (transaction.kind === 'transfer') return `${source?.name || '—'} → ${destination?.name || '—'}`;
       return (transaction.kind === 'income' ? destination : source)?.name || '—';
     },
-    getTransactionCategoryLabel: (transaction) => decorateTransaction(transaction)?.catLabel || '—',
+    getTransactionCategoryLabel: (transaction) => transaction?.assetOperation ? transaction.catLabel : decorateTransaction(transaction)?.catLabel || '—',
     resetDemoData() {
       commitmentState = structuredClone(commitments);
       engine.resetDemoData();

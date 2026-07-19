@@ -12,8 +12,8 @@
   width: 100%;
   border: 0;
   background: rgba(15, 22, 18, .24);
-  backdrop-filter: blur(7px);
-  -webkit-backdrop-filter: blur(7px);
+  backdrop-filter: blur(var(--rm-glass-compact-blur)) saturate(var(--rm-glass-compact-saturation));
+  -webkit-backdrop-filter: blur(var(--rm-glass-compact-blur)) saturate(var(--rm-glass-compact-saturation));
   pointer-events: auto;
 }
 .split-allocation-sheet {
@@ -137,7 +137,7 @@
 
 /* Confirmation is an independent modal root with one internal pan-y body. */
 .money-motion-layer.modal-layer { display: grid; place-items: center; overflow: hidden; pointer-events: none; }
-.money-motion-backdrop { position: absolute; inset: 0; width: 100%; border: 0; background: color-mix(in srgb, var(--s0) 88%, transparent); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); pointer-events: auto; }
+.money-motion-backdrop { position: absolute; inset: 0; width: 100%; border: 0; background: color-mix(in srgb, var(--s0) 88%, transparent); backdrop-filter: blur(var(--rm-glass-sheet-blur)) saturate(var(--rm-glass-sheet-saturation)); -webkit-backdrop-filter: blur(var(--rm-glass-sheet-blur)) saturate(var(--rm-glass-sheet-saturation)); pointer-events: auto; }
 .money-motion-layer .money-motion-card { position: relative; z-index: 1; pointer-events: auto; }
 .money-motion-card {
   height: min(calc(100dvh - max(20px, env(safe-area-inset-top)) - max(20px, env(safe-area-inset-bottom))), 820px);

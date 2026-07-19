@@ -2,6 +2,7 @@ import { escapeHTML } from '../app/format.js';
 import { registerOwnedModalHistory } from '../app/modalHistory.js';
 import { icon } from './Icons.js';
 import { isTopModal, mountModalLayer, pushModalLayer } from '../app/modalStack.js';
+import { attachSheetVisualViewport } from './AppSheet.js';
 
 const MAX_DEFAULT_MINOR = 99_999_999_99;
 const PRECEDENCE = { '+': 1, '−': 1, '×': 2, '÷': 2 };
@@ -118,20 +119,20 @@ function calculatorHTML(expression, options) {
   const state = inspectMoneyExpression(expression, options);
   const keys = ['C','back','÷','×','7','8','9','−','4','5','6','+','1','2','3','=','0','.','apply'];
   return `<button class="calculator-scrim" data-modal-backdrop data-calculator-cancel aria-label="取消金额计算"></button>
-    <section class="calculator-sheet glass-sheet" data-modal-surface role="dialog" aria-modal="true" aria-label="金额计算器" tabindex="-1">
+    <section class="calculator-sheet glass-sheet" data-sheet-detent="medium" data-modal-surface role="dialog" aria-modal="true" aria-label="金额计算器" tabindex="-1">
       <div class="time-picker-grabber"><span></span></div><header class="time-picker-title">金额计算器</header>
       <div class="calculator-display${state.error ? ' has-error' : ''}" data-calculator-display>
         <span class="caption calculator-display-label">算式</span><div class="calculator-expression num" data-calculator-expression>${escapeHTML(state.expression || '0')}</div>
         <span class="caption calculator-display-label">${state.result ? '结果' : '当前金额'}</span><div class="num calculator-result" data-calculator-result>${formatMoneyMinor(state.result?.minor ?? state.currentMinor)}</div>
         <div class="caption calculator-helper${state.error ? ' error' : ''}" data-calculator-error>${escapeHTML(state.helper)}</div>
       </div>
-      <div class="calculator-keypad" role="group" aria-label="计算器键盘">${keys.map((key) => `<button type="button" class="calculator-key${['÷','×','−','+','='].includes(key) ? ' operator' : ''}${key === '0' ? ' zero' : ''}${key === 'apply' ? ' apply' : ''}" ${key === 'apply' ? 'data-calculator-apply' : `data-calculator-key="${key}"`} aria-label="${key === 'back' ? '退格' : key === 'C' ? '清除' : key === 'apply' ? '应用金额' : key}">${key === 'back' ? icon('backspace', 19) : key === 'apply' ? '应用' : key}</button>`).join('')}</div>
+      <div class="calculator-keypad rm-calculator" data-rm-component="Calculator" role="group" aria-label="计算器键盘">${keys.map((key) => `<button type="button" class="calculator-key rm-calculator-key${['÷','×','−','+','='].includes(key) ? ' operator' : ''}${key === '0' ? ' zero' : ''}${key === 'apply' ? ' apply' : ''}" ${key === 'apply' ? 'data-calculator-apply' : `data-calculator-key="${key}"`} aria-label="${key === 'back' ? '退格' : key === 'C' ? '清除' : key === 'apply' ? '应用金额' : key}">${key === 'back' ? icon('backspace', 19) : key === 'apply' ? '应用' : key}</button>`).join('')}</div>
       <button type="button" class="calculator-cancel" data-calculator-cancel>取消</button>
     </section>`;
 }
 
 export function moneyCalculatorHTML(value, options = {}) {
-  return `<div class="calculator-layer" role="presentation">${calculatorHTML(String(value || ''), options)}</div>`;
+  return `<div class="calculator-layer" data-sheet-detent="medium" role="presentation">${calculatorHTML(String(value || ''), options)}</div>`;
 }
 
 export function openMoneyCalculatorSheet({ value = '', allowZero = false, maxMinor = MAX_DEFAULT_MINOR, onComplete, trigger = document.activeElement, id = null, parentId = undefined }) {
@@ -155,11 +156,13 @@ export function openMoneyCalculatorSheet({ value = '', allowZero = false, maxMin
   const calculatorId = id || `money-calculator:${++calculatorSequence}`;
   let closed = false;
   let ownedHistory = null;
+  let viewportCleanup = () => {};
   const finishClose = () => {
     if (closed) return false;
     if (!isTopModal(layer)) return false;
     closed = true;
     releaseModal(calculatorId);
+    viewportCleanup();
     activeCalculatorCancel = null;
     layer.classList.remove('open');
     setTimeout(() => layer.remove(), 220);
@@ -194,6 +197,8 @@ export function openMoneyCalculatorSheet({ value = '', allowZero = false, maxMin
   surface?.setAttribute('data-modal-surface', '');
   backdrop?.setAttribute('data-modal-backdrop', '');
   mountModalLayer(layer);
+  layer.dataset.sheetDetent = 'medium';
+  viewportCleanup = attachSheetVisualViewport(layer);
   releaseModal = pushModalLayer(layer, { id: calculatorId, parentId, kind: 'calculator', trigger, surface, backdrop });
   ownedHistory = registerOwnedModalHistory({ layerId: calculatorId, isTop: () => isTopModal(layer), onPop: finishClose });
   requestAnimationFrame(() => layer.classList.add('open'));

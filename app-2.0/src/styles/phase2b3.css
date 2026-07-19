@@ -118,7 +118,7 @@
 .relationship-effect-note { padding: var(--space-10); border-radius: var(--r-control); background: var(--accent-soft); color: var(--accent); text-align: center; font-weight: 650; }
 
 /* ---- Money flow confirmation ----------------------------- */
-.money-motion-layer { position: fixed; inset: 0; z-index: 1700; display: grid; place-items: center; padding: max(var(--space-16), env(safe-area-inset-top)) var(--space-12) max(var(--space-16), env(safe-area-inset-bottom)); background: color-mix(in srgb, var(--s0) 72%, transparent); backdrop-filter: blur(18px); overflow-y: auto; opacity: 1; transition: opacity 180ms ease; }
+.money-motion-layer { position: fixed; inset: 0; z-index: 1700; display: grid; place-items: center; padding: max(var(--space-16), env(safe-area-inset-top)) var(--space-12) max(var(--space-16), env(safe-area-inset-bottom)); background: color-mix(in srgb, var(--s0) 72%, transparent); backdrop-filter: blur(var(--rm-glass-sheet-blur)) saturate(var(--rm-glass-sheet-saturation)); overflow-y: auto; opacity: 1; transition: opacity 180ms ease; }
 .money-motion-layer.closing { opacity: 0; }
 .money-motion-card { position: relative; width: min(100%, 470px); padding: var(--space-20); border-radius: 28px; display: flex; flex-direction: column; gap: var(--space-10); transform: translateY(12px) scale(.98); opacity: 0; transition: transform 420ms var(--ease-out), opacity 280ms ease; }
 .frame-2 .money-motion-card,

@@ -311,8 +311,8 @@
   background: rgba(0, 0, 0, 0.45);
   padding: 4px 7px;
   border-radius: var(--r-pill);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(var(--rm-glass-compact-blur)) saturate(var(--rm-glass-compact-saturation));
+  backdrop-filter: blur(var(--rm-glass-compact-blur)) saturate(var(--rm-glass-compact-saturation));
 }
 
 .deck-fallback {

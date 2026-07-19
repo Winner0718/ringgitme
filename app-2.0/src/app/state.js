@@ -15,6 +15,7 @@ export const ui = {
   navDirection: 'forward',
   privacy: false,
   theme: 'auto', // auto | light | dark
+  chromeMotion: true, // session-only presentation preference
   heroIndex: 0, // Money Pulse hero state
   todayView: 'overview', // overview | fixed (still the Today tab)
   fixedMonth: '2026-07',
@@ -94,4 +95,31 @@ export function watchSystemTheme() {
       emit();
     }
   });
+}
+
+function reducedMotionIsActive() {
+  return document.documentElement.dataset.reducedMotion === 'true'
+    || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+export function applyChromeMotion(enabled = ui.chromeMotion) {
+  ui.chromeMotion = enabled !== false;
+  const root = document.documentElement;
+  const preference = ui.chromeMotion ? 'on' : 'off';
+  const effective = ui.chromeMotion && !reducedMotionIsActive() ? 'on' : 'off';
+  root.dataset.chromeMotionPreference = preference;
+  root.dataset.chromeMotion = effective;
+  const app = document.getElementById('app');
+  if (app) {
+    app.dataset.chromeMotionPreference = preference;
+    app.dataset.chromeMotion = effective;
+  }
+  return effective;
+}
+
+export function watchSystemMotion() {
+  const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const sync = () => applyChromeMotion(ui.chromeMotion);
+  media.addEventListener('change', sync);
+  return () => media.removeEventListener('change', sync);
 }

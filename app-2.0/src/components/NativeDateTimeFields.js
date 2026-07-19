@@ -3,18 +3,18 @@ import { icon } from './Icons.js';
 import { openDatePickerSheet } from './DatePickerSheet.js';
 import { openTimePickerSheet } from './TimePickerSheet.js';
 
-export function datePickerFieldHTML({ label = '日期', key = 'date', value = '', emptyLabel = '选择日期' }) {
+export function datePickerFieldHTML({ label = '日期', key = 'date', value = '', emptyLabel = '选择日期', inputName = null }) {
   const visible = value ? fmtDateMY(value) : emptyLabel;
   return `<div class="cap-field"><span class="caption">${escapeHTML(label)}</span>
     <div class="native-picker-wrap">
       <button type="button" class="native-picker-display" data-ringgit-date-trigger="${escapeHTML(key)}" aria-readonly="true" aria-label="${escapeHTML(label)}，当前 ${escapeHTML(visible)}"><span data-ringgit-date-label="${escapeHTML(key)}">${escapeHTML(visible)}</span>${icon('calendar', 16)}</button>
-      <input type="hidden" value="${escapeHTML(value)}" data-ringgit-date-input="${escapeHTML(key)}" />
+      <input type="hidden" ${inputName ? `name="${escapeHTML(inputName)}" ` : ''}value="${escapeHTML(value)}" data-ringgit-date-input="${escapeHTML(key)}" />
     </div>
   </div>`;
 }
 
 export function nativeDateTimeFieldsHTML({ prefix, date, time, dateLabel = '日期', timeLabel = '时间' }) {
-  return `<div class="cap-datetime" data-native-datetime="${escapeHTML(prefix)}">
+  return `<div class="cap-datetime rm-native-datetime" data-rm-component="NativeDateTimeField" data-native-datetime="${escapeHTML(prefix)}">
     ${datePickerFieldHTML({ label: dateLabel, key: 'date', value: date })}
     <div class="cap-field"><span class="caption">${escapeHTML(timeLabel)}</span>
       <div class="native-picker-wrap">

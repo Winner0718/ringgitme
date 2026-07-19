@@ -57,7 +57,7 @@ function bindCaptureViewport(sheet) {
 
 function defaultCategoryId(type) { return type === 'transfer' ? null : data.getDefaultCategoryId(type) || data.getDefaultCategory(type)?.id || null; }
 
-export function openCaptureSheet({ preserve = false } = {}) {
+export function openCaptureSheet({ preserve = false, preset = null } = {}) {
   const now = new Date();
   if (!preserve) {
     if (cap.submissionKey) data.discardDraftAttachments(cap.submissionKey);
@@ -69,11 +69,29 @@ export function openCaptureSheet({ preserve = false } = {}) {
       keypadOpen: true, detailsOpen: false, calculatorFresh: false, completedExpression: '', error: '',
     });
   }
+  if (preset) {
+    const eligible = data.getAccounts().filter((account) => account.status === 'active' && account.type !== 'cc' && !account.isHidden);
+    const mode = preset.mode || cap.mode;
+    let sourceAccountId = preset.sourceAccountId || cap.accountId;
+    let destinationAccountId = preset.destinationAccountId || cap.destinationAccountId;
+    if (mode === 'transfer' && sourceAccountId === destinationAccountId) {
+      if (preset.destinationAccountId) sourceAccountId = eligible.find((account) => account.id !== destinationAccountId)?.id || sourceAccountId;
+      else destinationAccountId = eligible.find((account) => account.id !== sourceAccountId)?.id || destinationAccountId;
+    }
+    Object.assign(cap, {
+      mode,
+      catId: mode === 'transfer' ? null : defaultCategoryId(mode),
+      accountId: sourceAccountId,
+      destinationAccountId,
+      error: '',
+    });
+  }
   saving = false;
   sheetEl = openSheet({
     id: 'capture-root',
     title: '',
     className: 'capture-sheet',
+    detent: 'large',
     contentHTML: captureHTML(),
     onClose: () => { unbindCaptureViewport(); sheetEl = null; },
   });
@@ -204,7 +222,8 @@ function accountButtons(accounts, selectedId, action, label) {
 
 function accountSummary(account) {
   if (!account) return '';
-  return account.type === 'cc' ? `${account.limit == null ? '未设信用额度' : account.overLimit > 0 ? `超额 ${fmtRM(account.overLimit)}` : `可用 ${fmtRM(account.availableCredit)}`} · 欠 ${fmtRM(account.outstanding)}` : `余额 ${fmtRM(account.balance)}`;
+  const cardDebt = Number.isFinite(account.totalCardDebt) ? account.totalCardDebt : account.outstanding;
+  return account.type === 'cc' ? `${account.limit == null ? '未设信用额度' : account.overLimit > 0 ? `超额 ${fmtRM(account.overLimit)}` : `可用 ${fmtRM(account.availableCredit)}`} · 欠 ${fmtRM(cardDebt)}` : `余额 ${fmtRM(account.balance)}`;
 }
 
 function accountsHTML(accounts) {

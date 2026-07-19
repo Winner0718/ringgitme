@@ -168,8 +168,8 @@
   padding: 10px 14px max(10px, env(safe-area-inset-bottom));
   border-top: 1px solid var(--line);
   background: color-mix(in srgb, var(--glass-sheet-bg) 94%, transparent);
-  backdrop-filter: blur(22px) saturate(150%);
-  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  backdrop-filter: blur(var(--rm-glass-chrome-blur)) saturate(var(--rm-glass-chrome-saturation));
+  -webkit-backdrop-filter: blur(var(--rm-glass-chrome-blur)) saturate(var(--rm-glass-chrome-saturation));
 }
 .money-motion-card[data-complex="true"] .money-motion-body { scroll-behavior: smooth; }
 

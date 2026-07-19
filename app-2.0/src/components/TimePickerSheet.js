@@ -1,6 +1,7 @@
 import { fmtTimeAMPM, parseTimeAMPM } from '../app/format.js';
 import { registerOwnedModalHistory } from '../app/modalHistory.js';
 import { isTopModal, mountModalLayer, pushModalLayer } from '../app/modalStack.js';
+import { attachSheetVisualViewport } from './AppSheet.js';
 
 let activeTimePickerCancel = null;
 
@@ -34,9 +35,9 @@ function wheelOptions(count, start, selected) {
 
 export function timePickerHTML(value) {
   const parts = timePartsFrom24(value);
-  return `<div class="time-picker-layer modal-layer" role="presentation">
+  return `<div class="time-picker-layer modal-layer" data-sheet-detent="medium" role="presentation">
     <button class="time-picker-scrim" data-time-cancel aria-label="取消选择时间"></button>
-    <section class="time-picker-sheet glass-sheet" role="dialog" aria-modal="true" aria-label="选择时间">
+    <section class="time-picker-sheet glass-sheet" data-sheet-detent="medium" role="dialog" aria-modal="true" aria-label="选择时间">
       <div class="time-picker-grabber"><span></span></div>
       <header class="time-picker-title">选择时间</header>
       <div class="time-picker-preview num" data-time-preview>${fmtTimeAMPM(value)}</div>
@@ -99,6 +100,7 @@ export function openTimePickerSheet({ value, onComplete, now = () => new Date(),
   wrapper.innerHTML = timePickerHTML(value);
   const layer = wrapper.firstElementChild;
   mountModalLayer(layer);
+  const viewportCleanup = attachSheetVisualViewport(layer);
   const timePickerId = id || `time-picker:${++timePickerSequence}`;
   const releaseModal = pushModalLayer(layer, { id: timePickerId, parentId, kind: 'time-picker', trigger, surface: layer.querySelector('.time-picker-sheet'), backdrop: layer.querySelector('.time-picker-scrim') });
   requestAnimationFrame(() => layer.classList.add('open'));
@@ -122,6 +124,7 @@ export function openTimePickerSheet({ value, onComplete, now = () => new Date(),
     if (closed || !isTopModal(layer)) return false;
     closed = true;
     releaseModal(timePickerId);
+    viewportCleanup();
     activeTimePickerCancel = null;
     layer.classList.remove('open');
     setTimeout(() => layer.remove(), 220);
