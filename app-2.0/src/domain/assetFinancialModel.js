@@ -28,11 +28,66 @@ export function sanitizePrivateIdentifier(value) {
   return String(value ?? '').trim();
 }
 
+// Account identifiers are deliberately handled as strings. They are not
+// amounts, must never go through number parsing, and may legitimately begin
+// with zero or include user-entered grouping spaces/hyphens.
+export function normalizeBankAccountNumber(value) {
+  return sanitizePrivateIdentifier(value);
+}
+
+export function validateOptionalBankAccountNumber(value) {
+  const accountNumber = normalizeBankAccountNumber(value);
+  if (accountNumber && !/^[0-9\s-]+$/.test(accountNumber)) throw new Error('银行账号只能包含数字、空格或连字符');
+  return accountNumber;
+}
+
+export function validateOptionalLastFour(value, label = '卡末四位') {
+  const lastFour = String(value ?? '').trim();
+  if (lastFour && !/^\d{4}$/.test(lastFour)) throw new Error(`${label}必须是 4 位数字`);
+  return lastFour;
+}
+
+export function bankAccountLastFour(value) {
+  const digits = normalizeBankAccountNumber(value).replace(/\D/g, '');
+  return digits ? digits.slice(-4) : '';
+}
+
+export function formatBankAccountNumber(value, { privacy = false } = {}) {
+  const accountNumber = normalizeBankAccountNumber(value);
+  if (!accountNumber) return '';
+  return privacy ? `•••• ${bankAccountLastFour(accountNumber)}` : accountNumber;
+}
+
+export function formatCardLastFour(value, { privacy = false } = {}) {
+  const lastFour = String(value ?? '').replace(/\D/g, '').slice(-4);
+  if (!lastFour) return '';
+  return privacy ? '••••' : lastFour;
+}
+
 export function maskAssetIdentifier(value) {
-  const normalized = sanitizePrivateIdentifier(value).replace(/\s+/g, '');
-  if (!normalized) return '';
-  const suffix = normalized.slice(-4);
-  return `•••• ${suffix}`;
+  return formatBankAccountNumber(value, { privacy: true });
+}
+
+function normalizeCustomAssetMedia(raw, kind) {
+  if (!raw) return null;
+  const dataUrl = String(raw.dataUrl || '');
+  const mimeType = String(raw.mimeType || '');
+  const maxBytes = kind === 'card' ? 10 * 1024 * 1024 : 5 * 1024 * 1024;
+  if (!['image/png', 'image/jpeg', 'image/webp'].includes(mimeType) || !dataUrl.toLowerCase().startsWith(`data:${mimeType};base64,`)) throw new Error('自定义图片格式无效');
+  const sizeBytes = Number(raw.sizeBytes || 0);
+  if (!Number.isFinite(sizeBytes) || sizeBytes <= 0 || sizeBytes > maxBytes) throw new Error('自定义图片大小无效');
+  return {
+    dataUrl,
+    fileName: String(raw.fileName || (kind === 'card' ? 'custom-card' : 'custom-logo')).slice(0, 120),
+    mimeType,
+    sizeBytes,
+    width: Math.max(1, Number(raw.width || 1)),
+    height: Math.max(1, Number(raw.height || 1)),
+    edgeTransparency: Math.max(0, Math.min(1, Number(raw.edgeTransparency || 0))),
+    opaqueCoverage: Math.max(0, Math.min(1, Number(raw.opaqueCoverage || 0))),
+    resolvedPresentation: ['icon_full_bleed', 'symbol_contained', 'wordmark_contained'].includes(raw.resolvedPresentation) ? raw.resolvedPresentation : null,
+    derivedPalette: raw.derivedPalette && /^#[0-9a-f]{6}$/i.test(String(raw.derivedPalette.primary || '')) ? structuredClone(raw.derivedPalette) : null,
+  };
 }
 
 export function clampMonthDay(year, monthIndex, day) {
@@ -91,15 +146,21 @@ export function normalizeAsset(raw, index = 0, clock = new Date().toISOString())
     ...structuredClone(raw),
     id: String(raw?.id || `asset:${type}:${index + 1}`),
     type,
+    accountKind: type === 'saving' ? 'bank_account' : type === 'cc' ? 'credit_card' : type === 'ew' ? 'ewallet' : type,
     domainType: type === 'saving' ? 'savings' : type === 'ew' ? 'ewallet' : 'credit',
     name,
+    displayName: String(raw?.displayName || name).trim(),
     short: String(raw?.short || name).trim(),
     bank: String(raw?.bank || raw?.institution || '').trim(),
     institution: String(raw?.institution || raw?.bank || '').trim(),
-    // Full private identifiers remain editable only in the in-memory editor.
-    // Future persistence/reveal requires a dedicated secure-auth vault gate.
-    bankAccountNumber: type === 'saving' ? sanitizePrivateIdentifier(raw?.bankAccountNumber ?? raw?.last4) : '',
+    // Bank account identifiers remain optional. A full legacy debit-card
+    // value is retained only for backward-compatible read/masking; the
+    // current editor never exposes or writes it and stores only last four.
+    bankAccountNumber: type === 'saving' ? normalizeBankAccountNumber(raw?.bankAccountNumber ?? raw?.accountNumber) : '',
     debitCardNumber: type === 'saving' ? sanitizePrivateIdentifier(raw?.debitCardNumber) : '',
+    debitCardLast4: type === 'saving'
+      ? String(raw?.debitCardLast4 ?? raw?.last4 ?? raw?.maskedDigits ?? '').replace(/\D/g, '').slice(-4)
+      : '',
     walletIdentifier: type === 'ew' ? sanitizePrivateIdentifier(raw?.walletIdentifier ?? raw?.last4) : '',
     creditCardLast4: type === 'cc'
       ? String(raw?.creditCardLast4 ?? raw?.last4 ?? raw?.maskedDigits ?? '').replace(/\D/g, '').slice(-4)
@@ -128,6 +189,24 @@ export function normalizeAsset(raw, index = 0, clock = new Date().toISOString())
     artworkAssetId: raw?.artworkAssetId || null,
     brandId: raw?.brandId || raw?.catalogInstitutionId || null,
     productId: raw?.productId || raw?.catalogProductId || null,
+    legacyProductId: raw?.legacyProductId || raw?.productId || raw?.catalogProductId || null,
+    networkId: raw?.networkId || null,
+    legacyNetworkId: raw?.legacyNetworkId || raw?.networkId || raw?.network || null,
+    cardThemeId: raw?.cardThemeId || null,
+    physicalVariantId: raw?.physicalVariantId || null,
+    visualAssetId: raw?.visualAssetId || raw?.artworkAssetId || null,
+    customBrandName: String(raw?.customBrandName || '').trim(),
+    customProductName: String(raw?.customProductName || '').trim(),
+    customLogo: normalizeCustomAssetMedia(raw?.customLogo, 'logo'),
+    logoPresentationMode: ['auto', 'fill', 'contain'].includes(raw?.logoPresentationMode) ? raw.logoPresentationMode : 'auto',
+    resolvedLogoPresentation: ['icon_full_bleed', 'symbol_contained', 'wordmark_contained'].includes(raw?.resolvedLogoPresentation) ? raw.resolvedLogoPresentation : null,
+    cardPalette: raw?.cardPalette && /^#[0-9a-f]{6}$/i.test(String(raw.cardPalette.primary || '')) ? structuredClone(raw.cardPalette) : null,
+    accountVisualOverride: raw?.accountVisualOverride?.enabled === true ? {
+      enabled: true,
+      logoPresentationMode: ['auto', 'fill', 'contain'].includes(raw.accountVisualOverride.logoPresentationMode) ? raw.accountVisualOverride.logoPresentationMode : 'auto',
+      palette: raw.accountVisualOverride.palette && /^#[0-9a-f]{6}$/i.test(String(raw.accountVisualOverride.palette.primary || '')) ? structuredClone(raw.accountVisualOverride.palette) : null,
+    } : null,
+    customCardImage: normalizeCustomAssetMedia(raw?.customCardImage, 'card'),
     iconKey: raw?.iconKey || null,
     artKey: raw?.artKey || raw?.artworkAssetId || null,
     createdAt: timestamp(raw?.createdAt, clock),
@@ -155,6 +234,7 @@ export function normalizeAsset(raw, index = 0, clock = new Date().toISOString())
     base.monthPaidMinor = raw?.monthPaidMinor ?? 0;
     base.network = String(raw?.network || '').trim();
     base.tier = String(raw?.tier || '').trim();
+    base.customTierLabel = String(raw?.customTierLabel || raw?.tierCustom || '').trim().slice(0, 32);
   } else {
     base.balanceMinor = raw?.balanceMinor ?? minor(raw?.balance ?? 0);
   }

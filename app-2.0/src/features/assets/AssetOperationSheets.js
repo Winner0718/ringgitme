@@ -4,6 +4,8 @@ import { bindDatePickerField, bindNativeDateTimeFields, datePickerFieldHTML, nat
 import { escapeHTML, fmtDateMY, fmtRM } from '../../app/format.js';
 import { buildInstallmentSchedule, installmentScheduleSummary, minor } from '../../domain/assetFinancialModel.js';
 import { assetSheetFooterHTML } from './AssetSheetFooter.js';
+import { openMoneyFlowConfirmation } from '../../components/MoneyFlowConfirmation.js';
+import { openRecordDetailOverlay } from '../../components/RecordDetailOverlay.js';
 
 let context = null;
 
@@ -28,6 +30,62 @@ function openSimpleOperation(account, operation) {
   const fields = `${operation === 'payment' ? `<label class="asset-form-field"><span>付款账户</span><select name="sourceAccountId">${sources.map((item) => `<option value="${escapeHTML(item.id)}">${escapeHTML(item.name)} · ${fmtRM(item.balance)}</option>`).join('')}</select></label>` : ''}${moneyField('amount', operation === 'payment' ? '还款金额' : operation === 'fee' ? '费用金额' : '已有欠款')}<label class="asset-form-field"><span>备注</span><input name="note" maxlength="80" placeholder="可选" /></label>`;
   context = { accountId: account.id, operation, closeDepth: 1 };
   openSheet({ title, className: 'asset-operation-sheet', contentHTML: `<form data-asset-simple-operation>${operationShell(account, fields, assetSheetFooterHTML({ primaryAction: 'asset-simple-operation-save', primaryLabel: '确认记录' }))}</form>` });
+}
+
+function openCashbackForm(account) {
+  context = { accountId: account.id, operation: 'cashback', closeDepth: 1 };
+  const now = new Date();
+  const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  const fields = `<div class="asset-form-note"><strong>${escapeHTML(account.name)}</strong><br>Cashback 会直接抵扣这张信用卡的当前欠款，不会计作普通收入。</div>
+    ${moneyField('amount', 'Cashback 金额')}
+    ${datePickerFieldHTML({ label: '日期', key: 'asset-cashback-date', value: data.today, inputName: 'date' })}
+    <input type="hidden" name="time" value="${escapeHTML(time)}" />
+    <label class="asset-form-field"><span>来源／活动名称（可选）</span><input name="source" maxlength="60" placeholder="例如 Weekend Cashback" /></label>
+    <label class="asset-form-field"><span>备注（可选）</span><textarea name="note" maxlength="120" placeholder="可选"></textarea></label>`;
+  openSheet({
+    title: '记录 Cashback',
+    className: 'asset-operation-sheet asset-cashback-sheet',
+    contentHTML: `<form data-card-cashback>${operationShell(account, fields, assetSheetFooterHTML({ primaryAction: 'asset-cashback-save', primaryLabel: '确认抵扣' }))}</form>`,
+    onOpen: (sheet) => bindDatePickerField(sheet, 'asset-cashback-date'),
+  });
+}
+
+function cashbackConfirmation(operation) {
+  const account = data.getAccount(operation.metadata.cardId);
+  const recentRecords = data.getActivities()
+    .filter((item) => [item.accountId, item.sourceAccountId, item.destinationAccountId].includes(account.id))
+    .slice(0, 8)
+    .map((item) => ({ id: item.id, kind: item.kind, desc: item.desc, amountMinor: item.amountMinor, date: item.date, time: item.time, sourceAccountId: item.sourceAccountId, destinationAccountId: item.destinationAccountId }));
+  return {
+    confirmationId: `cashback:${operation.id}`,
+    transactionId: operation.id,
+    kind: 'cashback',
+    amountMinor: operation.metadata.amountMinor,
+    description: operation.metadata.source || 'Cashback 抵扣',
+    accountEffect: 'posted',
+    accountChanges: [{
+      accountId: account.id,
+      accountName: account.name,
+      accountType: 'cc',
+      measure: 'outstanding',
+      beforeMinor: operation.result.cardBeforeMinor,
+      afterMinor: operation.result.cardAfterMinor,
+      deltaMinor: -operation.metadata.amountMinor,
+      role: 'destination',
+    }],
+    recentRecords,
+    createdAt: operation.createdAt,
+  };
+}
+
+function completeCashback(operation) {
+  closeSheet(true);
+  update({});
+  openMoneyFlowConfirmation({
+    confirmation: cashbackConfirmation(operation),
+    onViewRecord: () => openRecordDetailOverlay(operation.id, { originView: 'confirmation' }),
+    onDone: () => update({}),
+  });
 }
 
 function bindAdjustmentPreview(sheet, account) {
@@ -164,6 +222,7 @@ export function openAssetOperation(accountId, operation) {
   if (operation === 'adjustment') return openTargetAdjustment(account);
   if (operation === 'refund') return openRefundMode(account);
   if (operation === 'installment') return openInstallmentMode(account);
+  if (operation === 'cashback') return openCashbackForm(account);
   return openSimpleOperation(account, operation);
 }
 
@@ -183,6 +242,22 @@ export function registerAssetOperationActions() {
   registerAction('asset-target-adjustment-save', (el) => {
     const values = Object.fromEntries(new FormData(el.closest('form')));
     try { data.recordAssetTargetBalance({ accountId: context.accountId, targetBalance: values.targetBalance, note: values.note, idempotencyKey: `asset-target-${context.accountId}-${Date.now()}` }); closeOperation('余额调整已记录'); } catch (error) { toast(error.message); }
+  });
+  registerAction('asset-cashback-save', (el) => {
+    const form = el.closest('form');
+    const values = Object.fromEntries(new FormData(form));
+    try {
+      const operation = data.recordCardCashback({
+        cardId: context.accountId,
+        amount: values.amount,
+        date: values.date || data.today,
+        time: values.time,
+        source: values.source,
+        note: values.note,
+        idempotencyKey: `asset-cashback-${context.accountId}-${Date.now()}`,
+      });
+      completeCashback(operation);
+    } catch (error) { toast(error.message); }
   });
   registerAction('asset-refund-linked', openLinkedRefundPicker);
   registerAction('asset-refund-general', openGeneralCreditForm);

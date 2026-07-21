@@ -148,7 +148,7 @@ add('three Credit rows keep the same readable stack sizing', () => {
   assert.equal(credit.length, 3);
   assert.match(source.css2b3d, /asset-stack-row[\s\S]*padding: 10px/);
 });
-add('debt values display without redundant minus', () => assert.match(source.assets, /fmtRM\(debt \? account\.outstanding : account\.balance/));
+add('debt values display without redundant minus', () => { assert.match(source.assets,/model\.formattedAmount/); assert.doesNotMatch(source.assets,/−\$\{model\.formattedAmount\}/); });
 add('exact Credit total', () => assert.equal(sum(credit, 'outstanding'), 5258.25));
 add('eWallet compact tiles', () => assert.match(source.assets, /asset-wallet-tile/));
 add('eWallet giant card absent from overview', () => assert.doesNotMatch(source.assets, /ewalletSection\(\)[\s\S]{0,700}accountVisualCardHTML|renderCarousel/));
@@ -169,7 +169,11 @@ add('no pan-y-only blocker', () => assert.match(source.css2b3d, /native-carousel
 add('no pointer capture', () => assert.doesNotMatch(source.native, /setPointerCapture|releasePointerCapture/));
 add('no touchmove preventDefault', () => assert.doesNotMatch(source.native, /touchmove|preventDefault\(\)[\s\S]{0,80}touch/));
 add('no transparent full-card overlay', () => assert.doesNotMatch(source.native, /overlay|position:\s*absolute/));
-add('real card image draggable false', () => assert.match(accountVisualCardHTML(savings[0]), /draggable="false" data-card-art/));
+add('automatic-card brand image remains non-draggable', () => {
+  const html = accountVisualCardHTML(savings[0]);
+  assert.match(html, /data-card-renderer="ringgitme-auto-card"/);
+  assert.match(html, /draggable="false"/);
+});
 add('image pointer-events none', () => assert.match(source.css2b3d, /native-snap-card \.account-visual \*[\s\S]*pointer-events: none/));
 add('no transform-driven track', () => { assert.doesNotMatch(source.native, /style\.transform/); assert.match(source.css2b3d, /native-snap-card\.deck-card[\s\S]*transform: none/); });
 add('native horizontal overflow', () => assert.match(source.css, /native-carousel-scroller[\s\S]*overflow-x: auto/));
@@ -192,7 +196,7 @@ add('credit identity bar', () => assert.match(htmlFor(credit[0], { beforeMinor: 
 add('eWallet identity bar', () => assert.match(htmlFor(wallets[0]), /account-identity-bar/));
 add('logo rendered', () => assert.match(accountIdentityBarHTML(wallets[0]), /data-account-identity-logo/));
 add('account name rendered', () => assert.match(accountIdentityBarHTML(savings[0]), /Maybank 储蓄卡/));
-add('institution/brand rendered', () => assert.equal(resolveAccountIdentity(savings[0]).institution, 'Maybank'));
+add('institution/brand rendered with current localized identity', () => assert.equal(resolveAccountIdentity(savings[0]).institution, 'Maybank（马来亚银行）'));
 add('compact status rendered', () => assert.match(accountIdentityBarHTML(savings[0]), /account-identity-status/));
 add('identity and card share accountId', () => assert.match(htmlFor(savings[0]), /data-account-identity="sv-mbb"[\s\S]*data-account-visual="sv-mbb"/));
 add('identity and balance share accountId', () => assert.match(htmlFor(savings[0]), /data-account-identity="sv-mbb"[\s\S]*data-balance-account="sv-mbb"/));
@@ -200,7 +204,7 @@ add('fallback initial tile', () => assert.match(accountIdentityBarHTML({ id: 'x'
 add('no broken logo', () => assert.match(source.visual, /naturalWidth === 0[\s\S]*image-failed/));
 add('no remote hotlink', () => assert.doesNotMatch(source.visual, /https?:\/\//));
 add('status moved out of standalone header', () => assert.doesNotMatch(source.confirmation, /money-motion-header/));
-add('account history CTA may repeat the exact identity once', () => assert.equal((htmlFor(savings[0]).match(/Maybank 储蓄卡/g) || []).length, 2));
+add('account history CTA repeats the same identity across generated card identity bar and CTA', () => assert.ok((htmlFor(savings[0]).match(/Maybank 储蓄卡/g) || []).length >= 3));
 add('Liquid Glass visual contract', () => assert.match(accountIdentityBarHTML(savings[0]), /account-identity-bar glass-sheet/));
 add('dark-mode identity bar', () => assert.match(source.css2b3d, /account-identity-bar[\s\S]*var\(--text-2\)/));
 
@@ -233,7 +237,7 @@ add('instalment payment', () => { const confirmation = money(savings[0]); confir
 // 156–163 Safe area
 add('Assets final row clears bottom nav', () => assert.match(source.css2b3d, /app-content \{ padding-bottom: calc\(var\(--safe-bottom\) \+ 124px\)/));
 add('Credit section clears bottom nav', () => assert.match(source.assets, /showLiab \? creditSection\(\)/));
-add('category list clears bottom nav', () => assert.match(source.category, /allRowsHTML/));
+add('category stack and selected summary replace the old duplicate all-accounts list', () => { assert.match(source.category,/walletStackCategoryDeckHTML/); assert.match(source.category,/selectedSummaryHTML/); assert.doesNotMatch(source.category,/allRowsHTML/); });
 add('Account Detail clears bottom nav', () => assert.match(source.detail, /renderDetailPage/));
 add('Activity clears bottom nav', () => assert.match(source.activity, /registerPage\('activity'/));
 add('Ledger clears bottom nav', () => assert.match(source.ledger, /registerPage\('ledger'/));

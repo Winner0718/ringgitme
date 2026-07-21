@@ -11,12 +11,14 @@ import { data, ui, update, registerAction } from '../../app/state.js';
 import { fmtRM, fmtDateMY, daysBetween, escapeHTML } from '../../app/format.js';
 import { openSheet } from '../../components/AppSheet.js';
 import { icon } from '../../components/Icons.js';
-import { resolveAccountBrand } from '../../domain/brandRegistry.js';
+import { accountBrandVisualHTML } from '../../components/AssetBrandVisual.js';
 import { renderCategoryPage, activateCategoryPage, registerCategoryActions } from './category.js';
 import { renderDetailPage, activateDetailPage, registerDetailActions } from './detail.js';
 import { runSharedCardTransition } from '../../app/motion.js';
 import { registerAssetManagementActions } from './AssetManagementSheets.js';
-import { maskAssetIdentifier } from '../../domain/assetFinancialModel.js';
+import { formatBankAccountNumber, formatCardLastFour } from '../../domain/assetFinancialModel.js';
+import { resolveAccountCardViewModel } from '../../domain/accountCardSystem.js';
+import { hydrateCustomCardCompanionPalettes } from '../../components/AccountVisualCard.js';
 
 function summaryHTML(pulse) {
   return `
@@ -59,22 +61,15 @@ function sectionHeader({ iconName, title, valueLabel, value, valueCls = '', acti
 }
 
 function brandTileHTML(account) {
-  const brand = resolveAccountBrand(account);
-  const fallback = escapeHTML((brand?.name || account.bank || account.name || '?').slice(0, 1));
-  return `<span class="asset-brand-tile" style="--brand:${account.brandColor || brand?.fallback || 'var(--accent)'}">${brand?.logoURL ? `<img src="${brand.logoURL}" alt="" draggable="false" />` : fallback}</span>`;
+  return accountBrandVisualHTML(account, { className: 'asset-brand-tile' });
 }
 
 function compactAccountRows(list, { debt = false } = {}) {
-  return `<ul class="asset-account-list asset-card-stack">${list.map((account, index) => `<li class="asset-account-row asset-stack-row" style="--account-brand:${account.brandColor || 'var(--accent)'};--stack-index:${index}" data-action="assets-open-detail" data-acc="${escapeHTML(account.id)}" role="button" tabindex="0">
-    ${brandTileHTML(account)}<span class="asset-account-copy"><strong>${escapeHTML(account.name)}</strong><small class="num">${escapeHTML(account.type === 'cc' ? (account.creditCardLast4 ? `•••• ${account.creditCardLast4}` : account.bank) : maskAssetIdentifier(account.bankAccountNumber || account.debitCardNumber || account.walletIdentifier) || account.bank)}</small></span>
-    <span class="asset-account-amount num${debt ? ' debt' : ''}">${accountDisplayAmount(account, debt)}</span>${icon('chevronRight', 15)}
-  </li>`).join('')}</ul>`;
-}
-
-function accountDisplayAmount(account, debt) {
-  if (debt && Number.isFinite(account.totalCardDebt)) return fmtRM(account.totalCardDebt, { privacy: ui.privacy });
-  // Compatibility fallback for pre-2D1A records without canonical debt fields.
-  return fmtRM(debt ? account.outstanding : account.balance, { privacy: ui.privacy });
+  hydrateCustomCardCompanionPalettes(list);
+  return `<ul class="asset-account-list asset-card-stack">${list.map((account, index) => { const model = resolveAccountCardViewModel({ account, privacyState: ui.privacy, context: 'assets-compact' }); return `<li class="asset-account-row asset-stack-row" style="--account-brand:${escapeHTML(model.primaryColor)};--account-brand-secondary:${escapeHTML(model.secondaryColor)};--account-brand-text:${escapeHTML(model.foregroundColor)};--account-brand-muted:${escapeHTML(model.mutedForegroundColor)};--stack-index:${index}" data-action="assets-open-detail" data-acc="${escapeHTML(account.id)}" role="button" tabindex="0" aria-label="${escapeHTML(model.accessibilityLabel)}">
+    ${brandTileHTML(account)}<span class="asset-account-copy"><strong>${escapeHTML(model.title)}</strong><small>${escapeHTML(model.institutionName)}</small></span>
+    <span class="asset-account-amount num${debt ? ' debt' : ''}">${model.formattedAmount}</span>${icon('chevronRight', 15)}
+  </li>`; }).join('')}</ul>`;
 }
 
 function savingsSection() {
@@ -101,6 +96,7 @@ function creditSection() {
 
 function ewalletSection() {
   const list = data.getAccountsByType('ew');
+  hydrateCustomCardCompanionPalettes(list);
   const total = list.reduce((s, a) => s + a.balance, 0);
   return `
     <section class="section surface asset-sec">
@@ -259,3 +255,5 @@ export function registerAssetsFeature() {
     ]);
   });
 }
+
+export const assetOverviewTestHooks = Object.freeze({ compactAccountRows });

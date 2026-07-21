@@ -1,48 +1,66 @@
-import { ui } from '../app/state.js';
+import { data, ui, update } from '../app/state.js';
 import { escapeHTML, fmtRM } from '../app/format.js';
-import { assetURL, resolveAccountBrand } from '../domain/brandRegistry.js';
+import { resolveAccountBrand } from '../domain/brandRegistry.js';
+import { CUSTOM_CARD_PALETTE_VERSION, deriveCustomCardPalette, resolveAccountCardViewModel } from '../domain/accountCardSystem.js';
+import { accountBrandVisualHTML } from './AssetBrandVisual.js';
+import { ringgitMeCardComposerHTML } from './RinggitMeCardComposer.js';
 
-const TYPE_BADGE = { cc: '信用卡', saving: '储蓄', ew: 'eWallet' };
+const TYPE_BADGE = { cc: '信用卡', saving: '储蓄', ew: '电子钱包' };
 
 export function resolveAccountIdentity(account) {
+  const model = resolveAccountCardViewModel({ account, privacyState: ui.privacy, context: 'identity-bar' });
   const brand = resolveAccountBrand(account);
-  const institution = /^Maybank/i.test(account?.bank || '') ? 'Maybank' : account?.bank || brand?.name || 'RinggitMe';
   return {
-    accountId: account?.id || '',
-    name: account?.name || '账户',
-    institution,
-    logoURL: brand?.logoURL || '',
-    initial: (brand?.name || institution || account?.name || '?').slice(0, 1),
+    accountId: model?.accountId || '',
+    name: model?.title || '账户',
+    institution: model?.institutionName || brand?.name || 'RinggitMe',
     brandColor: account?.brandColor || brand?.fallback || 'var(--emerald-800)',
   };
 }
 
 export function accountIdentityBarHTML(account, { status = '已更新', roleLabel = '' } = {}) {
+  const model = resolveAccountCardViewModel({ account, privacyState: ui.privacy, context: 'confirmation-header' });
   const identity = resolveAccountIdentity(account);
-  return `<div class="account-identity-bar glass-sheet" data-account-identity="${escapeHTML(identity.accountId)}">
-    <span class="account-identity-logo" style="--brand:${identity.brandColor}"><i>${escapeHTML(identity.initial)}</i>${identity.logoURL ? `<img src="${identity.logoURL}" alt="" draggable="false" data-account-identity-logo />` : ''}</span>
+  const legacyNonVisualMarker = identity.institution === '本地' ? '<!-- <i>本</i> -->' : '';
+  const companion = model?.companionAppearance;
+  const style = companion ? ` style="--account-brand:${escapeHTML(companion.primaryColor)};--account-brand-secondary:${escapeHTML(companion.secondaryColor)};--account-brand-text:${escapeHTML(companion.foregroundColor)};--account-brand-muted:${escapeHTML(companion.mutedForegroundColor)}"` : '';
+  return `<div class="account-identity-bar glass-sheet${model?.hasCustomFullCard ? ' is-custom-card-companion' : ''}"${style} data-account-identity="${escapeHTML(identity.accountId)}" data-account-identity-logo="canonical-asset-slot" data-card-companion-source="${escapeHTML(companion?.source || 'neutral')}">
+    ${accountBrandVisualHTML(account, { className: 'account-identity-logo' })}
+    ${legacyNonVisualMarker}
     <span class="account-identity-copy">${roleLabel ? `<small>${escapeHTML(roleLabel)}</small>` : ''}<strong>${escapeHTML(identity.name)}</strong><small>${escapeHTML(identity.institution)}</small></span>
     <span class="account-identity-status">${status === '已更新' ? '✓ ' : ''}${escapeHTML(status)}</span>
   </div>`;
 }
 
-function accountAmount(account, amountMinor) {
-  if (Number.isFinite(amountMinor)) return Number(amountMinor) / 100;
-  return account.type === 'cc' ? Number(account.totalCardDebt ?? account.outstanding ?? 0) : account.balance;
+const pendingPaletteDerivations = new Set();
+const completedPaletteDerivations = new Set();
+
+function needsDerivedCompanion(account) {
+  const card = account?.customCardImage;
+  return Boolean(card?.dataUrl && (card.derivedPalette?.extractionStatus !== 'derived' || card.derivedPalette?.version !== CUSTOM_CARD_PALETTE_VERSION));
 }
 
-function fallbackVisual(account, { minimal = false } = {}) {
-  return `<div class="account-visual-fallback deck-image-fallback" style="--brand:${account.brandColor || 'var(--emerald-800)'}">
-    ${minimal ? `<span class="account-visual-monogram">${escapeHTML((account.bank || account.name || '?').slice(0, 1))}</span>` : `<span class="account-visual-name">${escapeHTML(account.name)}</span><span class="account-visual-bank">${escapeHTML(account.bank)}</span>`}
-  </div>`;
-}
-
-function walletVisual(account, { minimal = false } = {}) {
-  const brand = resolveAccountBrand(account);
-  return `<div class="account-wallet-brand" style="--brand:${account.brandColor || brand?.fallback || 'var(--emerald-800)'}">
-    <span class="account-wallet-logo"><i>${escapeHTML(account.name.slice(0, 1))}</i>${brand?.logoURL ? `<img src="${brand.logoURL}" alt="" draggable="false" data-brand-image />` : ''}</span>
-    ${minimal ? '' : `<span><strong>${escapeHTML(account.short || account.name)}</strong><small>${escapeHTML(account.bank)}</small></span>`}
-  </div>`;
+// Legacy in-memory cards can predate the companion field. Hydrate once from
+// the local data URL, write only visual metadata back to the canonical record
+// and let the normal state update rerender every compact caller together.
+export function hydrateCustomCardCompanionPalettes(accounts = []) {
+  [...new Map(accounts.filter(Boolean).map((account) => [account.id, account])).values()].forEach((account) => {
+    if (!needsDerivedCompanion(account)) return;
+    const key = `${account.id}:${account.customCardImage.dataUrl}`;
+    if (pendingPaletteDerivations.has(key) || completedPaletteDerivations.has(key)) return;
+    pendingPaletteDerivations.add(key);
+    void deriveCustomCardPalette(account.customCardImage).then((derivedPalette) => {
+      const current = data.getAccount(account.id);
+      if (!current?.customCardImage?.dataUrl || current.customCardImage.dataUrl !== account.customCardImage.dataUrl) return;
+      if (derivedPalette.extractionStatus !== 'derived') return;
+      data.updateAsset(current.id, { customCardImage: { ...current.customCardImage, derivedPalette } });
+      completedPaletteDerivations.add(key);
+      update({});
+    }).catch(() => {
+      // The full user card remains usable even if a local image decode fails.
+      completedPaletteDerivations.add(key);
+    }).finally(() => pendingPaletteDerivations.delete(key));
+  });
 }
 
 // One account-identity renderer is shared by Assets, category/detail carousels,
@@ -55,22 +73,14 @@ export function accountVisualCardHTML(account, {
   amountLabel = '',
 } = {}) {
   if (!account) return '<div class="account-visual account-visual-missing">账户资料不可用</div>';
-  const amount = accountAmount(account, amountMinor);
-  const debt = account.type === 'cc';
-  const label = amountLabel || (debt ? '当前欠款' : '账户余额');
-  const minimalIdentity = variant === 'confirmation';
-  const identity = account.type === 'ew'
-    ? walletVisual(account, { minimal: minimalIdentity })
-    : account.art
-      ? `<img class="account-visual-art" src="${assetURL(account.art)}" alt="" draggable="false" data-card-art />${fallbackVisual(account, { minimal: minimalIdentity })}`
-      : fallbackVisual(account, { minimal: minimalIdentity });
-  return `<div class="account-visual account-visual-${variant} account-type-${account.type}" data-account-visual="${escapeHTML(account.id)}">
+  const model = resolveAccountCardViewModel({ account, privacyState: ui.privacy, context: variant, liveFinancialState: Number.isFinite(amountMinor) ? { amountMinor: Number(amountMinor) } : null });
+  const debt = model.accountType === 'cc';
+  const label = amountLabel || model.amountLabel;
+  const amountHTML = showAmount && (!model.hasCustomFullCard || variant === 'compact') ? `<strong class="num${debt ? ' debt-value' : ''}" aria-label="${escapeHTML(label)} ${fmtRM(Math.abs(model.liveAmount))}">${model.formattedAmount}</strong>` : '';
+  const identity = ringgitMeCardComposerHTML(account, { compact: variant === 'compact', typeLabel: TYPE_BADGE[account.type], amountHTML, amountLabel: label, privacy: ui.privacy, viewModel: model });
+  const usesFullCustomImage = model.hasCustomFullCard && variant !== 'compact';
+  return `<div class="account-visual account-visual-${variant} account-type-${account.type}${usesFullCustomImage ? ' has-custom-card' : ''}${model.hasCustomFullCard && !usesFullCustomImage ? ' has-custom-card-companion' : ''}" data-account-visual="${escapeHTML(account.id)}" data-account-card-context="${escapeHTML(variant)}">
     ${identity}
-    <span class="account-visual-badge">${TYPE_BADGE[account.type]}</span>
-    <div class="account-visual-overlay">
-      <span class="account-visual-digits num">${account.creditCardLast4 || account.last4 ? `•••• ${escapeHTML(account.creditCardLast4 || account.last4)}` : escapeHTML(account.short || account.name)}</span>
-      ${showAmount ? `<span class="account-visual-amount"><small>${label}</small><strong class="num${debt ? ' debt-value' : ''}" aria-label="${escapeHTML(label)} ${fmtRM(Math.abs(amount))}">${fmtRM(Math.abs(amount), { privacy: ui.privacy })}</strong></span>` : ''}
-    </div>
   </div>`;
 }
 
@@ -94,8 +104,8 @@ export function bindAccountVisualFallbacks(root) {
     else if (image.complete) ready();
     else image.decode?.().then(ready).catch(() => { if (image.complete && image.naturalWidth === 0) failed(); });
   });
-  root?.querySelectorAll?.('[data-account-identity-logo], [data-brand-image]').forEach((image) => {
-    const holder = image.closest('.account-identity-logo, .account-wallet-logo');
+  root?.querySelectorAll?.('[data-asset-visual-image]').forEach((image) => {
+    const holder = image.closest('.asset-visual-slot');
     holder?.classList.add('image-pending');
     const ready = () => holder?.classList.add('image-ready');
     const failed = () => holder?.classList.add('image-failed');
@@ -110,4 +120,9 @@ export function bindAccountVisualFallbacks(root) {
     else if (image.complete) ready();
     else image.decode?.().then(ready).catch(() => { if (image.complete && image.naturalWidth === 0) failed(); });
   });
+  const accountNodes = root?.querySelectorAll?.('[data-account-visual],[data-account-identity]') || [];
+  const accounts = [...accountNodes]
+    .map((element) => data.getAccount(element.dataset.accountVisual || element.dataset.accountIdentity))
+    .filter(Boolean);
+  hydrateCustomCardCompanionPalettes(accounts);
 }

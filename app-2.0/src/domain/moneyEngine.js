@@ -1190,6 +1190,52 @@ export function createMoneyEngine({ accounts, transactions, installments = [], s
         },
       });
     },
+    recordCardCashback({ cardId, amountMinor, amount, date = today, time = '12:00', source = '', note = '', idempotencyKey }) {
+      const normalizedAmount = amountMinor ?? minor(amount);
+      if (!Number.isInteger(normalizedAmount) || normalizedAmount <= 0) throw new Error('Cashback 金额必须大于零');
+      return executeAssetOperation({
+        type: 'card_cashback',
+        idempotencyKey,
+        metadata: {
+          cardId,
+          amountMinor: normalizedAmount,
+          date,
+          time,
+          source: String(source || '').trim(),
+          note: String(note || '').trim(),
+          spendingDeltaMinor: 0,
+          incomeDeltaMinor: 0,
+          rewardType: 'statement-credit',
+        },
+        mutate: () => {
+          const card = assertAsset(cardId, 'cc');
+          const cardBeforeMinor = card.totalCardDebtMinor;
+          if (normalizedAmount > cardBeforeMinor) throw new Error('Cashback 不能超过当前信用卡欠款');
+          // A statement credit offsets gross debt without pretending that an
+          // installment principal, savings balance or cash-income stream moved.
+          card.cardCreditBalanceMinor += normalizedAmount;
+          card.updatedAt = nowISO();
+          card.revision += 1;
+          return {
+            cardId,
+            amountMinor: normalizedAmount,
+            cardBeforeMinor,
+            cardAfterMinor: cardBeforeMinor - normalizedAmount,
+            debtReductionMinor: normalizedAmount,
+          };
+        },
+      });
+    },
+    getCardCashbackSummary(cardId, monthKey = today.slice(0, 7)) {
+      const operations = state.assetOperations.filter((operation) => operation.type === 'card_cashback'
+        && operation.status === 'active'
+        && operation.metadata?.cardId === cardId);
+      const monthlyMinor = operations
+        .filter((operation) => String(operation.metadata?.date || operation.createdAt).startsWith(monthKey))
+        .reduce((sum, operation) => sum + Number(operation.metadata?.amountMinor || 0), 0);
+      const totalMinor = operations.reduce((sum, operation) => sum + Number(operation.metadata?.amountMinor || 0), 0);
+      return { cardId, monthKey, monthlyMinor, totalMinor, count: operations.length };
+    },
     reverseAssetOperation(id, { reason = 'user-reversal' } = {}) {
       const operation = state.assetOperations.find((item) => item.id === id);
       if (!operation) throw new Error('找不到资产操作');

@@ -110,3 +110,11 @@ Incorrect: a page creates a `.my-green-save` class, uses a raw emerald hex for s
 - Do not introduce arbitrary colours, radii, shadows, blur values or decorative teal/green.
 - Do not hardcode a replacement when a canonical component can be extended.
 - When a new feature needs an unsupported state: extend the canonical component, update the Design System Lab and tests, migrate all affected callers, and never create a one-page substitute.
+
+## Account-card identity contract
+
+Asset account cards use one automatic RinggitMe system-card renderer. The renderer derives a deterministic, contrast-safe gradient from the stable institution ID and its maintained palette. User-selectable visual themes and official-product selection are retired from the active experience; their legacy fields remain compatibility metadata only.
+
+The user's account name is the primary label and the institution is secondary. Bank accounts and credit cards may select Visa, Mastercard or American Express; the system card renders these as unframed application typography only. eWallets do not show a network selector by default. A complete custom card image replaces every generated identity decoration inside the card, while a custom Logo only replaces the small institution mark.
+
+Current institution Logos are temporary system assets addressed by stable institution ID, so each file can be replaced independently without migrating accounts. Users must never be asked for a full card number, CVV, PIN, expiry date or cardholder name. The shared custom-card guide recommends public official website references and explicitly prohibits photographs of a user's physical bank card.

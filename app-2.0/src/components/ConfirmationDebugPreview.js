@@ -16,6 +16,7 @@ function accountChange(account, deltaMinor) {
     beforeMinor,
     afterMinor: beforeMinor + deltaMinor,
     deltaMinor,
+    accountSnapshot: account,
   };
 }
 
@@ -45,6 +46,27 @@ export function buildConfirmationDebugPreview(data, variant = 'expense') {
   if (variant === 'credit') Object.assign(base, {
     description: 'Maybank Visa 消费', accountChanges: [accountChange(credit, 1000)],
   });
+  if (variant === 'hsbc') {
+    const hsbc = {
+      id: 'debug-hsbc-card', type: 'cc', name: '测试卡', displayName: '测试卡',
+      bank: 'HSBC Malaysia', institution: 'HSBC Malaysia', brandId: 'hsbc',
+      creditCardLast4: '1111', last4: '1111', tier: 'Platinum', networkId: 'mastercard',
+      cardPalette: { primary: '#b21f2d', supporting: '#5d1019' }, limit: 6000,
+      outstanding: 320, totalCardDebt: 320, totalCardDebtMinor: 32000,
+    };
+    Object.assign(base, { description: '测试卡消费', accountChanges: [accountChange(hsbc, 1000)] });
+  }
+  if (variant === 'custom-card') {
+    const custom = {
+      id: 'debug-custom-card', type: 'cc', name: '自定义卡面', bank: '我的卡片',
+      outstanding: 260, totalCardDebt: 260, totalCardDebtMinor: 26000,
+      customCardImage: {
+        fileName: 'custom-card.png', mimeType: 'image/png', sizeBytes: 1943,
+        dataUrl: '/assets/brands/official/hsbc.png', width: 512, height: 512,
+      },
+    };
+    Object.assign(base, { description: '自定义卡面消费', accountChanges: [accountChange(custom, 1000)] });
+  }
   if (variant === 'ewallet') Object.assign(base, {
     description: 'Touch n Go 充值', accountChanges: [accountChange(wallet, -1000)],
   });

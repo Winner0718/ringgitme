@@ -17,24 +17,36 @@ let pickerSequence = 0;
 function optionRow(option, selectedValue) {
   const active = option.value === selectedValue;
   return `<button type="button" class="picker-option${active ? ' active' : ''}" data-picker-value="${escapeHTML(option.value)}" role="option" aria-selected="${active}">
-    ${option.avatar ? `<span class="avatar picker-avatar">${escapeHTML(option.avatar)}</span>` : ''}
+    ${option.leadingHTML || (option.image ? `<span class="avatar picker-avatar picker-brand-avatar"><img src="${escapeHTML(option.image)}" alt="" draggable="false" /></span>` : option.avatar ? `<span class="avatar picker-avatar">${escapeHTML(option.avatar)}</span>` : '')}
     <span class="picker-option-main"><span class="picker-option-label">${escapeHTML(option.label)}</span>${option.caption ? `<span class="caption">${escapeHTML(option.caption)}</span>` : ''}</span>
     ${active ? `<span class="picker-check">${icon('check', 16)}</span>` : ''}
   </button>`;
 }
 
-export function openPickerSheet({ title, options, selectedValue = null, onSelect, searchable = options.length > SEARCH_THRESHOLD, trigger = document.activeElement, id = null, parentId = undefined }) {
+function optionRows(options, selectedValue) {
+  let lastGroup = null;
+  return options.map((option) => {
+    const group = option.group || null;
+    const heading = group && group !== lastGroup ? `<div class="picker-group-title" role="presentation">${escapeHTML(group)}</div>` : '';
+    lastGroup = group;
+    return `${heading}${optionRow(option, selectedValue)}`;
+  }).join('');
+}
+
+export function openPickerSheet({ title, options, selectedValue = null, onSelect, footerOptions = [], searchable = options.length > SEARCH_THRESHOLD, trigger = document.activeElement, id = null, parentId = undefined }) {
   if (activePickerCancel && !activePickerCancel()) return null;
   if (activePickerCancel) return null;
   const wrapper = document.createElement('div');
+  const primaryFooter = footerOptions.filter((option) => option.priority !== 'tertiary');
+  const tertiaryFooter = footerOptions.filter((option) => option.priority === 'tertiary');
   wrapper.innerHTML = `<div class="picker-layer modal-layer" data-sheet-detent="medium" role="presentation">
     <button class="picker-scrim" data-modal-backdrop data-picker-cancel aria-label="取消选择"></button>
-    <section class="picker-sheet glass-sheet" data-sheet-detent="medium" data-modal-surface role="dialog" aria-modal="true" aria-label="${escapeHTML(title)}" tabindex="-1">
+    <section class="picker-sheet glass-sheet" data-sheet-detent="medium" data-picker-searchable="${searchable}" data-modal-surface role="dialog" aria-modal="true" aria-label="${escapeHTML(title)}" tabindex="-1">
       <div class="time-picker-grabber"><span></span></div>
       <header class="time-picker-title">${escapeHTML(title)}</header>
       ${searchable ? `<label class="search-field surface picker-search">${icon('search', 15)}<input type="search" data-picker-search placeholder="搜索" aria-label="搜索选项" /></label>` : ''}
-      <div class="picker-options" data-picker-options role="listbox" aria-label="${escapeHTML(title)}">${options.map((option) => optionRow(option, selectedValue)).join('')}</div>
-      <button class="sheet-secondary picker-cancel" data-picker-cancel>取消</button>
+      <div class="picker-options" data-picker-options role="listbox" aria-label="${escapeHTML(title)}">${optionRows(options, selectedValue)}</div>
+      <footer class="picker-footer">${tertiaryFooter.map((option) => `<button type="button" class="${escapeHTML(option.className || 'picker-footer-manage')} picker-footer-action" data-picker-footer-value="${escapeHTML(option.value)}">${escapeHTML(option.label)}</button>`).join('')}${primaryFooter.map((option) => `<button type="button" class="${escapeHTML(option.className || 'sheet-secondary')} picker-footer-action" data-picker-footer-value="${escapeHTML(option.value)}">${escapeHTML(option.label)}</button>`).join('')}<button class="sheet-secondary picker-cancel" data-picker-cancel>取消</button></footer>
     </section>
   </div>`;
   const layer = wrapper.firstElementChild;
@@ -80,12 +92,28 @@ export function openPickerSheet({ title, options, selectedValue = null, onSelect
       throw error;
     }
   });
+  layer.querySelector('.picker-footer')?.addEventListener('click', (event) => {
+    if (!isTopModal(layer)) return;
+    const button = event.target.closest('[data-picker-footer-value]');
+    if (!button || committing || closed) return;
+    event.preventDefault();
+    committing = true;
+    layer.style.pointerEvents = 'none';
+    try {
+      onSelect?.(button.dataset.pickerFooterValue);
+      close();
+    } catch (error) {
+      committing = false;
+      layer.style.pointerEvents = '';
+      throw error;
+    }
+  });
   const search = layer.querySelector('[data-picker-search]');
   if (search) {
     search.addEventListener('input', () => {
       const query = search.value.trim().toLowerCase();
       const filtered = query ? options.filter((option) => `${option.label} ${option.caption || ''}`.toLowerCase().includes(query)) : options;
-      layer.querySelector('[data-picker-options]').innerHTML = filtered.map((option) => optionRow(option, selectedValue)).join('') || '<div class="caption picker-empty">没有符合的选项</div>';
+      layer.querySelector('[data-picker-options]').innerHTML = optionRows(filtered, selectedValue) || '<div class="caption picker-empty">没有符合的选项</div>';
     });
     search.focus();
   }

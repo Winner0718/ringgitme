@@ -1,0 +1,58 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { normalizeAsset } from '../src/domain/assetFinancialModel.js';
+import { resolveAccountAppearance } from '../src/domain/accountCardSystem.js';
+import { ringgitMeCardComposerHTML, creditCardTierLabel } from '../src/components/RinggitMeCardComposer.js';
+import { walletStackCategoryDeckHTML } from '../src/components/WalletStackCategoryDeck.js';
+import { createAssetIdentityDraft, assetIdentityMediaFieldsHTML } from '../src/features/assets/AssetIdentitySelector.js';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
+const css = read('src/styles/design-system.css');
+const picker = read('src/components/PickerSheet.js');
+const editor = read('src/features/assets/AssetManagementSheets.js');
+const overview = read('src/features/assets/index.js');
+let number = 0;
+const add = (title, fn) => test(`2D1B5-${String(++number).padStart(3, '0')} ${title}`, fn);
+
+const gx = { id:'gx:one', type:'saving', name:'GXBank', displayName:'GXBank', brandId:'gxbank', bank:'GXBank', bankAccountNumber:'123456789', balance:100 };
+const gxOverride = { ...gx, accountVisualOverride:{ enabled:true, logoPresentationMode:'contain', palette:{ primary:'#21002f', supporting:'#7600a8' } } };
+
+add('canonical resolved account appearance exists', () => ['logoSrc','logoFitMode','primaryColor','secondaryColor','gradient','foregroundColor','mutedForegroundColor','institutionId','visualSource','customFullCardMedia','accountLevelOverride'].forEach((key) => assert.ok(key in resolveAccountAppearance(gx), key)));
+add('GXBank resolver keeps its dark purple family', () => { const appearance=resolveAccountAppearance(gx); assert.notEqual(appearance.primaryColor,'#248a5b'); assert.match(appearance.primaryColor,/^#/); });
+add('full GXBank card reads canonical appearance', () => assert.match(ringgitMeCardComposerHTML(gx), /--card-primary:#141118/));
+add('compact GXBank stack reads resolver palette rather than legacy green', () => { const html=walletStackCategoryDeckHTML([gxOverride], gxOverride.id); assert.match(html,/--account-brand:#21002f/); assert.doesNotMatch(html,/#248a5b/); });
+add('account override outranks institution palette', () => assert.equal(resolveAccountAppearance(gxOverride).primaryColor,'#21002f'));
+add('institution palette outranks neutral fallback', () => assert.notEqual(resolveAccountAppearance(gx).visualSource,'neutral'));
+add('clearing account override restores institution appearance', () => assert.equal(resolveAccountAppearance({ ...gxOverride, accountVisualOverride:null }).primaryColor,resolveAccountAppearance(gx).primaryColor));
+add('one account override does not affect a sibling institution account', () => assert.notEqual(resolveAccountAppearance(gxOverride).primaryColor,resolveAccountAppearance({ ...gx, id:'gx:two' }).primaryColor));
+add('bank draft exposes a compact account appearance section', () => assert.match(assetIdentityMediaFieldsHTML(createAssetIdentityDraft(gx,'saving')), /卡面外观/));
+add('all account types can carry independent visual override metadata', () => ['saving','ew','cc'].forEach((type) => assert.equal(normalizeAsset({ id:type, type, name:'A', balance:1, limit:1000, accountVisualOverride:gxOverride.accountVisualOverride }).accountVisualOverride.enabled,true)));
+add('appearance control explains that it affects only this account', () => assert.match(read('src/features/assets/AssetIdentitySelector.js'), /只影响当前账户/));
+add('appearance control supports restoring institution default', () => assert.match(read('src/features/assets/AssetIdentitySelector.js'), /恢复机构默认/));
+add('custom full-card media remains image-only', () => { const card={dataUrl:'data:image/png;base64,AA=='}; const html=ringgitMeCardComposerHTML({ ...gx, type:'cc', customCardImage:card }); assert.match(html,/user-custom-card/); assert.doesNotMatch(html,/data-card-region/); });
+add('bank picker is a bottom-sheet picker surface', () => assert.match(picker,/picker-layer modal-layer/));
+add('picker declares searchable grid row so title search and list cannot overlap', () => assert.match(css,/data-picker-searchable="true"[^}]*grid-template-rows:auto auto auto minmax\(0,1fr\) auto/));
+add('picker gives the search field and first group explicit separation', () => { assert.match(css,/\.picker-search[^}]*margin:0 0 8px/); assert.match(css,/\.picker-group-title[^}]*margin-top:4px/); });
+add('picker options are independently scrollable', () => assert.match(css,/\.picker-options[^}]*overflow:auto/));
+add('picker keeps custom addition as the primary action and management tertiary', () => { assert.match(read('src/features/assets/AssetIdentitySelector.js'), /添加自定义银行/); assert.match(read('src/features/assets/AssetIdentitySelector.js'), /picker-footer-manage/); });
+add('desktop picker is bottom aligned not viewport-centred', () => { assert.match(css,/\.picker-layer\.open > \.picker-sheet[^}]*bottom:0!important/); assert.doesNotMatch(css,/\.picker-layer\.open > \.picker-sheet[^}]*top:50%!important/); });
+add('credit tier uses canonical picker field rather than native select', () => { assert.match(editor,/asset-credit-tier/); assert.doesNotMatch(editor,/<select name="tier"/); });
+add('tier picker offers other and a bounded custom input', () => { assert.match(editor,/World/); assert.match(editor,/customTierLabel/); assert.match(editor,/maxlength="32"/); });
+add('unspecified credit tier is omitted from card', () => assert.doesNotMatch(ringgitMeCardComposerHTML({ type:'cc', brandId:'cimb', name:'A' }),/data-card-region="tier"/));
+add('preset credit tier occupies lower-left tier region', () => assert.match(ringgitMeCardComposerHTML({ type:'cc', brandId:'cimb', name:'A', tier:'Platinum' }),/data-card-region="tier"[^>]*>Platinum/));
+add('other credit tier resolves to the custom label', () => assert.equal(creditCardTierLabel({tier:'Other',customTierLabel:'World Elite'}),'World Elite'));
+add('blank other tier is omitted from the card', () => assert.doesNotMatch(ringgitMeCardComposerHTML({type:'cc',brandId:'cimb',name:'A',tier:'Other',customTierLabel:'  '}),/data-card-region="tier"/));
+add('tier CSS truncates long custom labels inside lower-left safe zone', () => assert.match(css,/\.ringgit-card-tier[^}]*text-overflow:ellipsis[^}]*white-space:nowrap/));
+add('compact asset rows resolve the canonical complete account-card model', () => assert.match(overview,/resolveAccountCardViewModel/));
+add('compact overview second line is canonical institution only', () => { assert.match(overview,/model\.institutionName/); assert.doesNotMatch(overview,/formatBankAccountNumber\(account\.bankAccountNumber \|\| account\.walletIdentifier/); });
+add('inactive stack second line is institution only', () => { const html=walletStackCategoryDeckHTML([gx,{...gx,id:'gx:two',name:'Sibling'}],gx.id); const inactive=html.slice(html.indexOf('wallet-stack-card is-inactive')); assert.doesNotMatch(inactive,/123456789/); assert.match(inactive,/<small>GXBank<\/small>/); });
+add('credit card stores only last four and no bank account field', () => { const normalized=normalizeAsset({id:'cc',type:'cc',name:'A',limit:100,creditCardLast4:'9910'}); assert.equal(normalized.bankAccountNumber,''); assert.equal(normalized.creditCardLast4,'9910'); });
+add('eWallet card has no card network', () => assert.doesNotMatch(ringgitMeCardComposerHTML({type:'ew',brandId:'tng',name:'TNG',networkId:'visa'}),/data-card-region="network"/));
+add('account appearance normalisation preserves financial values', () => { const before=normalizeAsset({...gx,id:'safe'}); const after=normalizeAsset({...before,accountVisualOverride:gxOverride.accountVisualOverride}); assert.equal(after.balanceMinor,before.balanceMinor); });
+add('focused phase source has no persistence or network client', () => assert.doesNotMatch(`${picker}\n${editor}\n${overview}`,/(?:localStorage|indexedDB)\s*[.(]|fetch\(|XMLHttpRequest|supabase/i));
+
+assert.equal(number, 33);

@@ -1,0 +1,729 @@
+{
+  "schemaVersion": 1,
+  "phase": "2D1B.2",
+  "sourcePack": "/Users/winnertang/Desktop/ringgitme-logo-sources",
+  "policy": "user-reviewed-local-source; deterministic decode; no remote acquisition; no redraw; no recolour",
+  "totals": {
+    "banks": 22,
+    "ewallets": 6,
+    "networks": 3,
+    "normalized": 31,
+    "skipped": 0
+  },
+  "assets": [
+    {
+      "sourceFilename": "aeon-bank-source.png",
+      "sourceRelativePath": "banks/aeon-bank-source.png",
+      "sourceSha256": "98e62b2c89472690276fd62e83bf203c7354cf1e2732c597efb227102743d594",
+      "normalizedOutput": "assets/brands/user-reviewed/banks/aeon-bank.png",
+      "brandId": "aeon-bank",
+      "networkId": null,
+      "assetGroup": "banks",
+      "fitMode": "contain",
+      "safePadding": "8%",
+      "detectedFileType": "image/png",
+      "sourceDimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "normalizedDimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "assetShape": "square",
+      "cropApplied": false,
+      "outputSha256": "99d9c6c4a2c8d5547263f052eae3c87c30cce87cfbee4bf46772a411000d6488"
+    },
+    {
+      "sourceFilename": "affin-bank-source.png",
+      "sourceRelativePath": "banks/affin-bank-source.png",
+      "sourceSha256": "93598b8f5934ae7448247d6b8c1db6c4c6e6cddbf709c15c6024e1b66b63a97d",
+      "normalizedOutput": "assets/brands/user-reviewed/banks/affin-bank.png",
+      "brandId": "affin-bank",
+      "networkId": null,
+      "assetGroup": "banks",
+      "fitMode": "contain",
+      "safePadding": "8%",
+      "detectedFileType": "image/png",
+      "sourceDimensions": {
+        "width": 620,
+        "height": 608
+      },
+      "normalizedDimensions": {
+        "width": 620,
+        "height": 608
+      },
+      "assetShape": "square",
+      "cropApplied": false,
+      "outputSha256": "4d179b4bd54bc26e380d5c65f158b6d12d2d1fa11b7aee84aba8acc2d9486629"
+    },
+    {
+      "sourceFilename": "agrobank-source.png",
+      "sourceRelativePath": "banks/agrobank-source.png",
+      "sourceSha256": "f42d5dca29daec010cfabf214021f7de1337337d3cc82bf8c96641647983830c",
+      "normalizedOutput": "assets/brands/user-reviewed/banks/agrobank.png",
+      "brandId": "agrobank",
+      "networkId": null,
+      "assetGroup": "banks",
+      "fitMode": "contain",
+      "safePadding": "8%",
+      "detectedFileType": "image/webp",
+      "sourceDimensions": {
+        "width": 480,
+        "height": 480
+      },
+      "normalizedDimensions": {
+        "width": 480,
+        "height": 480
+      },
+      "assetShape": "square",
+      "cropApplied": false,
+      "outputSha256": "28ffe26b509e0d2cce29fc733ad0d8a8d00bbb5cd861318119e4449b62a33983"
+    },
+    {
+      "sourceFilename": "alliance-bank-source.png",
+      "sourceRelativePath": "banks/alliance-bank-source.png",
+      "sourceSha256": "da8953fb0fa7614006246cda5d829c40257ac9c327e66c1889da62aa6e26d87d",
+      "normalizedOutput": "assets/brands/user-reviewed/banks/alliance-bank.png",
+      "brandId": "alliance-bank",
+      "networkId": null,
+      "assetGroup": "banks",
+      "fitMode": "contain",
+      "safePadding": "8%",
+      "detectedFileType": "image/jpeg",
+      "sourceDimensions": {
+        "width": 400,
+        "height": 400
+      },
+      "normalizedDimensions": {
+        "width": 400,
+        "height": 400
+      },
+      "assetShape": "square",
+      "cropApplied": false,
+      "outputSha256": "777defac6b3fb2b751a10671ed17628d4a9e94b24751ba6e3e6475b591eaafee"
+    },
+    {
+      "sourceFilename": "ambank-source.png",
+      "sourceRelativePath": "banks/ambank-source.png",
+      "sourceSha256": "23dc3b79b79fb33544ba45710f27feb9b4b3c39f8b4b197d5301861ca604b9d2",
+      "normalizedOutput": "assets/brands/user-reviewed/banks/ambank.png",
+      "brandId": "ambank",
+      "networkId": null,
+      "assetGroup": "banks",
+      "fitMode": "contain",
+      "safePadding": "8%",
+      "detectedFileType": "image/png",
+      "sourceDimensions": {
+        "width": 320,
+        "height": 320
+      },
+      "normalizedDimensions": {
+        "width": 312,
+        "height": 210
+      },
+      "assetShape": "compact",
+      "cropApplied": true,
+      "outputSha256": "8a53f76161f18e3aa477192371565e109f36011e20f3b3dbe9021faeb10ed91d"
+    },
+    {
+      "sourceFilename": "bank-islam-source.png",
+      "sourceRelativePath": "banks/bank-islam-source.png",
+      "sourceSha256": "09cdbd465898ebe7bf948ffbc70483993c06034df782747538588afa57f9ed43",
+      "normalizedOutput": "assets/brands/user-reviewed/banks/bank-islam.png",
+      "brandId": "bank-islam",
+      "networkId": null,
+      "assetGroup": "banks",
+      "fitMode": "contain",
+      "safePadding": "8%",
+      "detectedFileType": "image/jpeg",
+      "sourceDimensions": {
+        "width": 447,
+        "height": 447
+      },
+      "normalizedDimensions": {
+        "width": 447,
+        "height": 447
+      },
+      "assetShape": "square",
+      "cropApplied": false,
+      "outputSha256": "f799b7d706214dedd29a2112d9a3020cfb0706953b02b54acc05de01d1f60761"
+    },
+    {
+      "sourceFilename": "bank-muamalat-source.png",
+      "sourceRelativePath": "banks/bank-muamalat-source.png",
+      "sourceSha256": "6be2a7d443497042fa4694db644266c53e0723268bba7ac534147c015a7554be",
+      "normalizedOutput": "assets/brands/user-reviewed/banks/bank-muamalat.png",
+      "brandId": "bank-muamalat",
+      "networkId": null,
+      "assetGroup": "banks",
+      "fitMode": "contain",
+      "safePadding": "8%",
+      "detectedFileType": "image/jpeg",
+      "sourceDimensions": {
+        "width": 625,
+        "height": 625
+      },
+      "normalizedDimensions": {
+        "width": 625,
+        "height": 625
+      },
+      "assetShape": "square",
+      "cropApplied": false,
+      "outputSha256": "065eeb28f598db6d2858f87ae160dd030f940a8484715543a9e83456b3de772f"
+    },
+    {
+      "sourceFilename": "bank-rakyat-source.png",
+      "sourceRelativePath": "banks/bank-rakyat-source.png",
+      "sourceSha256": "ff99a8abf36c5354a4f029e1ceed4c7c422ffbf486aaf4facc06eeac8c7dda13",
+      "normalizedOutput": "assets/brands/user-reviewed/banks/bank-rakyat.png",
+      "brandId": "bank-rakyat",
+      "networkId": null,
+      "assetGroup": "banks",
+      "fitMode": "contain",
+      "safePadding": "8%",
+      "detectedFileType": "image/webp",
+      "sourceDimensions": {
+        "width": 600,
+        "height": 300
+      },
+      "normalizedDimensions": {
+        "width": 324,
+        "height": 300
+      },
+      "assetShape": "square",
+      "cropApplied": true,
+      "outputSha256": "ab73c5cb4edab63b7c60e6c67bd87bbcee9d2feaecf539aa70fffb0c5f184b60"
+    },
+    {
+      "sourceFilename": "boost-bank-source.png",
+      "sourceRelativePath": "banks/boost-bank-source.png",
+      "sourceSha256": "acb20e59bbd018937f7fe6d8d6f6a8cbfbfb6dc505c6c39ce5dd90223b9220c9",
+      "normalizedOutput": "assets/brands/user-reviewed/banks/boost-bank.png",
+      "brandId": "boost-bank",
+      "networkId": null,
+      "assetGroup": "banks",
+      "fitMode": "contain",
+      "safePadding": "8%",
+      "detectedFileType": "image/png",
+      "sourceDimensions": {
+        "width": 336,
+        "height": 336
+      },
+      "normalizedDimensions": {
+        "width": 336,
+        "height": 336
+      },
+      "assetShape": "square",
+      "cropApplied": false,
+      "outputSha256": "0a922895053756481ee35f88679276722be8d3a038e20a9d1b24b32cc1feb9c3"
+    },
+    {
+      "sourceFilename": "bsn-source.png",
+      "sourceRelativePath": "banks/bsn-source.png",
+      "sourceSha256": "13f8dc23407eec578e2785b6d5825d4196571a13d40cc2bd00dfe04989965c40",
+      "normalizedOutput": "assets/brands/user-reviewed/banks/bsn.png",
+      "brandId": "bsn",
+      "networkId": null,
+      "assetGroup": "banks",
+      "fitMode": "contain",
+      "safePadding": "8%",
+      "detectedFileType": "image/jpeg",
+      "sourceDimensions": {
+        "width": 1200,
+        "height": 630
+      },
+      "normalizedDimensions": {
+        "width": 1024,
+        "height": 538
+      },
+      "assetShape": "wide",
+      "cropApplied": false,
+      "outputSha256": "cd55fd6ca52ee67063b9587acfffb80f4d1ae9f2a8f7723c07668cff11f4b54d"
+    },
+    {
+      "sourceFilename": "cimb-source.png",
+      "sourceRelativePath": "banks/cimb-source.png",
+      "sourceSha256": "e5edfd9a56b9eb7724f0d6953c5d0e03c44651e4362392f0e583d7475080a93a",
+      "normalizedOutput": "assets/brands/user-reviewed/banks/cimb.png",
+      "brandId": "cimb",
+      "networkId": null,
+      "assetGroup": "banks",
+      "fitMode": "contain",
+      "safePadding": "8%",
+      "detectedFileType": "image/png",
+      "sourceDimensions": {
+        "width": 1536,
+        "height": 1537
+      },
+      "normalizedDimensions": {
+        "width": 1023,
+        "height": 1024
+      },
+      "assetShape": "square",
+      "cropApplied": false,
+      "outputSha256": "17eff21401c486ddd65195a6337f7eda3f13e9303e8f3256c24bd6ae1626ec83"
+    },
+    {
+      "sourceFilename": "gxbank-source.png",
+      "sourceRelativePath": "banks/gxbank-source.png",
+      "sourceSha256": "8102adc89accc60633da898d6c039fa148c4079147667df7301f90f31ed9fb91",
+      "normalizedOutput": "assets/brands/user-reviewed/banks/gxbank.png",
+      "brandId": "gxbank",
+      "networkId": null,
+      "assetGroup": "banks",
+      "fitMode": "contain",
+      "safePadding": "8%",
+      "detectedFileType": "image/jpeg",
+      "sourceDimensions": {
+        "width": 400,
+        "height": 400
+      },
+      "normalizedDimensions": {
+        "width": 400,
+        "height": 400
+      },
+      "assetShape": "square",
+      "cropApplied": false,
+      "outputSha256": "71d8a023024e995eecb77ca34630563baacdda2c484adb98a2a03d4a0f322c6b"
+    },
+    {
+      "sourceFilename": "hong-leong-bank-source.png",
+      "sourceRelativePath": "banks/hong-leong-bank-source.png",
+      "sourceSha256": "17cf32b248d05ce5c2cc1670c2b0a975388f0662380dcef4c8ba573e285c99cd",
+      "normalizedOutput": "assets/brands/user-reviewed/banks/hong-leong-bank.png",
+      "brandId": "hong-leong-bank",
+      "networkId": null,
+      "assetGroup": "banks",
+      "fitMode": "contain",
+      "safePadding": "8%",
+      "detectedFileType": "image/jpeg",
+      "sourceDimensions": {
+        "width": 447,
+        "height": 447
+      },
+      "normalizedDimensions": {
+        "width": 447,
+        "height": 447
+      },
+      "assetShape": "square",
+      "cropApplied": false,
+      "outputSha256": "44ec998059b399ad59cb812c646b511526fff9645872d9de0f407d2f92635629"
+    },
+    {
+      "sourceFilename": "hsbc-source.png",
+      "sourceRelativePath": "banks/hsbc-source.png",
+      "sourceSha256": "f782a012c705eb8de913afbfb2269aac5c903a234fd61e5af621f9d880a19617",
+      "normalizedOutput": "assets/brands/user-reviewed/banks/hsbc.png",
+      "brandId": "hsbc",
+      "networkId": null,
+      "assetGroup": "banks",
+      "fitMode": "contain",
+      "safePadding": "8%",
+      "detectedFileType": "image/jpeg",
+      "sourceDimensions": {
+        "width": 1192,
+        "height": 671
+      },
+      "normalizedDimensions": {
+        "width": 1024,
+        "height": 576
+      },
+      "assetShape": "wide",
+      "cropApplied": false,
+      "outputSha256": "cb654724efc24bbb022777cadd8066589ba5b78d277f29dcc76575b9545d0754"
+    },
+    {
+      "sourceFilename": "maybank-source.png",
+      "sourceRelativePath": "banks/maybank-source.png",
+      "sourceSha256": "e93d89e69ea513caf49f450e2bc5ea3f5e342dad6fd355286d541bf7f0338588",
+      "normalizedOutput": "assets/brands/user-reviewed/banks/maybank.png",
+      "brandId": "maybank",
+      "networkId": null,
+      "assetGroup": "banks",
+      "fitMode": "contain",
+      "safePadding": "8%",
+      "detectedFileType": "image/png",
+      "sourceDimensions": {
+        "width": 600,
+        "height": 600
+      },
+      "normalizedDimensions": {
+        "width": 600,
+        "height": 600
+      },
+      "assetShape": "square",
+      "cropApplied": false,
+      "outputSha256": "2a9f70e70fd213782f000ed77599ff4d334d44d226720f68a5433d444ffddc8d"
+    },
+    {
+      "sourceFilename": "mbsb-source.png",
+      "sourceRelativePath": "banks/mbsb-source.png",
+      "sourceSha256": "72ede99657e599f518cb8b079a3f92b818cf1d50804cf0b39dfc10200874eb68",
+      "normalizedOutput": "assets/brands/user-reviewed/banks/mbsb-bank.png",
+      "brandId": "mbsb-bank",
+      "networkId": null,
+      "assetGroup": "banks",
+      "fitMode": "contain",
+      "safePadding": "8%",
+      "detectedFileType": "image/jpeg",
+      "sourceDimensions": {
+        "width": 200,
+        "height": 200
+      },
+      "normalizedDimensions": {
+        "width": 200,
+        "height": 200
+      },
+      "assetShape": "square",
+      "cropApplied": false,
+      "outputSha256": "b3d3c1430c35f3045ab4c584c54ddce16a17692743814e67cdbfed556a79ba89"
+    },
+    {
+      "sourceFilename": "ocbc-source.png",
+      "sourceRelativePath": "banks/ocbc-source.png",
+      "sourceSha256": "81becddac7048a38ec08bba5e2cf89760ba9601e61a0b1602879d56a57329b10",
+      "normalizedOutput": "assets/brands/user-reviewed/banks/ocbc.png",
+      "brandId": "ocbc",
+      "networkId": null,
+      "assetGroup": "banks",
+      "fitMode": "contain",
+      "safePadding": "8%",
+      "detectedFileType": "image/jpeg",
+      "sourceDimensions": {
+        "width": 355,
+        "height": 355
+      },
+      "normalizedDimensions": {
+        "width": 355,
+        "height": 355
+      },
+      "assetShape": "square",
+      "cropApplied": false,
+      "outputSha256": "39cb1878238443de8bde69ffd1444366b075d8cef802f908e56ce9eec333c9ba"
+    },
+    {
+      "sourceFilename": "public-bank-source.png",
+      "sourceRelativePath": "banks/public-bank-source.png",
+      "sourceSha256": "a54c1193567b29e1c9dcec50c0d3b829cb17c5b09f9bd34531d3e42aac5b4893",
+      "normalizedOutput": "assets/brands/user-reviewed/banks/publicbank.png",
+      "brandId": "publicbank",
+      "networkId": null,
+      "assetGroup": "banks",
+      "fitMode": "contain",
+      "safePadding": "8%",
+      "detectedFileType": "image/jpeg",
+      "sourceDimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "normalizedDimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "assetShape": "square",
+      "cropApplied": false,
+      "outputSha256": "7df72009f8b1f88c13f114dde6d1766247b939ecc11bb4f1c1c8be54bf1bd331"
+    },
+    {
+      "sourceFilename": "rhb-source.png",
+      "sourceRelativePath": "banks/rhb-source.png",
+      "sourceSha256": "f0113499fd997c2db7d9d25fcfa3c89bdebb7974adb6d4fc4f7b3da7413673ae",
+      "normalizedOutput": "assets/brands/user-reviewed/banks/rhb.png",
+      "brandId": "rhb",
+      "networkId": null,
+      "assetGroup": "banks",
+      "fitMode": "contain",
+      "safePadding": "8%",
+      "detectedFileType": "image/jpeg",
+      "sourceDimensions": {
+        "width": 400,
+        "height": 400
+      },
+      "normalizedDimensions": {
+        "width": 400,
+        "height": 400
+      },
+      "assetShape": "square",
+      "cropApplied": false,
+      "outputSha256": "d4cec53fffc5d2ec0270db8f48c8d1e2a7cca069f4388e8a971c0e85e12bf525"
+    },
+    {
+      "sourceFilename": "ryt-bank-source.png",
+      "sourceRelativePath": "banks/ryt-bank-source.png",
+      "sourceSha256": "3f204457462f29b0f2e9352bd70a87fa375a0600a48358c414f80708119262c0",
+      "normalizedOutput": "assets/brands/user-reviewed/banks/ryt-bank.png",
+      "brandId": "ryt-bank",
+      "networkId": null,
+      "assetGroup": "banks",
+      "fitMode": "contain",
+      "safePadding": "8%",
+      "detectedFileType": "image/jpeg",
+      "sourceDimensions": {
+        "width": 447,
+        "height": 447
+      },
+      "normalizedDimensions": {
+        "width": 447,
+        "height": 447
+      },
+      "assetShape": "square",
+      "cropApplied": false,
+      "outputSha256": "6cd6ec3b86c79414f533490dcd930c27ae1eefd602dce6409f4275c2c4fe2fc3"
+    },
+    {
+      "sourceFilename": "standard-chartered-source.png",
+      "sourceRelativePath": "banks/standard-chartered-source.png",
+      "sourceSha256": "1d7d48f46da38c5420c5125beabb5e2772a945fded1e7837a4a8fe7d72dbd151",
+      "normalizedOutput": "assets/brands/user-reviewed/banks/standard-chartered.png",
+      "brandId": "standard-chartered",
+      "networkId": null,
+      "assetGroup": "banks",
+      "fitMode": "contain",
+      "safePadding": "8%",
+      "detectedFileType": "image/jpeg",
+      "sourceDimensions": {
+        "width": 900,
+        "height": 900
+      },
+      "normalizedDimensions": {
+        "width": 900,
+        "height": 900
+      },
+      "assetShape": "square",
+      "cropApplied": false,
+      "outputSha256": "ae830620b48e43405217853b2e58d4c06c60fa5e31ced331b1766f266faea952"
+    },
+    {
+      "sourceFilename": "uob-source.png",
+      "sourceRelativePath": "banks/uob-source.png",
+      "sourceSha256": "7a56c580afdac72ad09b1e4c764ed73b0a66dfcbd857157645337433bc16f904",
+      "normalizedOutput": "assets/brands/user-reviewed/banks/uob.png",
+      "brandId": "uob",
+      "networkId": null,
+      "assetGroup": "banks",
+      "fitMode": "contain",
+      "safePadding": "8%",
+      "detectedFileType": "image/jpeg",
+      "sourceDimensions": {
+        "width": 447,
+        "height": 447
+      },
+      "normalizedDimensions": {
+        "width": 447,
+        "height": 447
+      },
+      "assetShape": "square",
+      "cropApplied": false,
+      "outputSha256": "e589430a6770643d11c5bc0fbc284b28c2c5ceb56cb3adb1d5fe6dbef90fca59"
+    },
+    {
+      "sourceFilename": "bigpay-source.png",
+      "sourceRelativePath": "ewallets/bigpay-source.png",
+      "sourceSha256": "2650d022b33b9498cd2eff935e8fe627e76375e701353c9362d7ca25a2298b7a",
+      "normalizedOutput": "assets/brands/user-reviewed/ewallets/bigpay.png",
+      "brandId": "bigpay",
+      "networkId": null,
+      "assetGroup": "ewallets",
+      "fitMode": "contain",
+      "safePadding": "8%",
+      "detectedFileType": "image/png",
+      "sourceDimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "normalizedDimensions": {
+        "width": 512,
+        "height": 512
+      },
+      "assetShape": "square",
+      "cropApplied": false,
+      "outputSha256": "f74cf872b107f85cc3848191fd63c1126ec9c12911aaf84ba83499c34ca4cd49"
+    },
+    {
+      "sourceFilename": "boost-ewallet-source.png",
+      "sourceRelativePath": "ewallets/boost-ewallet-source.png",
+      "sourceSha256": "492f8d9ccc43efa7ec30dc649a962bc7d3592e0bcd422f5607e2e3282240b260",
+      "normalizedOutput": "assets/brands/user-reviewed/ewallets/boost.png",
+      "brandId": "boost",
+      "networkId": null,
+      "assetGroup": "ewallets",
+      "fitMode": "contain",
+      "safePadding": "8%",
+      "detectedFileType": "image/jpeg",
+      "sourceDimensions": {
+        "width": 447,
+        "height": 447
+      },
+      "normalizedDimensions": {
+        "width": 447,
+        "height": 447
+      },
+      "assetShape": "square",
+      "cropApplied": false,
+      "outputSha256": "d126eca55ffb20e88652378d31f146decba3eb46af61791f6bf23fbdae4736a3"
+    },
+    {
+      "sourceFilename": "grabpay-source.png",
+      "sourceRelativePath": "ewallets/grabpay-source.png",
+      "sourceSha256": "95f3e0a9bf6a2c004b8bd1ae7b2b0035ae501a7620a3068cf0101892fe13b1cf",
+      "normalizedOutput": "assets/brands/user-reviewed/ewallets/grabpay.png",
+      "brandId": "grabpay",
+      "networkId": null,
+      "assetGroup": "ewallets",
+      "fitMode": "contain",
+      "safePadding": "8%",
+      "detectedFileType": "image/png",
+      "sourceDimensions": {
+        "width": 401,
+        "height": 401
+      },
+      "normalizedDimensions": {
+        "width": 401,
+        "height": 401
+      },
+      "assetShape": "square",
+      "cropApplied": false,
+      "outputSha256": "8309ef3b641ae2e7f2279653210e29b47181df6400ccd3abbb81537c655f3b89"
+    },
+    {
+      "sourceFilename": "setel-source.png",
+      "sourceRelativePath": "ewallets/setel-source.png",
+      "sourceSha256": "5c88b2f25d348e79b1cf4534913cf9818aeae738605abd67208cc6db0454e55e",
+      "normalizedOutput": "assets/brands/user-reviewed/ewallets/setel.png",
+      "brandId": "setel",
+      "networkId": null,
+      "assetGroup": "ewallets",
+      "fitMode": "contain",
+      "safePadding": "8%",
+      "detectedFileType": "image/jpeg",
+      "sourceDimensions": {
+        "width": 200,
+        "height": 200
+      },
+      "normalizedDimensions": {
+        "width": 200,
+        "height": 200
+      },
+      "assetShape": "square",
+      "cropApplied": false,
+      "outputSha256": "1496bebcd8aad04f53cec3811c61fd54ba8f082b1231de2ae43e121dfbb8a433"
+    },
+    {
+      "sourceFilename": "shopeepay-source.png",
+      "sourceRelativePath": "ewallets/shopeepay-source.png",
+      "sourceSha256": "08e011e97060ab7b4291f78fb98acfe6b3438a475823cbf98987cf1b67b4ef55",
+      "normalizedOutput": "assets/brands/user-reviewed/ewallets/shopeepay.png",
+      "brandId": "shopeepay",
+      "networkId": null,
+      "assetGroup": "ewallets",
+      "fitMode": "contain",
+      "safePadding": "8%",
+      "detectedFileType": "image/webp",
+      "sourceDimensions": {
+        "width": 980,
+        "height": 980
+      },
+      "normalizedDimensions": {
+        "width": 873,
+        "height": 873
+      },
+      "assetShape": "square",
+      "cropApplied": true,
+      "outputSha256": "1f04858bd7a87a346024f18c3cb38a8a8946b5b92f77ca52a2c330e3549198f0"
+    },
+    {
+      "sourceFilename": "touch-n-go-ewallet-source.png",
+      "sourceRelativePath": "ewallets/touch-n-go-ewallet-source.png",
+      "sourceSha256": "4978961552fc6af2e58403f6423ed4fecdaf6facfe5745f74e033088f789e75f",
+      "normalizedOutput": "assets/brands/user-reviewed/ewallets/tng.png",
+      "brandId": "tng",
+      "networkId": null,
+      "assetGroup": "ewallets",
+      "fitMode": "contain",
+      "safePadding": "8%",
+      "detectedFileType": "image/webp",
+      "sourceDimensions": {
+        "width": 960,
+        "height": 972
+      },
+      "normalizedDimensions": {
+        "width": 960,
+        "height": 972
+      },
+      "assetShape": "square",
+      "cropApplied": false,
+      "outputSha256": "f055676e599c1a7ff5845d6efda9edb6040d5e08477f9a5c0a6ab49c36238b5f"
+    },
+    {
+      "sourceFilename": "american-express-source.png",
+      "sourceRelativePath": "networks/american-express-source.png",
+      "sourceSha256": "ac9275cf6c480db17d98c62f22a93d4906b5f21500d5343afdfe0154c3ff5df4",
+      "normalizedOutput": "assets/networks/user-reviewed/amex.png",
+      "brandId": null,
+      "networkId": "amex",
+      "assetGroup": "networks",
+      "fitMode": "contain",
+      "safePadding": "8%",
+      "detectedFileType": "image/png",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "normalizedDimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "assetShape": "square",
+      "cropApplied": false,
+      "outputSha256": "df65bd8cfb411a001157fcefb2575f15c1c80eb9a2b3753f74506c5c79d6a6b4"
+    },
+    {
+      "sourceFilename": "mastercard-source.png",
+      "sourceRelativePath": "networks/mastercard-source.png",
+      "sourceSha256": "3a9a41af03e954cbcb57cb8cfc0d70fb27b7ecaa6057803ad1ca108ad52a4c8c",
+      "normalizedOutput": "assets/networks/user-reviewed/mastercard.png",
+      "brandId": null,
+      "networkId": "mastercard",
+      "assetGroup": "networks",
+      "fitMode": "contain",
+      "safePadding": "8%",
+      "detectedFileType": "image/png",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "normalizedDimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "assetShape": "square",
+      "cropApplied": false,
+      "outputSha256": "6ced7926cef65f67043b4c35b92e6acca02bdc12ea757a747b1ec40cd1730ceb"
+    },
+    {
+      "sourceFilename": "visa-source.png",
+      "sourceRelativePath": "networks/visa-source.png",
+      "sourceSha256": "d0a3c1b06593c90d97ee7b51e45f2c7c8d4d444cdfeeeabd69297ff31e7b4bb3",
+      "normalizedOutput": "assets/networks/user-reviewed/visa.png",
+      "brandId": null,
+      "networkId": "visa",
+      "assetGroup": "networks",
+      "fitMode": "contain",
+      "safePadding": "8%",
+      "detectedFileType": "image/png",
+      "sourceDimensions": {
+        "width": 1254,
+        "height": 1254
+      },
+      "normalizedDimensions": {
+        "width": 1024,
+        "height": 1024
+      },
+      "assetShape": "square",
+      "cropApplied": false,
+      "outputSha256": "6323d38b7d11423e0b505d2ca6b7871288b28a1c0f5f1fba58fddfdf187a9860"
+    }
+  ],
+  "skipped": []
+}

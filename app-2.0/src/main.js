@@ -96,7 +96,7 @@ if (params.get('capture') === '1') {
 if (params.get('profile') === '1') dispatchAction('open-profile', document.body, null);
 
 const confirmationDemo = params.get('confirmationDemo');
-if (['expense', 'income', 'transfer', 'credit', 'ewallet', 'grabpay', 'record', 'otherpayer', 'userpaid', 'directdebt', 'received', 'repayment', 'monthly', 'instalment'].includes(confirmationDemo)) {
+if (['expense', 'income', 'transfer', 'credit', 'ewallet', 'grabpay', 'hsbc', 'custom-card', 'record', 'otherpayer', 'userpaid', 'directdebt', 'received', 'repayment', 'monthly', 'instalment'].includes(confirmationDemo)) {
   openMoneyFlowConfirmation({ confirmation: buildConfirmationDebugPreview(data, confirmationDemo) });
 }
 if (params.get('splitComposerDemo')) openSplitComposerDebugPreview(params.get('splitComposerDemo'));

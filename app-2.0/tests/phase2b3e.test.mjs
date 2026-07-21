@@ -65,15 +65,15 @@ add('Assets overview has no large Savings Wallet deck', () => assert.doesNotMatc
 add('Assets overview has no large Credit Wallet deck', () => assert.doesNotMatch(source.assets, /wallet-stack-category-deck/));
 add('Account Detail remains horizontal carousel', () => assert.match(source.detail, /renderCarousel|activateCarousel/));
 add('Savings category uses WalletStackCategoryDeck', () => assert.match(source.category, /walletStackCategoryDeckHTML\(list, selected\.id/));
-add('Credit category uses the shared WalletStackCategoryDeck', () => assert.match(source.category, /type === 'saving' \|\| type === 'cc'/));
+add('Credit and eWallet categories use the shared WalletStackCategoryDeck', () => assert.match(source.category, /renderWalletCategory\(container, type, list\)/));
 add('category and Account Detail structures differ', () => { assert.match(source.category, /wallet-stack-section/); assert.doesNotMatch(source.detail, /wallet-stack-section/); });
 
 // 8–19 Wallet stack structure
 add('stable account-ID keys', () => assert.match(walletStackCategoryDeckHTML(savings, 'sv-cimb'), /data-wallet-account-id="sv-cimb"/));
 add('one selected card', () => assert.equal((walletStackCategoryDeckHTML(savings, 'sv-cimb').match(/class="wallet-stack-card is-selected"/g) || []).length, 1));
 add('inactive exposed layers', () => assert.equal((walletStackCategoryDeckHTML(savings, 'sv-cimb').match(/is-inactive/g) || []).length, 3));
-add('inactive Savings information', () => assert.match(walletStackCategoryDeckHTML(savings, 'sv-cimb'), /Public Bank Savings[\s\S]*•••• 1357[\s\S]*RM 3,180\.50/));
-add('inactive Credit information', () => assert.match(walletStackCategoryDeckHTML(credit, 'cc-mbb-visa', { type: 'cc' }), /Maybank Islamic Ikhwan[\s\S]*4421[\s\S]*到期 02\/08\/2026[\s\S]*RM 3,460\.45/));
+add('inactive Savings information is compact and privacy-safe', () => { const html=walletStackCategoryDeckHTML(savings, 'sv-cimb'); assert.match(html,/Public Bank Savings[\s\S]*Public Bank[\s\S]*RM 3,180\.50/); assert.doesNotMatch(html,/1357/); });
+add('inactive Credit information is compact and keeps current due copy', () => { const html=walletStackCategoryDeckHTML(credit, 'cc-mbb-visa', { type: 'cc' }); assert.match(html,/Maybank Islamic Ikhwan[\s\S]*Maybank Islamic[\s\S]*本期还款日 02\/08\/2026[\s\S]*RM 3,460\.45/); assert.doesNotMatch(html,/>4421</); });
 add('selected card full visual', () => assert.match(walletStackCategoryDeckHTML(savings, 'sv-mbb'), /account-visual-wallet-stack/));
 add('no anonymous color-only layer', () => { const html = walletStackCategoryDeckHTML(savings, 'sv-mbb'); assert.equal((html.match(/wallet-stack-layer-copy/g) || []).length, 3); });
 add('card width capped', () => assert.match(source.css, /width: min\(100%, 440px\)/));
@@ -84,7 +84,7 @@ add('desktop capped layout', () => assert.doesNotMatch(source.css, /wallet-stack
 
 // 20–32 Wallet selection
 add('tap inactive Savings promotes exact ID', () => assert.match(source.category, /wallet-stack-account'[\s\S]*\[type\]: el\.dataset\.acc/));
-add('tap inactive Credit promotes exact ID', () => assert.match(source.category, /\['saving', 'cc'\]\.includes\(type\)/));
+add('tap inactive Credit or eWallet promotes exact ID', () => assert.match(source.category, /\['saving', 'cc', 'ew'\]\.includes\(type\)/));
 add('previous card returns to stack', () => assert.deepEqual(walletStackPresentationOrder(savings, 'sv-cimb').map((account) => account.id), ['sv-cimb', 'sv-mbb', 'sv-pbb', 'sv-rhb']));
 add('selected card visual updates', () => assert.match(walletStackCategoryDeckHTML(savings, 'sv-pbb'), /data-selected-account-id="sv-pbb"[\s\S]*data-account-visual="sv-pbb"/));
 add('selected account summary updates', () => assert.match(source.category, /data-summary-account-id="\$\{escapeHTML\(selected\.id\)\}"/));
@@ -101,9 +101,14 @@ add('focus visibility', () => assert.match(source.css, /wallet-stack-card:focus-
 add('selectedAccountId equals active card ID', () => assert.match(walletStackCategoryDeckHTML(savings, 'sv-rhb'), /data-selected-account-id="sv-rhb"[\s\S]*aria-selected="true"/));
 add('selectedAccountId equals summary account ID', () => assert.match(source.category, /ui\.selectedAccountId\[type\] = selected\.id/));
 add('selectedAccountId equals Recent Records account ID', () => assert.match(source.category, /recentHTML\(type, selected/));
-add('selected card art correct', () => assert.match(walletStackCategoryDeckHTML(savings, 'sv-mbb'), /maybank-global-access-mastercard-world\.png/));
+add('selected card uses the canonical automatic card identity', () => {
+  const html = walletStackCategoryDeckHTML(savings, 'sv-mbb');
+  assert.match(html, /data-card-renderer="ringgitme-auto-card"/);
+  assert.match(html, /Maybank 储蓄卡/);
+  assert.doesNotMatch(html, /maybank-global-access-mastercard-world\.png/);
+});
 add('selected balance correct', () => assert.match(walletStackCategoryDeckHTML(savings, 'sv-cimb'), /RM 2,400\.00/));
-add('selected masked digits correct', () => assert.match(walletStackCategoryDeckHTML(savings, 'sv-pbb'), /•••• 1357/));
+add('selected card digits are in the canonical upper-right metadata region', () => assert.match(walletStackCategoryDeckHTML(savings, 'sv-pbb'), /data-card-region="cardLastFour">1357/));
 add('no stale prior-account records', () => { const rows = selectedAccountRecords(data.getActivities(), 'sv-cimb'); assert.ok(rows.every((row) => transactionTouchesAccount(row, 'sv-cimb'))); });
 add('no first-account fallback when valid selection exists', () => assert.equal(walletStackPresentationOrder(savings, 'sv-pbb')[0].id, 'sv-pbb'));
 add('back preserves selected category account', () => assert.match(source.state, /selectedAccountId: \{ saving: null, cc: null, ew: null \}/));
@@ -206,8 +211,8 @@ add('transfer has no recent-row compression', () => assert.equal(recentRecordLim
 
 // 121–130 Visual regressions
 add('Confirmation identity bar unchanged', () => assert.match(moneyFlowConfirmationHTML(baseConfirmation()), /account-identity-bar glass-sheet/));
-add('real bank card remains', () => assert.match(moneyFlowConfirmationHTML(baseConfirmation()), /account-visual-art/));
-add('eWallet visual remains', () => assert.match(source.visual, /account-wallet-brand/));
+add('generated bank card remains in confirmation', () => assert.match(moneyFlowConfirmationHTML(baseConfirmation()), /data-card-renderer="ringgitme-auto-card"/));
+add('eWallet visual uses the shared automatic-card renderer', () => assert.match(source.visual, /ringgitMeCardComposerHTML/));
 add('Odometer final frame static', () => assert.match(source.confirmation, /next === 3[\s\S]*remove\(\)/));
 add('no lifted digit', () => assert.match(source.cssCarousel + source.cssFrozen, /motion-static-balance[\s\S]*transform: none/));
 add('no blank first frame', () => assert.match(moneyFlowConfirmationHTML(baseConfirmation(), { frame: 1 }), /RM 6,842\.15/));

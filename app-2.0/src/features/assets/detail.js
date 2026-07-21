@@ -10,68 +10,106 @@ import { renderCarousel, activateCarousel } from '../../components/CardCarousel.
 import { renderActivityRow } from '../../components/ActivityRow.js';
 import { icon } from '../../components/Icons.js';
 import { replaceRoute } from '../../app/router.js';
-import { maskAssetIdentifier } from '../../domain/assetFinancialModel.js';
+import { formatBankAccountNumber, formatCardLastFour } from '../../domain/assetFinancialModel.js';
+import { cardNetworkLabel, creditCardTierLabel, resolveAccountCardViewModel } from '../../domain/accountCardSystem.js';
 import { openSheet, closeSheet, toast } from '../../components/AppSheet.js';
 
-const TYPE_LABEL = { cc: '信用卡', saving: '储蓄账户', ew: '电子钱包' };
+const TYPE_LABEL = { cc: '信用卡', saving: '储蓄', ew: '电子钱包' };
+
+function touchesAccount(transaction, accountId) {
+  return [transaction.accountId, transaction.sourceAccountId, transaction.destinationAccountId].includes(accountId);
+}
 
 function lastChange(acc) {
-  const t = data.getActivities().find((x) => x.accountId === acc.id);
+  const t = data.getActivities().find((x) => touchesAccount(x, acc.id));
   if (!t) return '—';
   const day = t.date === data.today ? '今天' : fmtDateMY(t.date);
   return `${day} ${fmtTimeAMPM(t.time)}`;
 }
 
-function fieldRows(rows) {
-  return `<div class="surface section"><ul>
+function detailGroup(title, rows, className = '') {
+  if (!rows.length) return '';
+  return `<section class="section asset-detail-group ${className}"><h2 class="sec-title">${escapeHTML(title)}</h2><div class="surface"><ul>
     ${rows.map(([k, v, cls]) => `
       <li class="row row-static detail-field">
         <div class="row-main caption">${k}</div>
         <span class="num detail-val ${cls || ''}">${v}</span>
       </li>`).join('')}
-  </ul></div>`;
+  </ul></div></section>`;
 }
 
-function savingsFields(a) {
-  const identifier = a.type === 'ew' ? maskAssetIdentifier(a.walletIdentifier) : maskAssetIdentifier(a.bankAccountNumber || a.debitCardNumber);
-  return fieldRows([
-    ['余额', fmtRM(a.balance, { privacy: ui.privacy }), ''],
-    ['账户类型', TYPE_LABEL[a.type], 'detail-plain'],
-    [a.type === 'ew' ? '品牌' : '银行', escapeHTML(a.bank), 'detail-plain'],
-    ...(identifier ? [[a.type === 'ew' ? '钱包标识' : '账户标识', escapeHTML(identifier), 'detail-plain']] : []),
+function cashFlow(a) {
+  return data.getActivities().filter((item) => item.status !== 'reversed' && item.date?.startsWith(data.today.slice(0, 7))).reduce((stats, item) => {
+    if ((item.kind === 'income' || item.kind === 'transfer') && item.destinationAccountId === a.id && item.accountEffect === 'posted') stats.inflow += item.amount;
+    if ((item.kind === 'expense' || item.kind === 'transfer') && item.sourceAccountId === a.id && item.accountEffect === 'posted') stats.outflow += item.amount;
+    return stats;
+  }, { inflow: 0, outflow: 0 });
+}
+
+function cashAccountFields(a) {
+  const bankAccountNumber = formatBankAccountNumber(a.bankAccountNumber, { privacy: ui.privacy });
+  const debitLastFour = formatCardLastFour(a.debitCardLast4, { privacy: ui.privacy });
+  const walletIdentifier = formatBankAccountNumber(a.walletIdentifier, { privacy: ui.privacy });
+  const flow = cashFlow(a);
+  const model = resolveAccountCardViewModel({ account: a, privacyState: ui.privacy, context: 'detail-information' });
+  const overviewTitle = a.type === 'ew' ? '钱包概览' : '账户概览';
+  const informationTitle = a.type === 'ew' ? '钱包资料' : '账户资料';
+  const overview = detailGroup(overviewTitle, [
+    ['当前余额', model.formattedAmount, ''],
+    ['本月流入', `+${fmtRM(flow.inflow, { privacy: ui.privacy })}`, 'amt-pos'],
+    ['本月流出', `−${fmtRM(flow.outflow, { privacy: ui.privacy })}`, 'amt-neg'],
     ['最近变动', lastChange(a), 'detail-plain'],
-    ['备注', a.note ? escapeHTML(a.note) : '—', 'detail-plain'],
-  ]);
+  ], 'asset-detail-overview');
+  const information = detailGroup(informationTitle, [
+    ['账户类型', TYPE_LABEL[a.type], 'detail-plain'],
+    [a.type === 'ew' ? '电子钱包品牌' : '银行', escapeHTML(model.institutionName || '未指定'), 'detail-plain'],
+    ...(a.type === 'ew' ? [['钱包名称', escapeHTML(model.title), 'detail-plain']] : []),
+    ...(a.type === 'ew' && walletIdentifier ? [['钱包标识', escapeHTML(walletIdentifier), 'detail-plain']] : []),
+    ...(a.type === 'saving' && bankAccountNumber ? [['银行账号', escapeHTML(bankAccountNumber), 'detail-plain']] : []),
+    ...(a.type === 'saving' && debitLastFour ? [['银行卡末四位', escapeHTML(debitLastFour), 'detail-plain']] : []),
+    ...(a.note ? [['备注', escapeHTML(a.note), 'detail-plain']] : []),
+  ], 'asset-detail-information');
+  return `${overview}${information}`;
 }
 
 function ccFields(a) {
   const inst = data.getInstalments(a.id);
   const pool = a.sharedLimitPoolId ? data.getSharedLimitPool(a.sharedLimitPoolId) : null;
-  const rows = [
+  const model = resolveAccountCardViewModel({ account: a, privacyState: ui.privacy, context: 'detail-information' });
+  const monthKey = data.today.slice(0, 7);
+  const cashback = data.getCardCashbackSummary(a.id, monthKey);
+  const monthlySpend = data.getActivities().filter((item) => item.status !== 'reversed' && item.kind === 'expense' && item.sourceAccountId === a.id && item.date?.startsWith(monthKey)).reduce((sum, item) => sum + item.amount, 0);
+  const debtOverview = detailGroup('欠款概览', [
     ['信用卡总欠款', fmtRM(a.totalCardDebt, { privacy: ui.privacy }), 'amt-neg'],
     ['普通消费欠款', fmtRM((a.ordinaryPrincipalOutstandingMinor || 0) / 100, { privacy: ui.privacy }), 'detail-plain'],
     ['分期剩余本金', fmtRM((a.installmentPrincipalOutstandingMinor || 0) / 100, { privacy: ui.privacy }), 'detail-plain'],
     ['费用与利息', fmtRM((a.feeInterestOutstandingMinor || 0) / 100, { privacy: ui.privacy }), 'detail-plain'],
-    ...(a.cardCreditBalanceMinor ? [['卡片溢缴余额', fmtRM(a.cardCreditBalanceMinor / 100, { privacy: ui.privacy }), 'amt-pos']] : []),
-    ...(!pool ? [['可用额度', fmtRM((a.availableCreditMinor || 0) / 100, { privacy: ui.privacy }), a.availableCreditMinor < 0 ? 'amt-neg' : '']] : []),
-    ['信用额度', fmtRM(a.limit, { privacy: ui.privacy }), ''],
+    [pool ? '共享可用' : '可用额度', fmtRM((pool?.availableMinor ?? a.availableCreditMinor ?? 0) / 100, { privacy: ui.privacy }), (pool?.availableMinor ?? a.availableCreditMinor ?? 0) < 0 ? 'amt-neg' : ''],
+  ], 'asset-detail-overview');
+  const monthly = detailGroup('本月账务', [
+    ['本月新增消费', fmtRM(monthlySpend, { privacy: ui.privacy }), 'amt-neg'],
     ['本月应还', fmtRM((a.monthStatementDueMinor || 0) / 100, { privacy: ui.privacy }), 'amt-warn'],
     ['本月已还', fmtRM((a.monthPaidMinor || 0) / 100, { privacy: ui.privacy }), 'amt-pos'],
     ['本月剩余', fmtRM((a.monthRemainingMinor || 0) / 100, { privacy: ui.privacy }), 'amt-warn'],
-    ['到期日', a.dueDate ? fmtDateMY(a.dueDate) : '暂无到期日', 'detail-plain'],
-  ];
-  return `
-    ${fieldRows(rows)}
-    ${pool ? `<section class="section surface asset-shared-pool"><div class="pad-h caption">共享额度池 · ${escapeHTML(pool.name)}</div><ul>${[
-      ['总额度', fmtRM(pool.limitMinor / 100, { privacy: ui.privacy }), ''],
-      ['已使用', fmtRM(pool.usedMinor / 100, { privacy: ui.privacy }), 'amt-neg'],
-      ['共享可用', fmtRM(pool.availableMinor / 100, { privacy: ui.privacy }), pool.availableMinor < 0 ? 'amt-neg' : ''],
-      ['成员卡片', `${pool.memberIds.length} 张`, 'detail-plain'],
-    ].map(([label, value, cls]) => `<li class="row row-static detail-field"><div class="row-main caption">${label}</div><span class="num detail-val ${cls}">${value}</span></li>`).join('')}</ul></section>` : ''}
+    ['本期还款日', a.dueDate ? fmtDateMY(a.dueDate) : '暂无本期还款日', 'detail-plain'],
+  ], 'asset-detail-monthly');
+  const cardInformation = detailGroup('卡片资料', [
+    ['发卡机构', escapeHTML(model.institutionName || '未指定'), 'detail-plain'],
+    ...(model.visibleLastFour ? [['信用卡末四位', escapeHTML(model.visibleLastFour), 'detail-plain']] : []),
+    ['信用额度', fmtRM(a.limit, { privacy: ui.privacy }), ''],
+    ...(creditCardTierLabel(a) ? [['等级', escapeHTML(creditCardTierLabel(a)), 'detail-plain']] : []),
+    ...(model.networkId ? [['卡组织', escapeHTML(cardNetworkLabel(model.networkId)), 'detail-plain']] : []),
+    ...(pool ? [['共享额度池', `${escapeHTML(pool.name)} · ${pool.memberIds.length} 张卡`, 'detail-plain']] : []),
+    ...(a.note ? [['备注', escapeHTML(a.note), 'detail-plain']] : []),
+  ], 'asset-detail-information');
+  const rewards = detailGroup('回馈与抵扣', [
+    ['本月 Cashback', `+${fmtRM(cashback.monthlyMinor / 100, { privacy: ui.privacy })}`, 'amt-pos'],
+    ['累计 Cashback', `+${fmtRM(cashback.totalMinor / 100, { privacy: ui.privacy })}`, 'amt-pos'],
+    ['记录数量', `${cashback.count} 笔`, 'detail-plain'],
+  ], 'asset-detail-cashback');
+  return `${debtOverview}${monthly}${cardInformation}${rewards}
     ${inst.length ? `
-      <section class="section surface">
-        <div class="pad-h caption" style="padding-top:10px">分期</div>
-        <ul>
+      <section class="section asset-detail-group"><h2 class="sec-title">分期计划</h2><div class="surface"><ul>
           ${inst.map((i) => `
             <li class="row row-static">
               <div class="row-main">
@@ -80,9 +118,7 @@ function ccFields(a) {
               </div>
               <span class="num row-amt">${fmtRM(i.monthly, { privacy: ui.privacy })}/月</span>
             </li>`).join('')}
-        </ul>
-      </section>` : ''}
-  `;
+        </ul></div></section>` : ''}`;
 }
 
 function operationAmount(operation) {
@@ -94,20 +130,26 @@ function operationAmount(operation) {
 function operationHistory(account) {
   const labels = {
     asset_adjustment: '余额调整', card_opening_debt: '导入已有欠款', card_fee: '费用与利息',
-    card_installment_purchase: '新分期消费', card_installment_conversion: '转换已有消费', card_installment_import: '导入已有分期', card_payment: '信用卡还款', card_refund: '信用卡退款', card_linked_refund: '原消费退款', card_general_credit: '一般卡片退款',
+    card_installment_purchase: '新分期消费', card_installment_conversion: '转换已有消费', card_installment_import: '导入已有分期', card_payment: '信用卡还款', card_refund: '信用卡退款', card_linked_refund: '原消费退款', card_general_credit: '一般卡片退款', card_cashback: 'Cashback 抵扣',
   };
   const operations = data.getAssetOperations().filter((operation) => [operation.metadata?.accountId, operation.metadata?.cardId, operation.metadata?.sourceAccountId].includes(account.id));
   if (!operations.length) return '';
-  return `<section class="section surface asset-operation-history"><div class="pad-h caption">账户操作</div><ul>${operations.slice(0, 8).map((operation) => `<li class="row row-static"><div class="row-main"><div class="row-title">${escapeHTML(labels[operation.type] || '账户操作')}</div><div class="caption">${operation.status === 'reversed' ? '已撤销' : '已记录'}</div></div><div class="asset-operation-history-result"><span class="num row-amt${['card_refund', 'card_linked_refund', 'card_general_credit', 'card_payment'].includes(operation.type) ? ' amt-pos' : ''}">${fmtRM(operationAmount(operation), { privacy: ui.privacy })}</span>${operation.status === 'active' ? `<button type="button" class="asset-operation-reverse" data-action="asset-operation-reverse-request" data-operation-id="${escapeHTML(operation.id)}" aria-label="撤销${escapeHTML(labels[operation.type] || '账户操作')}">撤销</button>` : ''}</div></li>`).join('')}</ul></section>`;
+  return `<section class="section asset-detail-group asset-operation-history"><h2 class="sec-title">账户操作</h2><div class="surface"><ul>${operations.slice(0, 8).map((operation) => `<li class="row row-static"><div class="row-main"><div class="row-title">${escapeHTML(labels[operation.type] || '账户操作')}</div><div class="caption">${operation.status === 'reversed' ? '已撤销' : '已记录'}</div></div><div class="asset-operation-history-result"><span class="num row-amt${['card_refund', 'card_linked_refund', 'card_general_credit', 'card_payment', 'card_cashback'].includes(operation.type) ? ' amt-pos' : ''}">${fmtRM(operationAmount(operation), { privacy: ui.privacy })}</span>${operation.status === 'active' ? `<button type="button" class="asset-operation-reverse" data-action="asset-operation-reverse-request" data-operation-id="${escapeHTML(operation.id)}" aria-label="撤销${escapeHTML(labels[operation.type] || '账户操作')}">撤销</button>` : ''}</div></li>`).join('')}</ul></div></section>`;
 }
 
 function detailActions(account) {
   const buttons = account.type === 'cc'
     ? [
-      ['payment', 'repayment', '还款'], ['refund', 'refund', '记录退款'], ['installment', 'calendar', '新增分期'],
+      ['expense', 'note', '记录消费'], ['payment', 'repayment', '记录还款'], ['cashback', 'refund', '记录 Cashback'],
+      ['refund', 'refund', '记录退款'], ['installment', 'calendar', '新增分期'], ['history', 'activity', '查看记录'],
     ]
-    : [['transfer-in', 'arrowDown', '转入'], ['transfer-out', 'arrowUp', '转出'], ['adjustment', 'transfer', '调整余额']];
-  return `<section class="section surface asset-detail-actions"><div class="asset-action-grid">${buttons.map(([operation, iconName, label]) => `<button type="button" data-action="${operation === 'transfer-in' ? 'asset-transfer-in' : operation === 'transfer-out' ? 'asset-transfer-out' : 'asset-detail-operation'}" data-id="${escapeHTML(account.id)}" ${operation.startsWith('transfer-') ? '' : `data-operation="${operation}"`}><span>${icon(iconName, 18)}</span><strong>${label}</strong></button>`).join('')}</div></section>`;
+    : [['transfer-in', 'arrowDown', '转入'], ['transfer-out', 'arrowUp', '转出'], ['adjustment', 'transfer', '调整余额'], ['history', 'activity', '查看记录']];
+  const actionName = (operation) => operation === 'transfer-in' ? 'asset-transfer-in'
+    : operation === 'transfer-out' ? 'asset-transfer-out'
+      : operation === 'expense' ? 'asset-record-expense'
+        : operation === 'history' ? 'assets-view-all-activity'
+          : 'asset-detail-operation';
+  return `<section class="section asset-detail-group asset-detail-actions"><h2 class="sec-title">快捷操作</h2><div class="surface"><div class="asset-action-grid">${buttons.map(([operation, iconName, label]) => `<button type="button" data-action="${actionName(operation)}" data-id="${escapeHTML(account.id)}" data-acc="${escapeHTML(account.id)}" ${['transfer-in', 'transfer-out', 'expense', 'history'].includes(operation) ? '' : `data-operation="${operation}"`}><span>${icon(iconName, 18)}</span><strong>${label}</strong></button>`).join('')}</div></div></section>`;
 }
 
 export function renderDetailPage(container, accountId) {
@@ -118,7 +160,7 @@ export function renderDetailPage(container, accountId) {
   const recent = data.getActivities().filter((t) => [t.accountId, t.sourceAccountId, t.destinationAccountId].includes(acc.id)).slice(0, 5);
   container.innerHTML = `
     ${renderCarousel(list, index, { selectAction: 'detail-card-tap', variant: 'detail' })}
-    ${acc.type === 'cc' ? ccFields(acc) : savingsFields(acc)}
+    ${acc.type === 'cc' ? ccFields(acc) : cashAccountFields(acc)}
     ${detailActions(acc)}
     ${operationHistory(acc)}
     <section class="section">

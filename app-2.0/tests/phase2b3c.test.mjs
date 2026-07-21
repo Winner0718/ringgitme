@@ -86,7 +86,11 @@ add('S', 'initial instant positioning', () => { assert.match(source.native, /deb
 
 // 21–32: account integrity
 add('A', 'B first visible frame', () => assert.match(renderNativeSnapCardCarousel(savings, 1), /data-selected-account-id="sv-cimb"/));
-add('A', 'B artwork or branded fallback', () => assert.match(accountVisualCardHTML(accountB), /account-visual-fallback/));
+add('A', 'B uses the canonical automatic card with a deterministic brand fallback', () => {
+  const html = accountVisualCardHTML(accountB);
+  assert.match(html, /data-card-renderer="ringgitme-auto-card"/);
+  assert.match(html, /data-card-system="institution-palette"/);
+});
 add('A', 'B balance', () => assert.match(accountVisualCardHTML(accountB), /RM 2,400\.00/));
 add('A', 'B metadata', () => assert.match(accountVisualCardHTML(accountB), /CIMB OctoSavers[\s\S]*2468/));
 add('A', 'B transactions', () => assert.ok(data.getActivities().filter((row) => row.accountId === accountB.id).every((row) => row.accountId === 'sv-cimb')));
@@ -141,13 +145,32 @@ add('K', 'no eval or Function', () => assert.doesNotMatch(source.capture, /\beva
 
 // 66–75: shared account visual
 add('V', 'Assets and confirmation share account visual source', () => { assert.match(source.native, /AccountVisualCard/); assert.match(source.confirmation, /AccountVisualCard/); });
-add('V', 'savings real-card visual', () => assert.match(accountVisualCardHTML(savings[0]), /maybank-global-access-mastercard-world\.png/));
-add('V', 'credit-card visual', () => assert.match(accountVisualCardHTML(credit[0]), /maybank-visa-platinum\.png/));
-add('V', 'eWallet visual', () => assert.match(accountVisualCardHTML(wallets[0]), /account-wallet-brand/));
-add('V', 'masked digits', () => assert.match(accountVisualCardHTML(savings[0]), /•••• 8888/));
+add('V', 'savings automatic-card visual preserves user account identity', () => {
+  const html = accountVisualCardHTML(savings[0]);
+  assert.match(html, /data-card-renderer="ringgitme-auto-card"/);
+  assert.match(html, /Maybank 储蓄卡/);
+});
+add('V', 'credit-card automatic visual renders its network as typography', () => {
+  const html = accountVisualCardHTML(credit[0]);
+  assert.match(html, /data-card-renderer="ringgitme-auto-card"/);
+  assert.match(html, /ringgit-card-network[\s\S]*VISA/);
+  assert.doesNotMatch(html, /maybank-visa-platinum\.png/);
+});
+add('V', 'eWallet automatic visual uses the shared generated-card owner without a network badge', () => {
+  const html = accountVisualCardHTML(wallets[0]);
+  assert.match(html, /data-card-renderer="ringgitme-auto-card"/);
+  assert.match(html, /电子钱包/);
+  assert.doesNotMatch(html, /ringgit-card-network/);
+});
+add('V', 'open card digits use the canonical upper-right metadata region', () => assert.match(accountVisualCardHTML(savings[0]), /data-card-region="cardLastFour">8888/));
 add('V', 'correct logo', () => assert.match(accountVisualCardHTML(wallets[0]), /data-brand-image/));
-add('V', 'correct card art', () => assert.match(accountVisualCardHTML(credit[1]), new RegExp(credit[1].art.replaceAll('.', '\\.'))));
-add('V', 'polished fallback', () => assert.match(accountVisualCardHTML(accountB), /account-visual-name[\s\S]*account-visual-bank/));
+add('V', 'legacy product art no longer controls active automatic-card rendering', () => {
+  const html = accountVisualCardHTML(credit[1]);
+  assert.match(html, /data-card-renderer="ringgitme-auto-card"/);
+  assert.match(html, /Maybank Islamic Ikhwan/);
+  assert.doesNotMatch(html, new RegExp(credit[1].art.replaceAll('.', '\\.')));
+});
+add('V', 'automatic fallback keeps user name primary and institution metadata secondary', () => assert.match(accountVisualCardHTML(accountB), /ringgit-card-copy[\s\S]*<strong>CIMB OctoSavers<\/strong>[\s\S]*ringgit-card-meta/));
 add('V', 'no broken-image icon', () => assert.match(source.visual, /naturalWidth === 0/));
 add('V', 'no wrong-account asset', () => assert.match(accountVisualCardHTML(accountB), /data-account-visual="sv-cimb"/));
 
@@ -157,7 +180,7 @@ add('F', 'account visual is primary', () => { assert.ok(moneyFlowConfirmationHTM
 add('F', 'reduced nested frames', () => assert.equal((moneyFlowConfirmationHTML(confirmation()).match(/motion-balance-hero/g) || []).length, 1));
 add('F', 'identity and card share one stable account', () => { const html = moneyFlowConfirmationHTML(confirmation()); assert.match(html, /data-account-identity="sv-mbb"[\s\S]*data-account-visual="sv-mbb"/); });
 add('F', 'no blank first frame', () => assert.match(moneyFlowConfirmationHTML(confirmation(), { frame: 1 }), /account-visual[\s\S]*RM 6,842\.15/));
-add('F', 'card asset prepared', () => assert.match(moneyFlowConfirmationHTML(confirmation(), { frame: 1 }), /data-card-art/));
+add('F', 'automatic card identity is prepared for confirmation', () => assert.match(moneyFlowConfirmationHTML(confirmation(), { frame: 1 }), /data-card-renderer="ringgitme-auto-card"/));
 add('F', 'transaction effect shown', () => assert.match(moneyFlowConfirmationHTML(confirmation()), /本次[\s\S]*KFC 午餐[\s\S]*−RM 10\.00/));
 add('F', 'bottom actions preserved', () => assert.match(moneyFlowConfirmationHTML(confirmation()), /继续记账[\s\S]*查看记录[\s\S]*完成/));
 add('F', 'actions single-fire', () => assert.match(source.confirmation, /if \(closed\) return/));

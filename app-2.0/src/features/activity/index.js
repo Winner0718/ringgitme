@@ -174,7 +174,7 @@ function timestampLabel(iso) {
 }
 
 function typeLabel(kind) {
-  return { expense: '支出', income: '收入', transfer: '转账' }[kind] || kind;
+  return { expense: '支出', income: '收入', transfer: '转账', cashback: 'Cashback 抵扣' }[kind] || kind;
 }
 
 function historyHTML(t) {

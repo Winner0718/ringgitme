@@ -36,7 +36,8 @@
   margin-top: -8px;
   padding: 8px 11px 7px;
   border-radius: 0 0 20px 20px;
-  background: linear-gradient(115deg, var(--account-brand), color-mix(in srgb, var(--account-brand) 68%, #0c1410));
+  background: linear-gradient(115deg, var(--account-brand), var(--account-brand-secondary, color-mix(in srgb, var(--account-brand) 68%, #0c1410)));
+  color: var(--account-brand-text, #fff);
   box-shadow: inset 0 1px rgba(255,255,255,.16), 0 8px 18px rgba(10,18,14,.11);
   transition: transform 360ms var(--motion-spring), filter 160ms ease, box-shadow 360ms ease;
 }
@@ -58,11 +59,11 @@
 }
 .wallet-stack-logo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #fff; pointer-events: none; -webkit-user-drag: none; }
 .wallet-stack-layer-copy { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 1px; }
-.wallet-stack-layer-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
-.wallet-stack-layer-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: rgba(255,255,255,.76); font-size: 10px; }
-.wallet-stack-layer-copy .wallet-stack-due { color: rgba(255,255,255,.68); font-size: 9px; }
-.wallet-stack-layer-value { flex: 0 0 auto; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; font-size: 13px; font-weight: 760; }
-.wallet-stack-layer-value.debt-value { color: #fff; }
+.wallet-stack-layer-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--account-brand-text, #fff); font-size: 13px; }
+.wallet-stack-layer-copy small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--account-brand-muted, rgba(255,255,255,.76)); font-size: 10px; }
+.wallet-stack-layer-copy .wallet-stack-due { color: var(--account-brand-muted, rgba(255,255,255,.68)); font-size: 9px; }
+.wallet-stack-layer-value { flex: 0 0 auto; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--account-brand-text, #fff); font-size: 13px; font-weight: 760; }
+.wallet-stack-layer-value.debt-value { color: var(--account-brand-text, #fff); }
 .wallet-stack-card img { -webkit-user-drag: none; }
 .wallet-stack-card .account-visual,
 .wallet-stack-card .account-visual * { pointer-events: none; }

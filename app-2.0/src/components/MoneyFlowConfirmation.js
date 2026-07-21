@@ -1,5 +1,5 @@
 import { escapeHTML, fmtDateMY, fmtTimeAMPM } from '../app/format.js';
-import { data } from '../app/state.js';
+import { data, update } from '../app/state.js';
 import { CONFIRMATION_COPY } from '../app/copy.js';
 import { icon } from './Icons.js';
 import { accountIdentityBarHTML, accountVisualCardHTML, bindAccountVisualFallbacks } from './AccountVisualCard.js';
@@ -84,7 +84,7 @@ export function confirmationBalanceMode(motionState, accountIndex = 0, accountCo
 }
 
 function accountForChange(change) {
-  return change.accountSnapshot || data.getAccount(change.accountId) || {
+  return data.getAccount(change.accountId) || change.accountSnapshot || {
     id: change.accountId,
     type: change.accountType || 'saving',
     name: change.accountName || '账户',
@@ -120,7 +120,7 @@ function accountHeroHTML(change, motionState, accountIndex, accountCount, { comp
   const balanceLabel = change.measure === 'outstanding' ? '当前欠款' : '账户余额';
   return `<article class="motion-balance-hero${compact ? ' compact' : ''}" data-motion-account="${escapeHTML(change.accountId)}">
     ${accountIdentityBarHTML(account, { status: status || (unchanged ? '余额未变' : '已更新'), roleLabel })}
-    ${accountVisualCardHTML(account, { variant: 'confirmation', showAmount: false })}
+    ${accountVisualCardHTML(account, { variant: 'confirmation', showAmount: true, amountMinor: change.afterMinor })}
     <div class="motion-balance-copy" data-balance-account="${escapeHTML(change.accountId)}">
       <span>${balanceLabel}</span>
       ${balanceStageHTML(change, motionState, accountIndex, accountCount)}
@@ -211,6 +211,7 @@ function titleFor(confirmation) {
   if (confirmation.kind === 'plan') return '计划已建立';
   if (confirmation.kind === 'settlement') return '结算完成';
   if (confirmation.kind === 'income') return '收入已入账';
+  if (confirmation.kind === 'cashback') return 'Cashback 已抵扣';
   return '已记入账户';
 }
 
@@ -389,7 +390,17 @@ export function openMoneyFlowConfirmation({ transaction, confirmation = transact
     releaseModal();
     activeConfirmationClose = null;
     layer.classList.add('closing');
-    setTimeout(() => { layer.remove(); if (!silent) callback?.(); }, instant || reducedMotion ? 0 : 180);
+    setTimeout(() => {
+      layer.remove();
+      if (!silent) {
+        // The confirmation is an immutable presentation snapshot, while the
+        // page behind it must resume from the canonical live account state.
+        // Re-render before running navigation/toast callbacks so detail,
+        // category and Assets surfaces cannot expose the pre-posting amount.
+        update({});
+        callback?.();
+      }
+    }, instant || reducedMotion ? 0 : 180);
     return true;
   };
   activeConfirmationClose = ({ silent = false, instant = false } = {}) => close(onDone, { silent, instant });

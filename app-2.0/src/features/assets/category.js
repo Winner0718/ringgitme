@@ -1,18 +1,14 @@
 // Category pages have a browsing responsibility distinct from Account Detail.
-// Savings/Credit use a tap-driven vertical Wallet stack; eWallet keeps its
-// existing category carousel. Account Detail remains the horizontal carousel.
+// Savings, credit cards and eWallets use the same tap-driven vertical Wallet
+// stack. Account Detail remains the horizontal carousel.
 
 import { data, ui, update, registerAction, dispatchAction } from '../../app/state.js';
 import { ASSET_CATEGORY_COPY } from '../../app/copy.js';
 import { fmtRM, fmtDateMY, fmtTimeAMPM, escapeHTML } from '../../app/format.js';
-import { renderCarousel, activateCarousel } from '../../components/CardCarousel.js';
 import { walletStackCategoryDeckHTML } from '../../components/WalletStackCategoryDeck.js';
 import { renderActivityRow } from '../../components/ActivityRow.js';
 import { icon } from '../../components/Icons.js';
 import { pushRoute } from '../../app/router.js';
-import { maskAssetIdentifier } from '../../domain/assetFinancialModel.js';
-
-const EW_COPY = { totalLabel: 'eWallet 总余额', listTitle: '全部钱包', recentTitle: '最近记录' };
 
 export function transactionTouchesAccount(transaction, accountId) {
   return Boolean(accountId) && [transaction.accountId, transaction.sourceAccountId, transaction.destinationAccountId].includes(accountId);
@@ -29,6 +25,14 @@ export function selectedSavingsFlow(activities, accountId) {
     if (transaction.kind === 'expense' && transaction.sourceAccountId === accountId) flow.outflow += transaction.amount;
     if (transaction.kind === 'transfer' && transaction.destinationAccountId === accountId) flow.inflow += transaction.amount;
     if (transaction.kind === 'transfer' && transaction.sourceAccountId === accountId) flow.outflow += transaction.amount;
+    return flow;
+  }, { inflow: 0, outflow: 0 });
+}
+
+export function selectedCashAccountFlow(activities, accountId) {
+  return activities.filter((transaction) => transaction.accountEffect === 'posted').reduce((flow, transaction) => {
+    if ((transaction.kind === 'income' || transaction.kind === 'transfer') && transaction.destinationAccountId === accountId) flow.inflow += transaction.amount;
+    if ((transaction.kind === 'expense' || transaction.kind === 'transfer') && transaction.sourceAccountId === accountId) flow.outflow += transaction.amount;
     return flow;
   }, { inflow: 0, outflow: 0 });
 }
@@ -55,8 +59,13 @@ function canonicalAvailableCreditForAccount(account) {
 
 function categoryStatsHTML(type, list, activities) {
   const copy = ASSET_CATEGORY_COPY[type];
-  if (type === 'saving') {
-    const flow = data.getSavingsFlow();
+  if (type === 'saving' || type === 'ew') {
+    const flow = type === 'saving'
+      ? data.getSavingsFlow()
+      : list.reduce((total, account) => {
+        const accountFlow = selectedCashAccountFlow(activities, account.id);
+        return { inflow: total.inflow + accountFlow.inflow, outflow: total.outflow + accountFlow.outflow };
+      }, { inflow: 0, outflow: 0 });
     return [
       [copy.countLabel, String(list.length), ''],
       [copy.inflowLabel, `+${fmtRM(flow.inflow, { privacy: ui.privacy })}`, 'amt-pos'],
@@ -75,8 +84,8 @@ function selectedSummaryHTML(type, selected, list, activities) {
   const copy = ASSET_CATEGORY_COPY[type];
   const records = selectedAccountRecords(activities, selected.id);
   const recent = records[0];
-  if (type === 'saving') {
-    const flow = selectedSavingsFlow(activities, selected.id);
+  if (type === 'saving' || type === 'ew') {
+    const flow = selectedCashAccountFlow(activities, selected.id);
     const lastChange = recent ? `${fmtDateMY(recent.date)} · ${fmtTimeAMPM(recent.time)}` : '—';
     return `<section class="section surface wallet-selected-summary" data-summary-account-id="${escapeHTML(selected.id)}">
       <div class="wallet-selected-heading"><span class="caption">${copy.currentLabel}</span><strong>${escapeHTML(selected.name)}</strong></div>
@@ -98,7 +107,7 @@ function selectedSummaryHTML(type, selected, list, activities) {
     <div class="wallet-selected-grid">
       <span>${copy.balanceLabel}<strong class="num amt-neg">${fmtRM(selected.totalCardDebt, { privacy: ui.privacy })}</strong></span>
       <span>${copy.dueLabel}<strong class="num amt-neg">${fmtRM(monthlyDue, { privacy: ui.privacy })}</strong></span>
-      <span>${copy.dueDateLabel}<strong class="num">${selected.dueDate ? fmtDateMY(selected.dueDate) : '暂无到期日'}</strong></span>
+      <span>本期还款日<strong class="num">${selected.dueDate ? fmtDateMY(selected.dueDate) : '暂无本期还款日'}</strong></span>
       <span>${copy.availableLabel}<strong class="num${available < 0 ? ' amt-neg' : ''}">${fmtRM(available, { privacy: ui.privacy })}</strong></span>
     </div>
     <button type="button" class="wallet-detail-cta" data-action="assets-open-detail" data-acc="${escapeHTML(selected.id)}">${copy.detailPrefix}${escapeHTML(selected.name)}${copy.detailSuffix} ${icon('chevronRight', 14)}</button>
@@ -134,40 +143,18 @@ function renderWalletCategory(container, type, list) {
     ${recentHTML(type, selected, copy.recentTitle, activities)}`;
 }
 
-function allRowsHTML(list) {
-  return `<section class="section"><h2 class="sec-title">${EW_COPY.listTitle} (${list.length})</h2><div class="surface"><ul>${list.map((account) => `<li class="row" data-action="assets-open-detail" data-acc="${account.id}"><span class="acc-chip" style="--brand:${account.brandColor}">${escapeHTML(account.name[0])}</span><div class="row-main"><div class="row-title">${escapeHTML(account.name)}</div><div class="caption num">${escapeHTML(maskAssetIdentifier(account.walletIdentifier) || account.bank)}</div></div><span class="num row-amt">${fmtRM(account.balance, { privacy: ui.privacy })}</span>${icon('chevronRight', 15)}</li>`).join('')}</ul></div></section>`;
-}
-
-function renderEWalletCategory(container, list) {
-  const requestedId = ui.selectedAccountId.ew;
-  const index = Math.max(0, list.findIndex((account) => account.id === requestedId));
-  const selected = list[index];
-  if (selected) ui.selectedAccountId.ew = selected.id;
-  const total = list.reduce((sum, account) => sum + account.balance, 0);
-  container.innerHTML = `<section class="section cat-summary"><div class="caption">${EW_COPY.totalLabel}</div><div class="num cat-total assets-net-primary">${fmtRM(total, { privacy: ui.privacy })}</div><div class="cat-stats"><div class="cat-stat"><span class="caption">钱包数量</span><span class="num">${list.length}</span></div></div></section>${renderCarousel(list, index, { selectAction: 'category-card-tap' })}${recentHTML('ew', selected, EW_COPY.recentTitle, data.getActivities())}${allRowsHTML(list)}`;
-}
-
 export function renderCategoryPage(container, type) {
   const list = data.getAccountsByType(type);
-  if (type === 'saving' || type === 'cc') renderWalletCategory(container, type, list);
-  else renderEWalletCategory(container, list);
+  renderWalletCategory(container, type, list);
 }
 
-export function activateCategoryPage(container, type) {
-  if (type === 'saving' || type === 'cc') return;
-  const list = data.getAccountsByType(type);
-  const index = Math.max(0, list.findIndex((account) => account.id === ui.selectedAccountId[type]));
-  activateCarousel(container, index, (next) => {
-    ui.categoryIndex[type] = next;
-    update({ selectedAccountId: { ...ui.selectedAccountId, [type]: list[next]?.id || null } });
-  });
-}
+export function activateCategoryPage() {}
 
 export function registerCategoryActions() {
   registerAction('wallet-stack-account', (el, event) => {
     const type = ui.assetsView.type;
     const accountId = el.dataset.acc;
-    if (ui.assetsView.name !== 'category' || !['saving', 'cc'].includes(type)) return;
+    if (ui.assetsView.name !== 'category' || !['saving', 'cc', 'ew'].includes(type)) return;
     if (accountId !== ui.selectedAccountId[type]) {
       const list = data.getAccountsByType(type);
       ui.categoryIndex[type] = list.findIndex((account) => account.id === accountId);

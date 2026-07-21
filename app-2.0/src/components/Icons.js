@@ -38,6 +38,8 @@ export const icons = {
   pin: P('<path d="M9 4h6l-1 7 3 2v2H7v-2l3-2-1-7z"/><path d="M12 15v6"/>'),
   radar: P('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4.5"/><path d="M12 12l6-6"/>'),
   wallet: P('<path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7z"/><path d="M16 12h4v4h-4a2 2 0 0 1 0-4z"/>'),
+  bank: P('<path d="M3 9h18L12 3 3 9z"/><path d="M5 9v9M9 9v9M15 9v9M19 9v9M3 21h18M3 18h18"/>'),
+  creditCard: P('<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 10h18M7 15h4"/>'),
   phone: P('<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M10 5h4M11 18.5h2"/>'),
   // category icons
   food: P('<path d="M5 3v9M8 3v9M6.5 12v9M5 3c0 3 3 3 3 0"/><path d="M17 3c-2 0-3 2.5-3 5 0 2 1 3 2 3v10M17 3c2 0 2 3 2 5"/>'),

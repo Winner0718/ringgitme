@@ -8,11 +8,11 @@ import { fmtRM, fmtTimeAMPM, escapeHTML } from '../app/format.js';
 import { ui, data } from '../app/state.js';
 import { icon } from './Icons.js';
 
-const KIND_ICON = { expense: null, income: 'arrowDown', transfer: 'transfer' };
+const KIND_ICON = { expense: null, income: 'arrowDown', transfer: 'transfer', cashback: 'refund' };
 
 export function renderActivityRow(t) {
-  const amtCls = t.kind === 'income' ? 'amt-pos' : t.kind === 'transfer' ? 'amt-muted' : '';
-  const sign = t.kind === 'income' ? '+' : t.kind === 'expense' ? '−' : '';
+  const amtCls = ['income', 'cashback'].includes(t.kind) ? 'amt-pos' : t.kind === 'transfer' ? 'amt-muted' : '';
+  const sign = ['income', 'cashback'].includes(t.kind) ? '+' : t.kind === 'expense' ? '−' : '';
   const category = data.getCategory(t.catId);
   const catIcon = KIND_ICON[t.kind] || category?.icon || catIconName(t.catId);
   const attachmentCount = t.attachmentCount ?? (t.attachment || t.receipt || t.photo ? 1 : 0);

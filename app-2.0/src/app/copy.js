@@ -109,6 +109,18 @@ export const ASSET_CATEGORY_COPY = Object.freeze({
     detailPrefix: '查看',
     detailSuffix: '详情',
   },
+  ew: {
+    totalLabel: 'eWallet 总余额',
+    countLabel: '钱包数量',
+    inflowLabel: '本月流入',
+    outflowLabel: '本月流出',
+    currentLabel: '当前钱包',
+    balanceLabel: '钱包余额',
+    recentChangeLabel: '最近变动',
+    recentTitle: '最近记录',
+    detailPrefix: '查看',
+    detailSuffix: '详情',
+  },
   action: {
     viewAll: '查看全部',
     clearAccountFilter: '清除账户筛选',

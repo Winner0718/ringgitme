@@ -137,17 +137,17 @@
   border: 0;
   border-radius: 18px 18px 12px 12px;
   color: #fff;
-  background: color-mix(in srgb, var(--account-brand) 88%, #101613);
+  background: linear-gradient(115deg, var(--account-brand), var(--account-brand-secondary, color-mix(in srgb, var(--account-brand) 88%, #101613)));
   box-shadow: 0 8px 18px rgba(13,22,18,.14), inset 0 1px 0 rgba(255,255,255,.18);
 }
 .asset-stack-row:first-child { margin-top: 0; }
 .asset-stack-row:last-child { border-radius: 18px; }
 .asset-stack-row .asset-brand-tile { border-radius: 50%; background: #fff; box-shadow: 0 1px 0 rgba(255,255,255,.35); }
-.asset-stack-row .asset-account-copy strong { color: #fff; font-size: 13px; }
-.asset-stack-row .asset-account-copy small { color: rgba(255,255,255,.74); }
+.asset-stack-row .asset-account-copy strong { color: var(--account-brand-text, #fff); font-size: 13px; }
+.asset-stack-row .asset-account-copy small { color: var(--account-brand-muted, rgba(255,255,255,.74)); }
 .asset-stack-row .asset-account-amount,
-.asset-stack-row .asset-account-amount.debt { color: #fff; font-size: 13px; }
-.asset-stack-row > .icon { color: rgba(255,255,255,.9); }
+.asset-stack-row .asset-account-amount.debt { color: var(--account-brand-text, #fff); font-size: 13px; }
+.asset-stack-row > .icon { color: var(--account-brand-text, rgba(255,255,255,.9)); }
 .asset-stack-row:active { filter: brightness(.96); }
 .asset-brand-tile {
   position: relative;
@@ -231,6 +231,14 @@
 .account-identity-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .account-identity-copy small { color: var(--text-2); font-size: 10px; }
 .account-identity-status { flex: 0 0 auto; padding: 5px 8px; border-radius: var(--r-pill); color: var(--accent); background: var(--accent-soft); font-size: 10px; font-weight: 750; white-space: nowrap; }
+.account-identity-bar.is-custom-card-companion {
+  color: var(--account-brand-text, #fff);
+  background: linear-gradient(118deg, var(--account-brand), var(--account-brand-secondary));
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--account-brand-text) 24%, transparent), 0 8px 18px rgba(15, 23, 42, .12);
+}
+.account-identity-bar.is-custom-card-companion .account-identity-copy strong { color: var(--account-brand-text, #fff); }
+.account-identity-bar.is-custom-card-companion .account-identity-copy small { color: var(--account-brand-muted, rgba(255,255,255,.72)); }
+.account-identity-bar.is-custom-card-companion .account-identity-status { color: var(--account-brand-text, #fff); background: color-mix(in srgb, var(--account-brand-text) 13%, transparent); }
 .motion-balance-hero > .account-visual-confirmation { width: 90%; margin: 0 auto; border-radius: 22px; box-shadow: 0 14px 34px rgba(0,0,0,.16); }
 .motion-balance-copy { width: 90%; margin: 0 auto; border-radius: 0 0 22px 22px; box-shadow: var(--shadow-1); }
 .account-wallet-logo { position: relative; }

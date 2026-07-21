@@ -10,16 +10,14 @@ export function immutableConfirmationSnapshot(snapshot) {
 
 export function accountConfirmationSnapshot(account) {
   if (!account) return null;
-  return {
-    id: account.id,
-    type: account.type,
-    name: account.name,
-    short: account.short,
-    bank: account.bank,
-    last4: account.last4,
-    brandColor: account.brandColor,
-    art: account.art || null,
-    balance: account.balance,
-    outstanding: account.outstanding,
-  };
+  const fields = [
+    'id', 'type', 'accountKind', 'name', 'displayName', 'short', 'bank', 'institution',
+    'institutionLocalizedName', 'brandId', 'catalogInstitutionId', 'customBrandName',
+    'last4', 'debitCardLast4', 'creditCardLast4', 'bankAccountNumber', 'walletIdentifier',
+    'network', 'networkId', 'tier', 'customTierLabel', 'brandColor', 'art', 'cardPalette',
+    'accountVisualOverride', 'customLogo', 'customCardImage', 'logoPresentationMode',
+    'resolvedLogoPresentation', 'balance', 'balanceMinor', 'outstanding',
+    'currentOutstandingMinor', 'totalCardDebt', 'totalCardDebtMinor',
+  ];
+  return Object.fromEntries(fields.filter((field) => account[field] !== undefined).map((field) => [field, structuredClone(account[field])]));
 }

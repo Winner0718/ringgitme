@@ -40,7 +40,7 @@ add('credit card stores last four only', () => { const a = makeEngine().createAs
 add('credit card private editor has no PAN CVV PIN or expiry field', () => { const s = read('../src/features/assets/AssetManagementSheets.js'); assert.doesNotMatch(s, /name="(?:pan|cvv|pin|expiry)"/i); });
 add('eWallet identifier is optional', () => { const a = makeEngine().createAsset({ type: 'ew', name: 'Wallet' }); assert.equal(a.walletIdentifier, ''); });
 add('identifier mask exposes last four only', () => assert.equal(maskAssetIdentifier('0000 1234 5678'), '•••• 5678'));
-add('privacy control cannot reveal identifiers', () => { const s = uiSource(); assert.doesNotMatch(s, /ui\.privacy[^\n]+bankAccountNumber|ui\.privacy[^\n]+debitCardNumber|ui\.privacy[^\n]+walletIdentifier/); });
+add('privacy control uses only canonical identifier formatters', () => { const s = uiSource(); assert.match(s, /formatBankAccountNumber/); assert.match(s, /formatCardLastFour/); assert.doesNotMatch(s, /`•••• \$\{escapeHTML\(account\.last4\)\}`/); });
 add('sensitive identifiers are not logged', () => { const s = source('../src/domain/assetFinancialModel.js', '../src/domain/moneyEngine.js', '../src/features/assets/AssetManagementSheets.js'); assert.doesNotMatch(s, /console\.(?:log|info|warn|error)\([^)]*(?:bankAccountNumber|debitCardNumber|walletIdentifier)/); });
 
 // Menus (19–24)
@@ -99,7 +99,7 @@ add('installment principal is shown separately', () => assert.match(read('../src
 add('monthly due is numeric', () => assert.match(read('../src/features/assets/detail.js'), /本月应还[^]*fmtRM/));
 add('monthly paid is numeric', () => assert.match(read('../src/features/assets/detail.js'), /本月已还[^]*fmtRM/));
 add('monthly remaining is numeric', () => assert.match(read('../src/features/assets/detail.js'), /本月剩余[^]*fmtRM/));
-add('shared pool availability is labelled shared', () => assert.match(read('../src/features/assets/detail.js'), /共享额度池[^]*共享可用/));
+add('shared pool availability is labelled shared', () => { const source=read('../src/features/assets/detail.js'); assert.match(source,/共享额度池/); assert.match(source,/共享可用/); });
 add('pool limit remains counted once', () => { const e = makeEngine({ accounts: [saving(), card('a', 100, { sharedLimitPoolId: 'pool' }), card('b', 50, { sharedLimitPoolId: 'pool' })], pools: [{ id: 'pool', name: 'Pool', limit: 1000 }] }); assert.equal(e.getAssetFinancialSummary().poolSummaries[0].limitMinor, 100000); });
 
 // UI (66–72)

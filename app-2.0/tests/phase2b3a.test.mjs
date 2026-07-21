@@ -64,13 +64,18 @@ const cases = [
   ['11', 'all approved card-art files exist', () => ['maybank-visa-platinum.png','maybank-islamic-petronas-ikhwan-visa-platinum.png','maybank-global-access-mastercard-world.png','maybank-amex-platinum.png','maybank-fc-barcelona-visa-signature.png'].forEach((name) => assert.equal(exists(`../public/assets/cards/${name}`), true))],
   ['12', 'fixture card paths are base-relative', () => assert.equal(/art:\s*['"]\/assets\//.test(sources.demo), false)],
   ['13', 'source contains no localhost asset URL', () => Object.values(sources).forEach((source) => assert.equal(/https?:\/\/(?:localhost|127\.0\.0\.1).*assets/.test(source), false))],
-  ['14', 'failed card art has a full-card fallback', () => assert.match(renderCardFace({ id: 'x', name: 'Card', bank: 'Bank', type: 'saving', balance: 100, art: 'assets/cards/missing.png', last4: '1234' }), /deck-image-fallback/)],
+  ['14', 'failed legacy card art resolves to the automatic system-card fallback', () => {
+    const html = renderCardFace({ id: 'x', name: 'Card', bank: 'Bank', type: 'saving', balance: 100, art: 'assets/cards/missing.png', last4: '1234' });
+    assert.match(html, /data-card-renderer="ringgitme-auto-card"/);
+    assert.match(html, /data-asset-visual-status="neutral_system_fallback"/);
+    assert.doesNotMatch(html, /assets\/cards\/missing\.png/);
+  }],
   ['15', 'card image errors suppress the browser broken icon', () => assert.match(sources.accountVisual, /image-failed[\s\S]*naturalWidth === 0/)],
   ['16', 'eWallet brand registry contains every required brand', () => ['boost','tng','grabpay','bigpay'].forEach((id) => assert.equal(getBrand(id)?.type, 'ewallet'))],
 
   ['17', 'eWallet layout uses a logo-left copy-right grid', () => assert.match(sources.css, /grid-template-columns: 46px minmax\(0, 1fr\)/)],
   ['18', 'Touch n Go resolves through long-name aliases', () => assert.equal(resolveAccountBrand({ name: "Touch 'n Go" })?.id, 'tng')],
-  ['19', 'eWallet amounts use the shared two-decimal formatter', () => assert.match(sources.accountVisual, /fmtRM\(Math\.abs\(amount\), \{ privacy: ui\.privacy \}\)/)],
+  ['19', 'eWallet amounts use the canonical two-decimal card formatter', () => { const html=renderCardFace({id:'ew',type:'ew',name:'Wallet',bank:'Wallet',balance:12.3}); assert.match(html,/RM 12\.30/); }],
   ['20', 'eWallet tiles have mobile-safe bounded width', () => assert.match(sources.css, /width: clamp\(158px, 44vw, 190px\)/)],
 
   ['21', 'Capture starts with its keypad ready', () => assert.match(sources.capture, /keypadOpen: true/)],
@@ -155,7 +160,7 @@ const cases = [
   ['93', 'avatar resolver falls back to initials', () => assert.deepEqual(resolveParticipantAvatar({ displayName: 'Mei Ling' }), { kind: 'initials', source: 'fallback', initials: 'ME' })],
   ['94', 'avatar resolver never performs a network request', () => assert.equal(/fetch\s*\(|XMLHttpRequest|WebSocket/.test(sources.avatar), false)],
 
-  ['95', 'credit-card debt presentation has no redundant minus', () => assert.match(sources.accountVisual, /fmtRM\(Math\.abs\(amount\)/)],
+  ['95', 'credit-card debt presentation has no redundant minus', () => { const html=renderCardFace({id:'cc',type:'cc',name:'Card',bank:'Bank',outstanding:12.3,limit:100}); assert.match(html,/RM 12\.30/); assert.doesNotMatch(html,/−RM|--RM/); }],
   ['96', 'app content reserves bottom-navigation safe area', () => assert.match(sources.css, /padding-bottom: calc\(var\(--safe-bottom\) \+ 120px\)/)],
   ['97', 'sticky header uses a lightweight transparent blur', () => assert.match(sources.css, /topbar\.scrolled[\s\S]*76%[\s\S]*blur\(15px\)/)],
   ['98', 'nested sheets use explicit modal suspension styling', () => assert.match(sources.css, /modal-suspended/)],

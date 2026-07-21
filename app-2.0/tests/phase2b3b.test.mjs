@@ -46,14 +46,14 @@ add('G', 'post-scroll click suppression has a finite window', () => assert.match
 add('A', 'stable selected account IDs live in UI state', () => assert.match(source.state, /selectedAccountId/));
 add('A', 'selection is separate by account type', () => assert.match(source.state, /saving: null, cc: null, ew: null/));
 add('A', 'category derives index from selected stable ID', () => assert.match(source.category, /findIndex\(\(account\) => account\.id === selectedId\)/));
-add('A', 'category swipe writes the stable ID', () => assert.match(source.category, /\[type\]: list\[next\]\?\.id/));
+add('A', 'category stack selection writes the stable ID', () => assert.match(source.category, /\[type\]: el\.dataset\.acc/));
 add('A', 'category card tap writes the stable ID', () => assert.match(source.category, /\[type\]: el\.dataset\.acc/));
 add('A', 'detail swipe writes the selected stable ID', () => assert.match(source.detail, /selectedAccountId: \{ \.\.\.ui\.selectedAccountId/));
 add('A', 'detail swipe keeps card and detail account together', () => assert.match(source.detail, /assetsView: \{ \.\.\.ui\.assetsView, accountId: target\.id \}/));
 add('A', 'overview navigation seeds selected account identity', () => assert.match(source.assets, /\[acc\.type\]: acc\.id/));
 add('A', 'detail recent rows include every stable account role', () => assert.match(source.detail, /\[t\.accountId, t\.sourceAccountId, t\.destinationAccountId\]\.includes\(acc\.id\)/));
 add('A', 'category recent rows filter by displayed card', () => assert.match(source.category, /t\.accountId === selected\.id/));
-add('A', 'category summary card uses actual selected account object', () => assert.match(source.category, /const selected = list\[index\]/));
+add('A', 'category summary card uses actual selected account object', () => assert.match(source.category, /const selected = list\.find\(\(account\) => account\.id === requestedId\) \|\| list\[0\]/));
 add('A', 'detail card list stays same-type only', () => assert.match(source.detail, /getAccountsByType\(acc\.type\)/));
 add('A', 'credit-card list remains type-isolated', () => assert.equal(createDemoDataSource().getAccountsByType('cc').every((a) => a.type === 'cc'), true));
 add('A', 'savings list remains type-isolated', () => assert.equal(createDemoDataSource().getAccountsByType('saving').every((a) => a.type === 'saving'), true));

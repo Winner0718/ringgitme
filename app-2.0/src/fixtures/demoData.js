@@ -408,25 +408,28 @@ export function createDemoDataSource({ recurringPostingFaultInjector = null } = 
       card_refund: [operation.metadata?.description || '信用卡退款', '信用卡退款'],
       card_linked_refund: ['原消费退款', '信用卡退款'],
       card_general_credit: ['一般卡片退款', '信用卡退款'],
+      card_cashback: [operation.metadata?.source || 'Cashback 抵扣', '信用卡 Cashback'],
     };
     const [desc, catLabel] = labels[operation.type] || ['账户操作', '账户操作'];
     const cardId = operation.metadata?.cardId || null;
     const accountId = operation.metadata?.accountId || cardId;
-    const sourceAccountId = operation.type === 'card_payment' ? operation.metadata?.sourceAccountId : ['card_fee', 'card_installment_purchase'].includes(operation.type) ? cardId : null;
+    const sourceAccountId = operation.type === 'card_payment' ? operation.metadata?.sourceAccountId : ['card_fee', 'card_installment_purchase', 'card_cashback'].includes(operation.type) ? cardId : null;
     const destinationAccountId = operation.type === 'card_payment' ? cardId : operation.type === 'card_refund' ? cardId : null;
     const signedMinor = operation.metadata?.deltaMinor ?? operation.metadata?.amountMinor
       ?? operation.result?.amountMinor ?? operation.result?.deltaMinor ?? 0;
-    const occurredAt = operation.createdAt || `${FIXTURE_TODAY}T09:00:00+08:00`;
+    const occurredAt = operation.metadata?.date
+      ? `${operation.metadata.date}T${operation.metadata.time || '12:00'}:00+08:00`
+      : operation.createdAt || `${FIXTURE_TODAY}T09:00:00+08:00`;
     return {
       id: operation.id,
       assetOperation: true,
       assetOperationType: operation.type,
-      kind: ['card_fee', 'card_installment_purchase'].includes(operation.type) ? 'expense' : 'transfer',
+      kind: operation.type === 'card_cashback' ? 'cashback' : ['card_fee', 'card_installment_purchase'].includes(operation.type) ? 'expense' : 'transfer',
       desc,
       catId: null,
       catLabel,
       category: catLabel,
-      categoryThemeToken: operation.type === 'card_refund' ? 'mint' : 'slate',
+      categoryThemeToken: ['card_refund', 'card_cashback'].includes(operation.type) ? 'mint' : 'slate',
       accountId,
       sourceAccountId,
       destinationAccountId,
@@ -633,6 +636,8 @@ export function createDemoDataSource({ recurringPostingFaultInjector = null } = 
     recordCardRefund: (command) => engine.recordCardRefund(command),
     recordLinkedCardRefund: (command) => engine.recordLinkedCardRefund(command),
     recordGeneralCardCredit: (command) => engine.recordGeneralCardCredit(command),
+    recordCardCashback: (command) => engine.recordCardCashback(command),
+    getCardCashbackSummary: (cardId, monthKey) => engine.getCardCashbackSummary(cardId, monthKey),
     reverseAssetOperation: (id, options) => engine.reverseAssetOperation(id, options),
     getInvestments: () => investments,
     getFixedDeposits: () => fixedDeposits,
